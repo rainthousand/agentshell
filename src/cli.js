@@ -8,7 +8,7 @@ import { undo } from "./commands/undo.js";
 import { history } from "./commands/history.js";
 import { manual } from "./commands/manual.js";
 import { getLog } from "./commands/log.js";
-import { metrics } from "./commands/metrics.js";
+import { exportMetrics, metrics, resetMetrics } from "./commands/metrics.js";
 import { benchmark } from "./commands/benchmark.js";
 import { schema } from "./commands/schema.js";
 import { diagnose } from "./commands/diagnose.js";
@@ -19,7 +19,7 @@ import { start } from "./commands/start.js";
 import { pluginStatus } from "./commands/plugin-status.js";
 import { parsePluginValidateOptions, pluginValidate } from "./commands/plugin-validate.js";
 import { exportTrial } from "./commands/trial-export.js";
-import { startDashboard } from "./commands/dashboard.js";
+import { dashboardStatus, startDashboard, stopDashboard } from "./commands/dashboard.js";
 import { fail, printJson } from "./core/output.js";
 import { appendEvent, appendRunCommandStats } from "./core/store.js";
 
@@ -41,7 +41,7 @@ async function main() {
         "agentshell plugin status [--compact] [--home <home>] [--marketplace <path>] [--cache-root <path>]",
         "agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]",
         "agentshell trial export [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]",
-        "agentshell dashboard [--port N] [--window|--browser] [--no-open]",
+        "agentshell dashboard [--port N] [--window|--browser] [--no-open|--status|--stop]",
         "agentshell understand [--compact]",
         "agentshell find <query>",
         "agentshell read <file> --lines A:B",
@@ -53,7 +53,9 @@ async function main() {
         "agentshell undo [operationId]",
         "agentshell history",
         "agentshell log get <logRef> --tail N",
-        "agentshell metrics [--compact] [--limit N]",
+        "agentshell metrics [--compact] [--limit N] [--since 24h|7d|all]",
+        "agentshell metrics export --out <file> [--since 24h|7d|all]",
+        "agentshell metrics reset --confirm",
         "agentshell benchmark test",
         "agentshell diagnose test [--compact] [--profile]",
         "agentshell fix test [--fast|--safe|--dry-run] [--compact] [--profile]",
@@ -142,9 +144,18 @@ async function main() {
       process.exitCode = 2;
       return;
     }
+    if (options.value.action === "status") {
+      emit(await dashboardStatus());
+      return;
+    }
+    if (options.value.action === "stop") {
+      emit(await stopDashboard());
+      return;
+    }
     const session = await startDashboard(process.cwd(), options.value);
     emit(session.report);
-    const close = () => session.server.close(() => process.exit(0));
+    if (session.reused || !session.server) return;
+    const close = () => session.close().finally(() => process.exit(0));
     process.once("SIGINT", close);
     process.once("SIGTERM", close);
     return;
@@ -280,10 +291,33 @@ async function main() {
   }
 
   if (command === "metrics") {
+    if (args[1] === "reset") {
+      const result = args.includes("--confirm")
+        ? resetMetrics(process.cwd())
+        : fail("CONFIRMATION_REQUIRED", "Use `agentshell metrics reset --confirm`");
+      emit(result);
+      process.exitCode = result.ok ? 0 : 2;
+      return;
+    }
+    if (args[1] === "export") {
+      const outFlag = args.indexOf("--out");
+      const out = outFlag >= 0 ? args[outFlag + 1] : undefined;
+      const sinceFlag = args.indexOf("--since");
+      const since = sinceFlag >= 0 ? args[sinceFlag + 1] : undefined;
+      const result = out
+        ? await exportMetrics(process.cwd(), out, { since })
+        : fail("INVALID_ARGUMENT", "Usage: agentshell metrics export --out <file> [--since 24h|7d|all]");
+      emit(result);
+      process.exitCode = result.ok ? 0 : 2;
+      return;
+    }
     const limitFlag = args.indexOf("--limit");
     const limit = limitFlag >= 0 ? args[limitFlag + 1] : undefined;
+    const sinceFlag = args.indexOf("--since");
+    const since = sinceFlag >= 0 ? args[sinceFlag + 1] : undefined;
     emit(await metrics(process.cwd(), {
       limit,
+      since,
       compact: args.includes("--compact")
     }));
     return;
@@ -353,6 +387,8 @@ function emit(result) {
       estimatedTokens: Math.ceil(outputChars / 4),
       durationMs: Number(process.hrtime.bigint() - commandStartedAt) / 1e6
     };
+    const operationIds = operationIdsFor(result);
+    if (operationIds.length > 0) event.operationIds = operationIds;
     appendEvent(process.cwd(), event);
     if (result.runId && command !== "run") {
       appendRunCommandStats(process.cwd(), result.runId, event);
@@ -360,6 +396,17 @@ function emit(result) {
   } catch {
     // Telemetry must never break the command the agent actually asked for.
   }
+}
+
+function operationIdsFor(result) {
+  return [...new Set([
+    result?.operationId,
+    result?.verification?.operationId,
+    result?.finalVerification?.operationId,
+    result?.diagnosis?.verification?.operationId,
+    result?.relatedTestFileVerification?.operationId,
+    result?.verification?.relatedTestFileVerification?.operationId
+  ].filter((value) => typeof value === "string" && value))];
 }
 
 function parseFixPolicy(args) {
@@ -479,6 +526,13 @@ function parseDashboardOptions(argv) {
       options.open = false;
       continue;
     }
+    if (arg === "--status" || arg === "--stop") {
+      const action = arg.slice(2);
+      if (options.action && options.action !== action) return fail("INVALID_ARGUMENT", "Choose either --status or --stop");
+      options.action = action;
+      options.open = false;
+      continue;
+    }
     if (arg === "--window" || arg === "--browser") {
       const surface = arg.slice(2);
       if (options.surface && options.surface !== surface) {
@@ -506,5 +560,8 @@ function parseDashboardOptions(argv) {
     return fail("INVALID_ARGUMENT", "--port must be an integer from 0 to 65535");
   }
   options.port = port;
+  if (options.action && (options.surface || options.port !== undefined)) {
+    return fail("INVALID_ARGUMENT", "--status/--stop cannot be combined with surface or port options");
+  }
   return { ok: true, value: options };
 }

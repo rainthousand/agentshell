@@ -4,8 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { startDashboard } from "../src/commands/dashboard.js";
-import { metrics } from "../src/commands/metrics.js";
+import { dashboardStatus, startDashboard } from "../src/commands/dashboard.js";
+import { exportMetrics, metrics, resetMetrics } from "../src/commands/metrics.js";
 
 test("metrics v2 separates measured, estimated, and unavailable values", async () => {
   const root = fixtureWorkspace();
@@ -16,6 +16,8 @@ test("metrics v2 separates measured, estimated, and unavailable values", async (
   assert.ok(report.measurement.measured.includes("commandExecutionMs"));
   assert.ok(report.measurement.estimated.includes("contextAvoidedTokens"));
   assert.ok(report.measurement.unavailable.includes("codexModelTokens"));
+  assert.equal(report.measurement.attribution.exactEvents, 1);
+  assert.equal(report.measurement.attribution.legacyEvents, 0);
   assert.equal(report.dashboard.workspace.name, "dashboard-fixture");
   assert.equal(report.dashboard.health, "ready");
   assert.equal(report.dashboard.totals.tasks, 1);
@@ -31,13 +33,54 @@ test("metrics v2 separates measured, estimated, and unavailable values", async (
   assert.equal(report.dashboard.latestTask.verificationOk, true);
 });
 
+test("metrics reset preserves history while starting a fresh measurement window", async () => {
+  const root = fixtureWorkspace();
+  const before = await metrics(root, { compact: true });
+  assert.equal(before.dashboard.totals.estimatedContextAvoidedTokens, 900);
+  const exported = await exportMetrics(root, "evidence/metrics.json");
+  assert.equal(exported.ok, true);
+  assert.equal(fs.existsSync(exported.output), true);
+
+  const reset = resetMetrics(root);
+  assert.equal(reset.preservedHistory, true);
+  const after = await metrics(root, { compact: true });
+  assert.equal(after.dashboard.totals.operations, 0);
+  assert.equal(after.dashboard.totals.toolCalls, 0);
+  assert.equal(after.dashboard.totals.estimatedContextAvoidedTokens, null);
+  assert.equal(fs.existsSync(path.join(root, ".agentshell", "history.jsonl")), true);
+});
+
+test("time saved counts verified cache hits, not ordinary runtime variance", async () => {
+  const root = fixtureWorkspace();
+  fs.appendFileSync(path.join(root, ".agentshell", "history.jsonl"), `${JSON.stringify({
+    id: "op_cached",
+    type: "verify",
+    ok: false,
+    cacheHit: true,
+    cacheKey: "fixture-key",
+    durationMs: 0,
+    rawOutputChars: 4000,
+    createdAt: new Date().toISOString()
+  })}\n`);
+  const historyFile = path.join(root, ".agentshell", "history.jsonl");
+  const first = JSON.parse(fs.readFileSync(historyFile, "utf8").split("\n")[0]);
+  first.cacheKey = "fixture-key";
+  first.cacheHit = false;
+  first.durationMs = 350;
+  const rest = fs.readFileSync(historyFile, "utf8").split("\n").slice(1).filter(Boolean);
+  fs.writeFileSync(historyFile, `${[JSON.stringify(first), ...rest].join("\n")}\n`);
+  const report = await metrics(root, { compact: true });
+  assert.equal(report.dashboard.totals.estimatedTimeSavedMs, 350);
+});
+
 test("dashboard serves local read-only UI and metrics with security headers", async () => {
   const root = fixtureWorkspace();
-  const session = await startDashboard(root, { port: 0, open: false });
+  const session = await startDashboard(root, { port: 0, open: false, singleton: false });
   try {
     assert.equal(session.report.protocolVersion, "agentshell.dashboard.v1");
     assert.match(session.report.url, /^http:\/\/127\.0\.0\.1:\d+\/$/);
     assert.equal(session.report.readOnly, true);
+    assert.equal(session.report.reused, false);
     assert.equal(session.report.surface, "none");
     assert.equal(typeof session.report.nativeAppAvailable, "boolean");
     assert.equal(session.report.privacy.networkUpload, false);
@@ -59,8 +102,28 @@ test("dashboard serves local read-only UI and metrics with security headers", as
     const denied = await fetch(new URL("/api/metrics", session.report.url), { method: "POST" });
     assert.equal(denied.status, 405);
   } finally {
-    await new Promise((resolve) => session.server.close(resolve));
+    await session.close();
   }
+});
+
+test("dashboard reuses one healthy user-level server", async () => {
+  const root = fixtureWorkspace();
+  const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-dashboard-runtime-"));
+  const first = await startDashboard(root, { port: 0, open: false, runtimeDir, monitorParent: false });
+  try {
+    const second = await startDashboard(root, { port: 0, open: false, runtimeDir, monitorParent: false });
+    assert.equal(second.server, null);
+    assert.equal(second.report.reused, true);
+    assert.equal(second.report.pid, process.pid);
+    assert.equal(second.report.url, first.report.url);
+    const status = await dashboardStatus({ runtimeDir });
+    assert.equal(status.running, true);
+    assert.equal(status.state.port, first.report.port);
+  } finally {
+    await first.close();
+  }
+  assert.equal(fs.existsSync(path.join(runtimeDir, "dashboard.lock")), false);
+  assert.equal(fs.existsSync(path.join(runtimeDir, "dashboard.json")), false);
 });
 
 function fixtureWorkspace() {
@@ -76,9 +139,11 @@ function fixtureWorkspace() {
     outputChars: 400,
     estimatedTokens: 100,
     durationMs: 350,
+    operationIds: ["op_dashboard"],
     createdAt: new Date(now - 500).toISOString()
   })}\n`);
   fs.writeFileSync(path.join(state, "history.jsonl"), `${JSON.stringify({
+    id: "op_dashboard",
     type: "verify",
     ok: true,
     rawOutputChars: 4000,

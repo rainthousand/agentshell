@@ -50,6 +50,13 @@
     "plugin:install-local": "node scripts/install-codex-plugin.js",
     "plugin:release-local": "node scripts/plugin-release-local.js",
     "install:codex": "node scripts/install-for-codex-user.js",
+    "update:codex": "node scripts/install-for-codex-user.js --action update",
+    "uninstall:codex": "node scripts/install-for-codex-user.js --action uninstall",
+    "doctor:codex": "node scripts/plugin-lifecycle.js doctor",
+    "plugin:lifecycle": "node scripts/plugin-lifecycle.js",
+    "security:scan": "node scripts/security-scan.js",
+    "release:gate": "node scripts/release-gate.js",
+    "release:artifacts": "node scripts/release-artifacts.js",
     "install:agent-policy": "node scripts/install-agent-policy.js"
   },
   "engines": {

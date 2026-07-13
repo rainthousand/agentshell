@@ -63,6 +63,19 @@ settings:
 npm run install:codex -- --dry-run
 ```
 
+Lifecycle commands are symmetric and rollback-aware:
+
+```bash
+npm run update:codex
+npm run doctor:codex
+npm run uninstall:codex
+```
+
+Install and update stage a complete copy before swapping it into place, retain up
+to three backups, and restore the previous installation automatically when later
+validation fails. Share packages include double-clickable update, check, and
+uninstall commands.
+
 If the installer stops, read the "Next:" lines at the bottom of the output;
 they point to the command or setup step to retry.
 
@@ -169,6 +182,8 @@ agentshell run next
 agentshell run status --compact
 agentshell run latest --compact
 agentshell metrics --compact
+agentshell metrics --compact --since 24h
+agentshell metrics export --out metrics-evidence.json --since 7d
 agentshell trial export --rating 1-5
 agentshell dashboard
 ```
@@ -186,16 +201,18 @@ tokens or commands run outside AgentShell.
 Run `agentshell dashboard` on macOS to open the native always-on-top AgentShell
 floating window. The 81 KB AppKit shell embeds the local read-only Dashboard
 without browser chrome, stays available from the menu bar, and loads data from
-`127.0.0.1`. It refreshes every five seconds and shows measured AgentShell
-execution time, workflow elapsed time, estimated tool-output context avoided,
-success rate, commands per task, the latest task, and a 12-task trend. It does not
-upload data or expose file contents and command output. Metrics v2 labels measured,
-estimated, and unavailable values explicitly; Codex model tokens and thinking time
-remain unavailable unless Codex provides a trusted accounting surface.
+`127.0.0.1`. The compact HUD refreshes every five seconds and shows only estimated
+tool-output tokens saved and cache-backed time saved. It does not upload data or
+expose file contents and command output. Metrics v2 labels measured, estimated,
+unavailable, exact-attribution, and legacy-fallback values explicitly.
 
 Use `agentshell dashboard --browser` to open the same UI in a browser, or
 `agentshell dashboard --no-open` when another process will open or embed the local
 URL. Non-macOS hosts currently use the browser surface automatically.
+The Dashboard is a user-level singleton. Repeated launches reuse a healthy matching
+process, while stale versions are stopped before replacement. Use
+`agentshell dashboard --status` and `agentshell dashboard --stop` for lifecycle
+control.
 
 ### Protocol and integration
 

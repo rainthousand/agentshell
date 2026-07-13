@@ -33,12 +33,22 @@
   "$defs": {
     "measurement": {
       "type": "object",
-      "required": ["scope", "measured", "estimated", "unavailable"],
+      "required": ["scope", "measured", "estimated", "unavailable", "attribution"],
       "properties": {
         "scope": { "const": "agentshell-local-tooling" },
         "measured": { "type": "array", "items": { "type": "string" } },
         "estimated": { "type": "array", "items": { "type": "string" } },
-        "unavailable": { "type": "array", "items": { "type": "string" } }
+        "unavailable": { "type": "array", "items": { "type": "string" } },
+        "attribution": {
+          "type": "object",
+          "required": ["exactEvents", "legacyEvents", "method"],
+          "properties": {
+            "exactEvents": { "type": "integer", "minimum": 0 },
+            "legacyEvents": { "type": "integer", "minimum": 0 },
+            "method": { "enum": ["operation-id", "operation-id-with-legacy-fallback"] }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
@@ -121,10 +131,12 @@
     },
     "window": {
       "type": "object",
-      "required": ["events", "limit"],
+      "required": ["events", "limit", "since", "cutoff"],
       "properties": {
         "events": { "type": "integer", "minimum": 0 },
-        "limit": { "type": "integer", "minimum": 1, "maximum": 500 }
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "since": { "type": "string" },
+        "cutoff": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },
@@ -181,6 +193,7 @@
         "ok": { "type": "boolean" },
         "outputChars": { "type": "integer", "minimum": 0 },
         "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "operationIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
         "createdAt": { "type": "string" }
       },
       "additionalProperties": false

@@ -127,7 +127,7 @@ test("benchmark suite passes CI thresholds with the default token ceiling", () =
   assert.equal(output.ok, true);
   assert.equal(output.thresholds.ok, true);
   assert.equal(output.thresholds.mode, "ci");
-  assert.equal(output.thresholds.maxFixTokens, 260);
+  assert.equal(output.thresholds.maxFixTokens, 275);
   assert.equal(output.thresholds.checks.every((check) => check.ok), true);
   assert.ok(output.thresholds.checks.some((check) => check.name === "all-cases-ok"));
   assert.ok(output.thresholds.checks.some((check) => check.name.endsWith(":fix-tokens")));

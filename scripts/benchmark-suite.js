@@ -29,7 +29,7 @@ if (options.thresholds && !report.thresholds.ok) {
 function parseArgs(args) {
   let format = "json";
   let thresholds = false;
-  let maxFixTokens = 260;
+  let maxFixTokens = 275;
   let reportPath = null;
   let markdownPath = null;
   for (let index = 0; index < args.length; index += 1) {

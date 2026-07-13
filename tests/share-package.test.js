@@ -25,6 +25,8 @@ test("share package builds a real-user handoff directory without runtime state",
   assert.equal(fs.existsSync(path.join(packageDir, "START-HERE.md")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "install.command")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "check-install.command")), true);
+  assert.equal(fs.existsSync(path.join(packageDir, "update.command")), true);
+  assert.equal(fs.existsSync(path.join(packageDir, "uninstall.command")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "README.md")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "package.json")), true);
   assert.equal(fs.existsSync(path.join(packageDir, ".codex-plugin", "plugin.json")), true);
@@ -65,10 +67,15 @@ test("share package builds a real-user handoff directory without runtime state",
   const installCommandMode = fs.statSync(path.join(packageDir, "install.command")).mode;
   assert.notEqual(installCommandMode & 0o111, 0, "install.command should be executable");
   const checkInstallCommand = fs.readFileSync(path.join(packageDir, "check-install.command"), "utf8");
-  assert.match(checkInstallCommand, /plugin validate --compact/);
+  assert.match(checkInstallCommand, /doctor:codex/);
   assert.match(checkInstallCommand, /agentshell-install-check\.json/);
   const checkInstallCommandMode = fs.statSync(path.join(packageDir, "check-install.command")).mode;
   assert.notEqual(checkInstallCommandMode & 0o111, 0, "check-install.command should be executable");
+  for (const action of ["update", "uninstall"]) {
+    const file = path.join(packageDir, `${action}.command`);
+    assert.match(fs.readFileSync(file, "utf8"), new RegExp(`npm run ${action}:codex`));
+    assert.notEqual(fs.statSync(file).mode & 0o111, 0, `${action}.command should be executable`);
+  }
 });
 
 test("share package CLI prints help and creates parseable JSON", () => {

@@ -33,6 +33,17 @@ To preview the same steps without changing anything, run:
 npm run install:codex -- --dry-run
 ```
 
+Update, diagnose, or remove only AgentShell-managed state with:
+
+```bash
+npm run update:codex
+npm run doctor:codex
+npm run uninstall:codex
+```
+
+The share package exposes the same actions through `update.command`,
+`check-install.command`, and `uninstall.command`.
+
 If installation stops, use the "Next:" lines in the output first. They name the
 failed command and the most likely retry path, such as installing Codex,
 rerunning with `--skip-link`, or retrying only the AgentShell policy step.

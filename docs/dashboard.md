@@ -6,6 +6,14 @@ Start the local value dashboard from the project being measured:
 agentshell dashboard
 ```
 
+AgentShell maintains one user-level Dashboard process. Repeated launches reuse a
+healthy matching instance; a stale version or different workspace is replaced.
+
+```bash
+agentshell dashboard --status
+agentshell dashboard --stop
+```
+
 On macOS the command opens a native AppKit floating panel with no browser chrome.
 It stays above normal windows by default, joins all Spaces, can be resized, and
 remains available from the `AS` menu-bar item after it is closed. The native shell
@@ -43,3 +51,18 @@ until a matched workflow baseline exists.
 - No network upload or analytics endpoint is present.
 - Responses disable caching and include a restrictive Content Security Policy.
 - The native WebView rejects navigation outside `http://127.0.0.1`.
+
+## Evidence And Windows
+
+New verification events are attributed to raw operations by `operationId`. Older
+records remain visible but are labeled as legacy fallback. Token values use the
+documented chars/4 estimate; time saved only counts validated cache hits against
+their measured uncached baseline.
+
+```bash
+agentshell metrics --compact --since 24h
+agentshell metrics export --out metrics-evidence.json --since 7d
+agentshell metrics reset --confirm
+```
+
+Reset starts a fresh measurement window without deleting history or logs.

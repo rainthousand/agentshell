@@ -18,6 +18,8 @@ const INCLUDED_PATHS = [
   "scripts",
   "skills",
   "src",
+  "CHANGELOG.md",
+  "LICENSE",
   "README.md",
   "package.json"
 ];
@@ -72,7 +74,13 @@ export function buildSharePackage(projectRoot = root, options = {}) {
   const checkInstallCommandPath = path.join(packageDir, "check-install.command");
   fs.writeFileSync(checkInstallCommandPath, renderCheckInstallCommand(), "utf8");
   fs.chmodSync(checkInstallCommandPath, 0o755);
-  copied.push("START-HERE.md", "install.command", "check-install.command");
+  const updateCommandPath = path.join(packageDir, "update.command");
+  fs.writeFileSync(updateCommandPath, renderLifecycleCommand("update"), "utf8");
+  fs.chmodSync(updateCommandPath, 0o755);
+  const uninstallCommandPath = path.join(packageDir, "uninstall.command");
+  fs.writeFileSync(uninstallCommandPath, renderLifecycleCommand("uninstall"), "utf8");
+  fs.chmodSync(uninstallCommandPath, 0o755);
+  copied.push("START-HERE.md", "install.command", "check-install.command", "update.command", "uninstall.command");
 
   const excludedPresent = findExcludedPaths(packageDir);
   const zip = options.zip ? writeZip(outDir, packageName, zipPath) : null;
@@ -265,10 +273,16 @@ If installation fails or you want to confirm it later, double-click
 Desktop. Send that small JSON file to the AgentShell maintainer when asking for
 help.
 
+Use \`update.command\` for a staged, rollback-aware update and
+\`uninstall.command\` to remove only AgentShell-managed files and settings.
+
 Terminal fallback from this folder:
 
 \`\`\`bash
 npm run install:codex
+npm run update:codex
+npm run doctor:codex
+npm run uninstall:codex
 \`\`\`
 
 When the installer succeeds, open a new Codex task. The installer links the local \`agentshell\` command, installs the local Codex plugin copy, writes AgentShell guidance into \`~/.codex/AGENTS.md\`, and runs smoke checks.
@@ -328,7 +342,7 @@ else
   REPORT_FILE="$PWD/agentshell-install-check.json"
 fi
 echo "Checking AgentShell installation..."
-node src/cli.js plugin validate --compact | tee "$REPORT_FILE"
+npm run doctor:codex 2>/dev/null | tee "$REPORT_FILE"
 STATUS=\${PIPESTATUS[0]}
 echo
 if [ "$STATUS" -eq 0 ]; then
@@ -338,6 +352,25 @@ else
 fi
 echo "Diagnostic report: $REPORT_FILE"
 echo "Review this JSON before sending it to the AgentShell maintainer."
+read -r -p "Press Enter to close this window..." _
+exit "$STATUS"
+`;
+}
+
+function renderLifecycleCommand(action) {
+  return `#!/bin/bash
+set -uo pipefail
+cd "$(dirname "$0")"
+LOG_FILE="$PWD/agentshell-${action}.log"
+echo "Running AgentShell ${action}..."
+npm run ${action}:codex 2>&1 | tee "$LOG_FILE"
+STATUS=\${PIPESTATUS[0]}
+echo
+if [ "$STATUS" -eq 0 ]; then
+  echo "AgentShell ${action} completed. Quit and reopen Codex."
+else
+  echo "AgentShell ${action} needs attention. See: $LOG_FILE"
+fi
 read -r -p "Press Enter to close this window..." _
 exit "$STATUS"
 `;

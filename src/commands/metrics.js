@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { readActiveRun, readEvents, readOperations, readRuns } from "../core/store.js";
+import { ensureState, readActiveRun, readEvents, readOperations, readRuns } from "../core/store.js";
 import { runStatus, summarizeRun } from "./run-status.js";
 
 const PROTOCOL_VERSION = "agentshell.metrics.v2";
@@ -9,23 +9,27 @@ const PROTOCOL_VERSION = "agentshell.metrics.v2";
 export async function metrics(root, options = {}) {
   const limit = parseLimit(options.limit);
   const compact = Boolean(options.compact);
-  const allEvents = readEvents(root);
+  const cutoff = metricsCutoff(root, options.since);
+  const allEvents = readEvents(root).filter((event) => afterCutoff(event.createdAt, cutoff));
   const events = allEvents.slice(-limit);
-  const operations = readOperations(root);
+  const operations = readOperations(root).filter((operation) => afterCutoff(operation.createdAt, cutoff));
   const verifyOps = operations.filter((operation) => operation.type === "verify");
   const verifyRawChars = sum(verifyOps.map((operation) => operation.rawOutputChars || 0));
-  const outputChars = sum(events.map((event) => event.outputChars || 0));
+  const outputChars = sum(allEvents.map((event) => event.outputChars || 0));
+  const attribution = attributedVerification(allEvents, verifyOps);
 
   const latestRun = await runStatus(root, "status");
   const byCommand = groupByCommand(events);
-  const dashboard = dashboardSummary(root, events, operations, allEvents.length);
+  const dashboard = dashboardSummary(root, allEvents, operations, allEvents.length);
   const base = {
     ok: true,
     protocolVersion: PROTOCOL_VERSION,
     compact,
     window: {
-      events: events.length,
-      limit
+      events: allEvents.length,
+      limit,
+      since: options.since || "all",
+      cutoff: cutoff ? new Date(cutoff).toISOString() : null
     },
     totals: {
       agentShellOutputChars: outputChars,
@@ -33,16 +37,21 @@ export async function metrics(root, options = {}) {
       verifyRawOutputChars: verifyRawChars,
       verifyRawEstimatedTokens: estimateTokens(verifyRawChars)
     },
-    savings: verifyRawChars > 0 ? {
-      charsSavedVsRawVerify: Math.max(0, verifyRawChars - outputChars),
-      percentSavedVsRawVerify: Math.max(0, Math.round((1 - outputChars / verifyRawChars) * 100))
+    savings: attribution.rawTokens > 0 ? {
+      charsSavedVsRawVerify: attribution.charsSaved,
+      percentSavedVsRawVerify: attribution.percentSaved
     } : null,
     latestRun: latestRun.summary,
     measurement: {
       scope: "agentshell-local-tooling",
       measured: ["commandCount", "commandExecutionMs", "workflowElapsedMs", "verificationStatus"],
       estimated: ["agentShellOutputTokens", "rawVerifyTokens", "contextAvoidedTokens"],
-      unavailable: ["codexModelTokens", "codexThinkingTimeMs", "nonAgentShellCommandTelemetry"]
+      unavailable: ["codexModelTokens", "codexThinkingTimeMs", "nonAgentShellCommandTelemetry"],
+      attribution: {
+        exactEvents: attribution.exactEvents,
+        legacyEvents: attribution.legacyEvents,
+        method: attribution.legacyEvents > 0 ? "operation-id-with-legacy-fallback" : "operation-id"
+      }
     },
     dashboard,
     privacy: {
@@ -67,6 +76,21 @@ export async function metrics(root, options = {}) {
   };
 }
 
+export function resetMetrics(root) {
+  const resetAt = new Date().toISOString();
+  const file = path.join(ensureState(root), "metrics-reset.json");
+  fs.writeFileSync(file, `${JSON.stringify({ resetAt }, null, 2)}\n`);
+  return { ok: true, protocolVersion: PROTOCOL_VERSION, resetAt, preservedHistory: true };
+}
+
+export async function exportMetrics(root, out, options = {}) {
+  const report = await metrics(root, { compact: false, since: options.since });
+  const output = path.resolve(root, out);
+  fs.mkdirSync(path.dirname(output), { recursive: true });
+  fs.writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`);
+  return { ok: true, protocolVersion: PROTOCOL_VERSION, output, generatedAt: report.dashboard.generatedAt };
+}
+
 function dashboardSummary(root, events, operations, toolCallCount) {
   const runs = uniqueRuns(root);
   const summaries = runs.map(summarizeRun);
@@ -74,20 +98,16 @@ function dashboardSummary(root, events, operations, toolCallCount) {
   const commandCount = sum(summaries.map((run) => run.commandCount));
   const executionMs = sum(summaries.map((run) => run.durationMs));
   const workflowElapsedMs = sum(runs.map(elapsedMsForRun));
-  const estimatedTimeSavedMs = timeSavedFromRepeatedVerification(operations);
+  const estimatedTimeSavedMs = timeSavedFromCacheHits(operations);
   const agentShellOutputTokens = sum(events.map((event) => event.estimatedTokens || estimateTokens(event.outputChars || 0)));
-  const compactVerificationTokens = sum(events
-    .filter((event) => event.command === "verify" || event.command === "fix")
-    .map((event) => event.estimatedTokens || estimateTokens(event.outputChars || 0)));
-  const rawVerifyTokens = sum(operations
-    .filter((operation) => operation.type === "verify")
-    .map((operation) => operation.rawEstimatedTokens || estimateTokens(operation.rawOutputChars || 0)));
-  const estimatedContextAvoidedTokens = rawVerifyTokens > 0
-    ? Math.max(0, rawVerifyTokens - compactVerificationTokens)
+  const attribution = attributedVerification(events, operations.filter((operation) => operation.type === "verify"));
+  const rawVerifyTokens = attribution.rawTokens;
+  const estimatedContextAvoidedTokens = attribution.rawTokens > 0
+    ? attribution.tokensSaved
     : null;
   const contextAvoidedPercent = estimatedContextAvoidedTokens === null
     ? null
-    : Math.round((estimatedContextAvoidedTokens / rawVerifyTokens) * 100);
+    : attribution.percentSaved;
   const latest = summaries.at(-1) || null;
 
   return {
@@ -118,21 +138,66 @@ function dashboardSummary(root, events, operations, toolCallCount) {
   };
 }
 
-function timeSavedFromRepeatedVerification(operations) {
+function timeSavedFromCacheHits(operations) {
   const baselines = new Map();
   let saved = 0;
   for (const operation of operations) {
     if (operation.type !== "verify" || !operation.cacheKey) continue;
-    if (operation.ok && Number.isFinite(operation.durationMs) && !baselines.has(operation.cacheKey)) {
+    if (!operation.cacheHit && Number.isFinite(operation.durationMs)) {
       baselines.set(operation.cacheKey, operation.durationMs);
       continue;
     }
     const baseline = baselines.get(operation.cacheKey);
-    if (operation.ok && Number.isFinite(baseline)) {
+    if (operation.cacheHit && Number.isFinite(baseline)) {
       saved += Math.max(0, baseline - (operation.durationMs || 0));
     }
   }
   return baselines.size > 0 ? saved : null;
+}
+
+function attributedVerification(events, operations) {
+  const operationById = new Map(operations.filter((operation) => operation.id).map((operation) => [operation.id, operation]));
+  const claimed = new Set();
+  let rawChars = 0;
+  let compactChars = 0;
+  let exactEvents = 0;
+  let legacyEvents = 0;
+
+  for (const event of events) {
+    const ids = Array.isArray(event.operationIds)
+      ? event.operationIds.filter((id) => operationById.has(id))
+      : [];
+    if (ids.length > 0) {
+      exactEvents += 1;
+      compactChars += event.outputChars || 0;
+      for (const id of ids) {
+        if (claimed.has(id)) continue;
+        claimed.add(id);
+        rawChars += operationById.get(id).rawOutputChars || 0;
+      }
+      continue;
+    }
+    if (event.command !== "verify" && event.command !== "fix") continue;
+    legacyEvents += 1;
+    compactChars += event.outputChars || 0;
+  }
+
+  if (legacyEvents > 0) {
+    for (const operation of operations) {
+      if (!claimed.has(operation.id)) rawChars += operation.rawOutputChars || 0;
+    }
+  }
+  const rawTokens = estimateTokens(rawChars);
+  const compactTokens = estimateTokens(compactChars);
+  return {
+    rawTokens,
+    compactTokens,
+    tokensSaved: rawTokens > 0 ? Math.max(0, rawTokens - compactTokens) : null,
+    charsSaved: Math.max(0, rawChars - compactChars),
+    percentSaved: rawChars > 0 ? Math.max(0, Math.round((1 - compactChars / rawChars) * 100)) : null,
+    exactEvents,
+    legacyEvents
+  };
 }
 
 function healthFor(latest, run) {
@@ -221,6 +286,23 @@ function parseLimit(value) {
   const parsed = Number(value || 500);
   if (!Number.isInteger(parsed) || parsed <= 0) return 500;
   return Math.min(parsed, 500);
+}
+
+function metricsCutoff(root, since) {
+  let cutoff = 0;
+  try {
+    const marker = JSON.parse(fs.readFileSync(path.join(ensureState(root), "metrics-reset.json"), "utf8"));
+    cutoff = dateValue(marker.resetAt);
+  } catch {}
+  if (!since || since === "all") return cutoff;
+  const match = /^(\d+)(h|d)$/.exec(String(since));
+  if (!match) throw new Error("Metrics --since must be `all`, `<hours>h`, or `<days>d`");
+  const unitMs = match[2] === "h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  return Math.max(cutoff, Date.now() - Number(match[1]) * unitMs);
+}
+
+function afterCutoff(value, cutoff) {
+  return cutoff === 0 || dateValue(value) >= cutoff;
 }
 
 function dateValue(value) {

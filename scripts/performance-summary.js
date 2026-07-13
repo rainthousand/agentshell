@@ -179,7 +179,7 @@ function recommendationFor({ benchmark, coldStart, cache }) {
   if (!coldStart) missing.push("cold-start benchmark");
   if (!cache) missing.push("cache benchmark");
   if (missing.length > 0) return `Run missing performance reports before making broad claims: ${missing.join(", ")}.`;
-  if ((benchmark.maxFixTokens ?? 0) > 260) return "Investigate fix compact output; at least one benchmark case exceeds the 260-token target.";
+  if ((benchmark.maxFixTokens ?? 0) > 275) return "Investigate fix compact output; at least one benchmark case exceeds the 275-token target.";
   if ((cache.speedupPercent ?? 0) <= 0) return "Investigate verify cache behavior; the cache report does not show a positive speedup.";
   return "Performance evidence is ready for product reporting; keep collecting real Codex run data for external validity.";
 }

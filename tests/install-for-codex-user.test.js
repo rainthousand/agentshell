@@ -28,6 +28,7 @@ test("friendly Codex installer dry run reports the full install sequence", () =>
   assert.deepEqual(output.steps.map((step) => step.name), [
     "node-version",
     "codex-version",
+    "dashboard-stop",
     "npm-link",
     "cachebuster",
     "source-validate",
@@ -81,4 +82,20 @@ test("package exposes friendly Codex installer", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
   assert.equal(packageJson.scripts?.["install:codex"], "node scripts/install-for-codex-user.js");
   assert.equal(packageJson.scripts?.["install:agent-policy"], "node scripts/install-agent-policy.js");
+  assert.equal(packageJson.scripts?.["update:codex"], "node scripts/install-for-codex-user.js --action update");
+  assert.equal(packageJson.scripts?.["uninstall:codex"], "node scripts/install-for-codex-user.js --action uninstall");
+  assert.equal(packageJson.scripts?.["doctor:codex"], "node scripts/plugin-lifecycle.js doctor");
+});
+
+test("friendly Codex lifecycle exposes update, uninstall, and doctor plans", () => {
+  for (const [action, expectedStep] of [["update", "install-local"], ["uninstall", "uninstall-local"], ["doctor", "lifecycle-doctor"]]) {
+    const result = spawnSync("node", ["scripts/install-for-codex-user.js", "--action", action, "--dry-run", "--json"], {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.action, action);
+    assert.ok(report.steps.some((step) => step.name === expectedStep));
+  }
 });

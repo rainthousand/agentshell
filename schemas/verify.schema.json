@@ -24,9 +24,10 @@
         "relatedTestFileSource": { "enum": ["options", "cache"] },
         "relatedTestFileVerification": {
           "type": "object",
-          "required": ["ok", "command", "exitCode", "durationMs", "summary", "relatedTestFile", "logRef"],
+          "required": ["ok", "operationId", "command", "exitCode", "durationMs", "summary", "relatedTestFile", "logRef"],
           "properties": {
             "ok": { "type": "boolean" },
+            "operationId": { "type": "string" },
             "command": { "type": "string" },
             "exitCode": { "type": ["integer", "null"] },
             "durationMs": { "type": "integer", "minimum": 0 },

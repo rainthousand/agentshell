@@ -19,7 +19,7 @@ test("help returns command list as JSON", () => {
   assert.ok(output.commands.includes("agentshell plugin status [--compact] [--home <home>] [--marketplace <path>] [--cache-root <path>]"));
   assert.ok(output.commands.includes("agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]"));
   assert.ok(output.commands.includes("agentshell trial export [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]"));
-  assert.ok(output.commands.includes("agentshell dashboard [--port N] [--window|--browser] [--no-open]"));
+  assert.ok(output.commands.includes("agentshell dashboard [--port N] [--window|--browser] [--no-open|--status|--stop]"));
   assert.ok(output.commands.includes("agentshell manual [--full|--topic <repair|plugin|benchmark|profile|onboarding|log-triage|reference>]"));
   assert.ok(output.commands.includes("agentshell start [--compact] [--profile]"));
   assert.ok(output.commands.includes("agentshell entry [--compact] [--profile]"));

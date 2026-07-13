@@ -217,6 +217,7 @@ function addVerificationMetadata(output, metadata) {
 function compactRelatedVerification(verification) {
   return {
     ok: verification.ok,
+    operationId: verification.operationId,
     command: verification.command,
     exitCode: verification.exitCode,
     durationMs: verification.durationMs,

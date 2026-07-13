@@ -200,6 +200,7 @@ function compactFinalVerification(output) {
   if (!verification) return null;
   return {
     ok: verification.ok ?? output.diagnosis?.verificationOk ?? null,
+    operationId: verification.operationId || null,
     summary: verification.summary || null,
     logRef: verification.logRef || null,
     durationMs: verification.durationMs || null,
