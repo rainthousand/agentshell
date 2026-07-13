@@ -207,6 +207,6 @@ function compareMatches(left, right) {
   return String(left.line).localeCompare(String(right.line), undefined, { numeric: true });
 }
 
-if (process.argv[1] === import.meta.filename) {
+if (path.basename(process.argv[1] || "") === "strategy-coverage-matrix.js") {
   console.log(JSON.stringify(buildStrategyCoverageMatrix(), null, 2));
 }

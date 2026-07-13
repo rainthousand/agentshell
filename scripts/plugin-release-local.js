@@ -96,6 +96,11 @@ function buildSteps(options) {
     npmStep("plugin:validate:source"),
     npmStep("plugin:install-local"),
     {
+      name: "npm-link",
+      command: "npm",
+      args: ["link"]
+    },
+    {
       name: "codex-add",
       command: "codex",
       args: ["plugin", "add", "agentshell@personal"],

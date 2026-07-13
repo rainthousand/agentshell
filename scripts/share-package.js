@@ -259,7 +259,7 @@ This folder is a local AgentShell share package for Codex users. It is not a pub
 
 Requirements:
 
-- Node.js 20+
+- Apple silicon Mac (the current Beta build target)
 - Codex CLI available on PATH
 
 Easiest path on macOS:
@@ -279,26 +279,26 @@ Use \`update.command\` for a staged, rollback-aware update and
 Terminal fallback from this folder:
 
 \`\`\`bash
-npm run install:codex
-npm run update:codex
-npm run doctor:codex
-npm run uninstall:codex
+bin/agentshell-darwin-arm64 setup codex install --source "$PWD"
+bin/agentshell-darwin-arm64 setup codex update --source "$PWD"
+bin/agentshell-darwin-arm64 setup codex doctor --source "$PWD"
+bin/agentshell-darwin-arm64 setup codex uninstall --source "$PWD"
 \`\`\`
 
-When the installer succeeds, open a new Codex task. The installer links the local \`agentshell\` command, installs the local Codex plugin copy, writes AgentShell guidance into \`~/.codex/AGENTS.md\`, and runs smoke checks.
+When the installer succeeds, open a new Codex task. The installer places the native \`agentshell\` command in \`~/.local/bin\`, installs the local Codex plugin copy, writes AgentShell guidance into \`~/.codex/AGENTS.md\`, and runs smoke checks. End users do not need Node.js or npm.
 
 After Codex completes and verifies a real task, ask it:
 
-> Please run \`agentshell trial export --rating 5\` in this project and tell me where the exported file is.
+> Please run \`agentshell trial export --verify --rating 5\` in this project and tell me where the exported file is.
 
 Review the exported JSON on the Desktop, then send it to the AgentShell maintainer.
 
 ## Try The CLI
 
 \`\`\`bash
-node src/cli.js start --compact
-node src/cli.js manual
-node src/cli.js manual --topic onboarding
+bin/agentshell-darwin-arm64 start --compact
+bin/agentshell-darwin-arm64 manual
+bin/agentshell-darwin-arm64 manual --topic onboarding
 \`\`\`
 
 ## What Is Included
@@ -317,7 +317,11 @@ LOG_FILE="$PWD/agentshell-install.log"
 echo "Installing AgentShell for Codex..."
 echo "A local log will be written to: $LOG_FILE"
 echo
-npm run install:codex 2>&1 | tee "$LOG_FILE"
+if [ -x "$PWD/bin/agentshell-darwin-arm64" ]; then
+  "$PWD/bin/agentshell-darwin-arm64" setup codex install --source "$PWD" 2>&1 | tee "$LOG_FILE"
+else
+  npm run install:codex 2>&1 | tee "$LOG_FILE"
+fi
 STATUS=\${PIPESTATUS[0]}
 echo
 if [ "$STATUS" -eq 0 ]; then
@@ -342,7 +346,11 @@ else
   REPORT_FILE="$PWD/agentshell-install-check.json"
 fi
 echo "Checking AgentShell installation..."
-npm run doctor:codex 2>/dev/null | tee "$REPORT_FILE"
+if [ -x "$PWD/bin/agentshell-darwin-arm64" ]; then
+  "$PWD/bin/agentshell-darwin-arm64" setup codex doctor --source "$PWD" 2>/dev/null | tee "$REPORT_FILE"
+else
+  npm run doctor:codex 2>/dev/null | tee "$REPORT_FILE"
+fi
 STATUS=\${PIPESTATUS[0]}
 echo
 if [ "$STATUS" -eq 0 ]; then
@@ -363,7 +371,11 @@ set -uo pipefail
 cd "$(dirname "$0")"
 LOG_FILE="$PWD/agentshell-${action}.log"
 echo "Running AgentShell ${action}..."
-npm run ${action}:codex 2>&1 | tee "$LOG_FILE"
+if [ -x "$PWD/bin/agentshell-darwin-arm64" ]; then
+  "$PWD/bin/agentshell-darwin-arm64" setup codex ${action} --source "$PWD" 2>&1 | tee "$LOG_FILE"
+else
+  npm run ${action}:codex 2>&1 | tee "$LOG_FILE"
+fi
 STATUS=\${PIPESTATUS[0]}
 echo
 if [ "$STATUS" -eq 0 ]; then

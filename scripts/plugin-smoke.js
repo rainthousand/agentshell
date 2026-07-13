@@ -215,6 +215,7 @@ check("schema get dashboard exposes local read-only UI protocol", () => {
   assert(schema.properties?.host?.const === "127.0.0.1", "dashboard schema does not lock the loopback host");
   assert(schema.properties?.readOnly?.const === true, "dashboard schema does not declare read-only mode");
   assert(schema.properties?.surface?.enum?.includes("desktop-window"), "dashboard schema does not expose native desktop surface");
+  assert(schema.properties?.surface?.enum?.includes("menu-bar"), "dashboard schema does not expose native menu-bar surface");
 });
 
 check("installed plugin bundles the native macOS dashboard app", () => {

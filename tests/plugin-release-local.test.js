@@ -9,6 +9,7 @@ const expectedCommands = [
   "npm run plugin:cachebust",
   "npm run plugin:validate:source",
   "npm run plugin:install-local",
+  "npm link",
   "codex plugin add agentshell@personal",
   "npm run plugin:doctor-local",
   "npm run plugin:smoke",
@@ -133,8 +134,8 @@ exit 0
   assert.equal(output.ok, true);
   assert.equal(output.dryRun, false);
   assert.equal(output.skipCodexAdd, true);
-  assert.equal(output.steps[3].status, "skipped");
-  assert.equal(output.steps[3].reason, "--skip-codex-add");
+  assert.equal(output.steps[4].status, "skipped");
+  assert.equal(output.steps[4].reason, "--skip-codex-add");
   assert.equal(output.steps.every((step) => step.ok), true);
   assert.deepEqual(output.plugin, {
     name: "agentshell",
@@ -165,9 +166,9 @@ test("plugin release local can skip codex add outside dry run", () => {
   assert.equal(output.dryRun, false);
   assert.equal(output.skipCodexAdd, true);
   assert.deepEqual(output.steps.map((step) => step.command), expectedCommands);
-  assert.equal(output.steps[3].command, "codex plugin add agentshell@personal");
-  assert.equal(output.steps[3].status, "skipped");
-  assert.equal(output.steps[3].reason, "--skip-codex-add");
+  assert.equal(output.steps[4].command, "codex plugin add agentshell@personal");
+  assert.equal(output.steps[4].status, "skipped");
+  assert.equal(output.steps[4].reason, "--skip-codex-add");
   assert.equal(output.steps.every((step) => step.ok), true);
   assert.equal(output.plugin, null);
 });

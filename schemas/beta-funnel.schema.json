@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/beta-funnel.schema.json",
+  "title": "AgentShell External Beta Funnel Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "generatedAt", "summary", "gate", "attempts", "privacy"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.beta-funnel.v1" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "summary": {
+      "type": "object",
+      "required": ["counts", "rates", "failureReasons"],
+      "properties": {
+        "counts": { "$ref": "#/$defs/counts" },
+        "rates": { "$ref": "#/$defs/rates" },
+        "failureReasons": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "gate": {
+      "type": "object",
+      "required": ["version", "status", "ready", "checks"],
+      "properties": {
+        "version": { "const": "v1" },
+        "status": { "enum": ["ready", "collecting"] },
+        "ready": { "type": "boolean" },
+        "checks": {
+          "type": "object",
+          "required": ["successfulExternalExports", "activationRate", "exportRate"],
+          "properties": {
+            "successfulExternalExports": { "$ref": "#/$defs/gateCheck" },
+            "activationRate": { "$ref": "#/$defs/gateCheck" },
+            "exportRate": { "$ref": "#/$defs/gateCheck" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "attempts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/attempt" }
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["aggregateOnly", "omitted"],
+      "properties": {
+        "aggregateOnly": { "const": true },
+        "omitted": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "required": ["attempted", "cliAvailable", "activated", "verified", "exported", "distinctSuccessfulExports"],
+      "properties": {
+        "attempted": { "type": "integer", "minimum": 1 },
+        "cliAvailable": { "type": "integer", "minimum": 0 },
+        "activated": { "type": "integer", "minimum": 0 },
+        "verified": { "type": "integer", "minimum": 0 },
+        "exported": { "type": "integer", "minimum": 0 },
+        "distinctSuccessfulExports": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "rates": {
+      "type": "object",
+      "required": ["cliAvailable", "activation", "verification", "export"],
+      "properties": {
+        "cliAvailable": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "activation": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "verification": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "export": { "type": "integer", "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "gateCheck": {
+      "type": "object",
+      "required": ["ok", "actual", "required", "unit"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "actual": { "type": "integer", "minimum": 0 },
+        "required": { "type": "integer", "minimum": 0 },
+        "unit": { "enum": ["minimum", "minimum-percent"] }
+      },
+      "additionalProperties": false
+    },
+    "attempt": {
+      "type": "object",
+      "required": ["id", "inputType", "stages", "failureReason"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^attempt-[1-9][0-9]*$" },
+        "inputType": { "enum": ["trial-export", "evidence-bundle", "adapter-collector", "trial-collector", "failure-envelope"] },
+        "stages": {
+          "type": "object",
+          "required": ["attempted", "cliAvailable", "activated", "verified", "exported"],
+          "properties": {
+            "attempted": { "const": true },
+            "cliAvailable": { "type": "boolean" },
+            "activated": { "type": "boolean" },
+            "verified": { "type": "boolean" },
+            "exported": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "failureReason": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -7,6 +7,16 @@ description: Use AgentShell when a coding task benefits from compact JSON projec
 
 AgentShell is a structured local CLI for AI coding agents. Its v0.24 purpose is to reduce terminal noise, command round trips, and token usage during code understanding and failing-test repair while keeping next-action task guidance and previewable conservative suggested changes that agents can inspect cheaply. It includes `start --compact`/`entry --compact` for the cheapest combined doctor, compact understand, and run-next summary, full `start`/`entry` for debugging payloads, `doctor` readiness checks, a slim `fix test --fast --compact` response for the one-command diagnose/suggest/apply/verify loop, `fix test --safe --compact` for the preview-first policy, compact test diagnosis, structured fix plans, generated change templates, `change suggest --dry-run --compact` and `change suggest --apply --compact` for missing object properties, flat deepEqual missing properties, simple deepEqual array additions, simple deepEqual array tail removals, simple deepEqual extra property removals, simple deepEqual array primitive replacements, small returned-array length shortfalls, simple wrong literals, empty `join('')` separator repairs, simple string case transforms, simple truthy-return assertions, missing named exports, unique local import path repairs, and narrow TypeScript diagnostic repairs, `run next`, compact run status, compact metrics, compact verification, log references, raw-vs-compact benchmarking, JSON schemas, adapter instruction generation, and hash-checked edits with undo.
 
+## Activation Contract
+
+1. Establish the actual project root from the opened workspace, git root, or nearest supported project manifest, then run AgentShell from that directory. Never default to `$HOME` unless it is itself the project.
+2. Resolve the CLI with `command -v agentshell`. If it is missing, use `./bin/agentshell` from an AgentShell checkout or first resolve the newest version under `${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/agentshell/`, then invoke that version's `bin/agentshell`.
+3. Run `agentshell start --compact` early in a supported coding task, before broad inspection or test repair.
+4. Run `agentshell verify test --compact` before declaring a task complete when the project has a supported test script.
+5. For beta evidence, run `agentshell trial status`, then `agentshell trial export --verify --rating 1-5`; report actionable status instead of asking the user to diagnose project location or missing verification.
+
+The local CLI/plugin flow is canonical. Do not require or start an MCP server; MCP remains deferred.
+
 ## When To Use
 
 Use AgentShell first for supported actions:
@@ -19,7 +29,7 @@ Use AgentShell first for supported actions:
 - `agentshell find <query>` for compact code search.
 - `agentshell read <file> --lines A:B` for bounded file reads.
 - `agentshell read <file> --around <query>` for context near known text or symbols.
-- `agentshell verify test` for compact summarized test output.
+- `agentshell verify test --compact` for compact summarized test output.
 - `agentshell verify test --tail N` when inline log tail is needed.
 - `agentshell fix test --fast --compact` for the fastest supported failing-test repair path; `agentshell fix test --compact` is the compatible default.
 - `agentshell fix test --safe --compact` or `agentshell fix test --dry-run --compact` to preview the same one-command repair without changing source files.
@@ -38,8 +48,9 @@ Use AgentShell first for supported actions:
 - `agentshell run latest --compact` to inspect the most recent run snapshot summary.
 - `agentshell undo [operationId]` to revert AgentShell edits.
 - `agentshell metrics --compact [--limit N]` to inspect recent output cost cheaply.
-- `agentshell dashboard` to open the native macOS floating value window (browser fallback elsewhere) with measured execution time, estimated context avoided, task success, and recent trends; use `--browser` to request the browser surface explicitly.
-- `agentshell trial export [--rating 1-5]` after a verified real-user task to write a redacted, collector-ready evidence JSON file to the Desktop.
+- `agentshell dashboard` to open the compact native macOS menu-bar status tool (browser fallback elsewhere) with verified token and time savings; use `--window` for the legacy floating window or `--browser` for the browser surface.
+- `agentshell trial status` to check project location, test support, freshness, and verification readiness before beta export.
+- `agentshell trial export --verify --rating 1-5` to verify and write a redacted, collector-ready evidence JSON file to the Desktop.
 - `agentshell metrics [--limit N]` when debugging detailed recent event history.
 - `agentshell benchmark test` to compare raw test output with compact AgentShell output.
 - `agentshell schema list` and `agentshell schema get <name>` to inspect stable JSON contracts.
@@ -48,7 +59,7 @@ Fall back to normal shell commands only when AgentShell does not support the nee
 
 ## Availability Check
 
-Before relying on AgentShell in a workspace, run:
+First enter the actual project root, then run:
 
 ```bash
 agentshell manual
@@ -56,7 +67,7 @@ agentshell manual --topic repair
 agentshell start --compact
 ```
 
-If `agentshell` is not on PATH, use a local checkout or plugin cache fallback:
+If `agentshell` is not on PATH, keep the same project working directory and invoke a local checkout or installed plugin-cache binary:
 
 ```bash
 node src/cli.js manual
@@ -69,6 +80,7 @@ node src/cli.js start --compact
 bin/agentshell start --compact
 node src/cli.js doctor
 bin/agentshell doctor
+${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/agentshell/<version>/bin/agentshell start --compact
 ```
 
 ## Workflow: Diagnose A Failing Test
@@ -94,6 +106,7 @@ bin/agentshell doctor
 ## Rules
 
 - Treat AgentShell JSON as the source of truth.
+- Establish and enter the real project root first; never run project commands from `$HOME` merely because the shell opened there.
 - Use `agentshell start --compact` or `agentshell entry --compact` for the cheapest first pass in a fresh workspace.
 - Use `agentshell doctor` before longer workflows when the checkout, PATH, state directory, or test script may be uncertain.
 - Prefer `summary` and `suggestedNextActions` before reading full logs.
@@ -105,7 +118,7 @@ bin/agentshell doctor
 - Use `agentshell manual --topic log-triage` for the summary-first, bounded-tail log workflow when terminal output is noisy.
 - Use `agentshell metrics --compact` for measurement, not for diagnosis.
 - Treat Dashboard context savings as estimated tool-output context avoided, execution time as measured AgentShell time, and unavailable Codex model tokens or thinking time as unavailable rather than zero.
-- Use `agentshell trial export` only after final verification; review the JSON before sharing it, and do not treat its AgentShell-only telemetry as full Codex session token accounting.
+- Use `agentshell trial status` before evidence collection and prefer `agentshell trial export --verify --rating 1-5`; review the JSON before sharing it, and do not treat its AgentShell-only telemetry as full Codex session token accounting.
 - Use `agentshell fix test --fast --compact` before the split diagnose/change/verify loop when the task is to repair a supported failing test.
 - Use `agentshell change suggest --apply --compact` only when the active diagnosis has a clear generated template.
 - Use `agentshell run next` for the cheapest next-action check.

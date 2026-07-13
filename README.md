@@ -183,32 +183,36 @@ agentshell run status --compact
 agentshell run latest --compact
 agentshell metrics --compact
 agentshell metrics --compact --since 24h
+agentshell metrics --compact --scope global
 agentshell metrics export --out metrics-evidence.json --since 7d
 agentshell trial export --rating 1-5
 agentshell dashboard
 ```
 
-After a real Codex task passes, `agentshell trial export` creates a small redacted
-JSON evidence file on the user's Desktop. It includes AgentShell command duration,
+After a real Codex task, `agentshell trial export --verify --rating 5` verifies the
+project and creates a small redacted JSON evidence file on the user's Desktop. It includes AgentShell command duration,
 output-token estimates, final verification, and plugin version while omitting logs,
 file contents, paths, user/host names, and environment variables. See
 [Codex Beta Evidence](docs/codex-beta-evidence.md) for the non-developer handoff and
 the exact measurement boundary; it does not claim visibility into full Codex model
 tokens or commands run outside AgentShell.
+Use `agentshell trial status` to diagnose the wrong directory, a missing test
+script, stale evidence, or a failed verification before asking a user to retry.
 
 ### Local Dashboard
 
-Run `agentshell dashboard` on macOS to open the native always-on-top AgentShell
-floating window. The 81 KB AppKit shell embeds the local read-only Dashboard
-without browser chrome, stays available from the menu bar, and loads data from
-`127.0.0.1`. The compact HUD refreshes every five seconds and shows only estimated
-tool-output tokens saved and cache-backed time saved. It does not upload data or
-expose file contents and command output. Metrics v2 labels measured, estimated,
-unavailable, exact-attribution, and legacy-fallback values explicitly.
+Run `agentshell dashboard` on macOS to open the native AgentShell menu-bar utility.
+The status item shows compact verified savings such as `AS 79K`; clicking it shows
+the full `Verified savings` and cache-backed `Time saved` values. It refreshes every
+five seconds, does not appear in the Dock, and does not open a window by default.
+The local read-only service binds to `127.0.0.1` and never uploads file contents or
+command output. Metrics v2 labels measured, estimated, unavailable,
+exact-attribution, and legacy-fallback values explicitly.
 
-Use `agentshell dashboard --browser` to open the same UI in a browser, or
-`agentshell dashboard --no-open` when another process will open or embed the local
-URL. Non-macOS hosts currently use the browser surface automatically.
+Use `agentshell dashboard --window` for the optional detailed panel,
+`agentshell dashboard --browser` for the browser UI, or `agentshell dashboard
+--no-open` when another process will open or embed the local URL. Non-macOS hosts
+currently use the browser surface automatically.
 The Dashboard is a user-level singleton. Repeated launches reuse a healthy matching
 process, while stale versions are stopped before replacement. Use
 `agentshell dashboard --status` and `agentshell dashboard --stop` for lifecycle

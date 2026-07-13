@@ -14,16 +14,34 @@ agentshell dashboard --status
 agentshell dashboard --stop
 ```
 
-On macOS the command opens a native AppKit floating panel with no browser chrome.
-It stays above normal windows by default, joins all Spaces, can be resized, and
-remains available from the `AS` menu-bar item after it is closed. The native shell
-is built from `desktop/macos/AgentShellDashboard.swift` and embeds the same local
-Dashboard through a non-persistent `WKWebView`.
+On macOS the command opens a native AppKit menu-bar utility by default. The status
+item shows compact verified savings such as `AS 79K`; clicking it reveals the full
+`Verified savings` and `Time saved` values across all registered workspaces. The
+popover labels this scope as `All workspaces` without exposing project paths. It
+does not appear in the Dock or open a window at launch. Use `--window` when the
+optional detailed panel is useful.
+The native shell is built from `desktop/macos/AgentShellDashboard.swift`.
 
 The command binds only to `127.0.0.1`, chooses port 4317 or the next available
-port, and keeps running until interrupted. Use `--browser` for the browser surface,
-`--no-open` for a side-by-side Codex workflow, or `--port 0` in automation.
+port, and keeps running until interrupted. Use `--menubar` to explicitly select the
+native default, `--browser` for the browser surface, `--no-open` for a headless
+workflow, or `--port 0` in automation.
 Non-macOS systems currently fall back to the browser surface.
+
+For a menu-bar process launched independently of a terminal, use
+`nohup agentshell dashboard --menubar --daemon >/dev/null 2>&1 &`. The `--daemon`
+flag keeps the singleton server alive after its launching shell exits.
+
+The read-only metrics endpoint defaults to the global aggregate. Call it with an
+explicit workspace scope when a project-only view is needed:
+
+```text
+/api/metrics
+/api/metrics?scope=workspace
+```
+
+The workspace response is labeled `Project` in native UI. Neither scope sends
+workspace paths to the menu-bar utility.
 
 ## Measurement Labels
 
@@ -38,7 +56,7 @@ Estimated values use the documented four-characters-per-token proxy:
 
 - AgentShell output tokens;
 - raw verification output tokens;
-- context avoided versus raw verification output.
+- verified savings versus raw verification output.
 
 The Dashboard does not claim access to Codex model tokens, Codex thinking time,
 or commands executed outside AgentShell. Estimated time saved stays unavailable

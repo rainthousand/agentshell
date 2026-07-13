@@ -104,7 +104,7 @@ function topicManual(topic) {
         "npm run benchmark:suite",
         "npm run benchmark:cache",
         "npm run benchmark:cold-start",
-        "agentshell metrics --compact"
+        "agentshell metrics --compact --scope global"
       ],
       rules: [
         "Use estimatedTokens as a rough chars/4 output-cost proxy.",
@@ -301,7 +301,7 @@ function fullManual() {
       },
       {
         need: "Inspect compact context cost metrics",
-        command: "agentshell metrics --compact [--limit N]"
+        command: "agentshell metrics --compact [--limit N] [--scope workspace|global]"
       },
       {
         need: "Compare raw test output with compact AgentShell output",

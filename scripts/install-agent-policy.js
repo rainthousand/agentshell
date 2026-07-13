@@ -12,27 +12,31 @@ const POLICY = [
   START,
   "# AgentShell Default Policy",
   "",
-  "For coding work, prefer AgentShell before noisy raw shell commands when the `agentshell` CLI is available.",
+  "For coding work, activate AgentShell from the real project root before noisy raw shell commands.",
   "",
-  "- Start fresh repositories with `agentshell start --compact`.",
+  "- Establish the project root from the opened workspace, git root, or nearest supported manifest; never blindly run project commands from `$HOME`.",
+  "- Run `agentshell start --compact` early from that project root.",
+  "- If `agentshell` is not on PATH, use `./bin/agentshell` from a checkout or resolve the newest version under `${CODEX_HOME:-$HOME/.codex}/plugins/cache/personal/agentshell/` before invoking its `bin/agentshell`.",
   "- For supported failing tests, try `agentshell fix test --fast --compact` before split manual repair.",
-  "- Use `agentshell verify test` for compact verification output.",
+  "- Before completing a task, use `agentshell verify test --compact` when the project has a supported test script.",
+  "- For beta evidence, run `agentshell trial status`, then `agentshell trial export --verify --rating 1-5`.",
   "- Use `agentshell run status --compact` to inspect task state, rollback guidance, command count, and token estimates.",
   "- Use `agentshell read <file> --lines A:B` or `agentshell read <file> --around <query>` instead of reading whole large files.",
   "- Use `agentshell log get <logRef> --tail N` only when compact summaries are insufficient.",
   "- Treat AgentShell JSON as the source of truth; fall back to ordinary shell commands only when AgentShell does not support the needed action.",
+  "- Keep MCP deferred; the local AgentShell CLI/plugin flow is canonical.",
   "",
   "Recommended first pass:",
   "",
   "```bash",
   "agentshell start --compact",
   "agentshell fix test --fast --compact",
-  "agentshell run status --compact",
+  "agentshell verify test --compact",
   "```",
   END
 ].join("\n");
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));

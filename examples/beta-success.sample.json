@@ -1,0 +1,76 @@
+{
+  "id": "beta-user-01",
+  "host": "codex",
+  "fixture": "external-project-01",
+  "source": "agentshell-local-export",
+  "events": [
+    {
+      "type": "command",
+      "command": "agentshell start --compact",
+      "outputTokens": 42,
+      "durationMs": 58,
+      "startedAt": "2026-07-10T08:30:00.000Z",
+      "finishedAt": "2026-07-10T08:30:00.058Z"
+    },
+    {
+      "type": "command",
+      "command": "agentshell verify test --compact",
+      "outputTokens": 118,
+      "durationMs": 1240,
+      "startedAt": "2026-07-10T08:41:10.000Z",
+      "finishedAt": "2026-07-10T08:41:11.240Z"
+    }
+  ],
+  "finalVerification": {
+    "ok": true,
+    "command": "agentshell verify test",
+    "summary": "AgentShell recorded a passing final verification."
+  },
+  "notes": "Automatically exported from local AgentShell telemetry. Coverage is limited to AgentShell commands; Codex model tokens and non-AgentShell shell commands are not observed.",
+  "evidenceMetadata": {
+    "protocolVersion": "agentshell.trial-export.v1",
+    "exportedAt": "2026-07-10T08:41:12.000Z",
+    "captureScope": {
+      "agentShellCommands": true,
+      "agentShellOutputTokenEstimate": true,
+      "rawVerificationOutputEstimate": true,
+      "codexModelTokens": false,
+      "nonAgentShellCommands": false
+    },
+    "plugin": {
+      "name": "agentshell",
+      "version": "0.24.0",
+      "status": "ready"
+    },
+    "runtime": {
+      "platform": "darwin",
+      "arch": "arm64",
+      "nodeMajor": 22
+    },
+    "measurement": {
+      "agentShellEstimatedTokens": 160,
+      "rawVerifyEstimatedTokens": 1280,
+      "estimatedTokensSavedVsRawVerify": 1120,
+      "tokenSavingsPercentVsRawVerify": 88,
+      "commandDurationMs": 1298,
+      "observedDurationMs": 671240,
+      "commandCount": 2
+    },
+    "userFeedback": {
+      "rating": 5
+    },
+    "privacy": {
+      "redacted": true,
+      "omitted": [
+        "stdout",
+        "stderr",
+        "absolutePaths",
+        "userName",
+        "hostName",
+        "environmentVariables",
+        "fileContents"
+      ],
+      "reviewBeforeSharing": true
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "ok": false,
+  "error": {
+    "code": "TRIAL_NOT_READY",
+    "message": "No recent verified AgentShell run is ready to export.",
+    "details": {
+      "eventCount": 0,
+      "runStatus": "missing",
+      "maximumRunAgeHours": 6
+    },
+    "suggestedNextActions": [
+      {
+        "command": "agentshell trial status",
+        "reason": "Check activation and verification from the real project directory"
+      },
+      {
+        "command": "agentshell trial export --verify --rating 1-5",
+        "reason": "Verify and export immediately after the task is complete"
+      }
+    ]
+  }
+}

@@ -5,7 +5,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { exportTrial } from "../src/commands/trial-export.js";
+import { exportTrial, trialStatus } from "../src/commands/trial-export.js";
+
+function writePackage(root, scripts = { test: "node --test" }) {
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "trial-fixture", scripts }));
+}
 
 test("trial export writes a redacted collector-ready evidence bundle", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-export-"));
@@ -17,6 +21,7 @@ test("trial export writes a redacted collector-ready evidence bundle", async () 
   const verificationAt = new Date(now - 1_000).toISOString();
   const finishedAt = new Date(now - 800).toISOString();
   fs.mkdirSync(state, { recursive: true });
+  writePackage(root);
 
   const events = [
     {
@@ -110,15 +115,183 @@ test("trial export CLI validates the optional rating", () => {
   assert.match(output.error.message, /1 to 5/);
 });
 
+test("trial export accepts a recent standalone successful verification", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-verify-"));
+  const state = path.join(root, ".agentshell");
+  const out = path.join(root, "trial.json");
+  const createdAt = new Date(Date.now() - 1_000).toISOString();
+  fs.mkdirSync(state, { recursive: true });
+  writePackage(root);
+  fs.writeFileSync(path.join(state, "history.jsonl"), `${JSON.stringify({
+    id: "op_verify",
+    type: "verify",
+    ok: true,
+    verificationMode: "full",
+    rawEstimatedTokens: 500,
+    createdAt
+  })}\n`);
+  fs.writeFileSync(path.join(state, "events.jsonl"), `${JSON.stringify({
+    command: "verify",
+    args: ["verify", "test", "--compact"],
+    ok: true,
+    operationIds: ["op_verify"],
+    estimatedTokens: 50,
+    durationMs: 200,
+    createdAt: new Date(Date.now() - 900).toISOString()
+  })}\n`);
+
+  const result = await exportTrial(root, { out, rating: 5 });
+  const bundle = JSON.parse(fs.readFileSync(out, "utf8"));
+
+  assert.equal(result.ok, true);
+  assert.equal(bundle.events.length, 1);
+  assert.equal(bundle.events[0].command, "agentshell verify test --compact");
+  assert.equal(bundle.finalVerification.ok, true);
+  assert.equal(bundle.evidenceMetadata.measurement.rawVerifyEstimatedTokens, 500);
+});
+
 test("trial export refuses to create an unverified or stale evidence file", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-empty-"));
   const out = path.join(root, "trial.json");
+  writePackage(root);
   const result = await exportTrial(root, { out });
 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "TRIAL_NOT_READY");
   assert.equal(fs.existsSync(out), false);
-  assert.ok(result.error.suggestedNextActions.some((item) => item.command === "agentshell fix test --fast --compact"));
+  assert.equal(result.error.details.diagnosis, "no-agentshell-events");
+  assert.ok(result.error.suggestedNextActions.some((item) => item.command === "agentshell trial export --verify --rating 1-5"));
+});
+
+test("trial status distinguishes wrong directory and conservatively suggests one direct child", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-wrong-dir-"));
+  const project = path.join(root, "only-project");
+  fs.mkdirSync(project);
+  writePackage(project);
+
+  const status = trialStatus(root);
+
+  assert.equal(status.status, "wrong-directory");
+  assert.equal(status.ready, false);
+  assert.equal(status.project.root, null);
+  assert.equal(status.project.suggestedRoot, project);
+
+  const second = path.join(root, "second-project");
+  fs.mkdirSync(second);
+  writePackage(second);
+  assert.equal(trialStatus(root).project.suggestedRoot, null);
+});
+
+test("trial status treats a package-like home directory without tests as the wrong directory", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-home-"));
+  const project = path.join(home, "real-project");
+  writePackage(home, {});
+  fs.mkdirSync(project);
+  writePackage(project);
+
+  const status = trialStatus(home, { home });
+
+  assert.equal(status.status, "wrong-directory");
+  assert.equal(status.project.root, null);
+  assert.equal(status.project.suggestedRoot, project);
+});
+
+test("trial status distinguishes missing test script and missing AgentShell events", () => {
+  const noTest = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-no-test-"));
+  writePackage(noTest, { build: "node build.js" });
+  assert.equal(trialStatus(noTest).status, "no-test-script");
+
+  const noEvents = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-no-events-"));
+  writePackage(noEvents);
+  const status = trialStatus(noEvents);
+  assert.equal(status.status, "no-agentshell-events");
+  assert.equal(status.evidence.eventCount, 0);
+});
+
+test("trial status distinguishes stale evidence and a recent failed verification", () => {
+  const stale = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-stale-"));
+  const staleState = path.join(stale, ".agentshell");
+  const old = new Date(Date.now() - 7 * 60 * 60 * 1_000).toISOString();
+  writePackage(stale);
+  fs.mkdirSync(staleState);
+  fs.writeFileSync(path.join(staleState, "events.jsonl"), `${JSON.stringify({ command: "verify", createdAt: old })}\n`);
+  fs.writeFileSync(path.join(staleState, "history.jsonl"), `${JSON.stringify({ type: "verify", ok: true, createdAt: old })}\n`);
+  assert.equal(trialStatus(stale).status, "stale-evidence");
+
+  const failed = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-failed-"));
+  const failedState = path.join(failed, ".agentshell");
+  const recent = new Date(Date.now() - 1_000).toISOString();
+  writePackage(failed);
+  fs.mkdirSync(failedState);
+  fs.writeFileSync(path.join(failedState, "history.jsonl"), `${JSON.stringify({ type: "verify", ok: false, createdAt: recent })}\n`);
+  assert.equal(trialStatus(failed).status, "failed-verification");
+
+  const activeFailure = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-active-failed-"));
+  const activeState = path.join(activeFailure, ".agentshell");
+  writePackage(activeFailure);
+  fs.mkdirSync(activeState);
+  fs.writeFileSync(path.join(activeState, "active-run.json"), JSON.stringify({
+    id: "run_failed",
+    status: "failing",
+    startedAt: recent,
+    updatedAt: recent,
+    nodes: [{ type: "diagnose", verificationOk: false }],
+    commandStats: []
+  }));
+  assert.equal(trialStatus(activeFailure).status, "failed-verification");
+});
+
+test("trial export can verify and export through an injected function API", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-self-rescue-"));
+  const state = path.join(root, ".agentshell");
+  const out = path.join(root, "trial.json");
+  writePackage(root);
+  fs.mkdirSync(state);
+
+  const result = await exportTrial(root, {
+    out,
+    verify: true,
+    rating: 4,
+    verifyFn: async (verifyRoot, type, options) => {
+      assert.equal(verifyRoot, root);
+      assert.equal(type, "test");
+      assert.equal(options.run, true);
+      const operation = {
+        id: "op_self_rescue",
+        type: "verify",
+        ok: true,
+        verificationMode: "full",
+        rawEstimatedTokens: 900,
+        durationMs: 25,
+        createdAt: new Date().toISOString()
+      };
+      fs.writeFileSync(path.join(state, "history.jsonl"), `${JSON.stringify(operation)}\n`);
+      return { ok: true, operationId: operation.id, durationMs: 25, summary: { failedTests: 0 } };
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(trialStatus(root).status, "ready");
+  const bundle = JSON.parse(fs.readFileSync(out, "utf8"));
+  assert.equal(bundle.events.at(-1).command, "agentshell verify test --compact");
+  assert.equal(bundle.evidenceMetadata.userFeedback.rating, 4);
+});
+
+test("trial export verify mode reports failed verification without writing evidence", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-trial-verify-failed-"));
+  const out = path.join(root, "trial.json");
+  writePackage(root);
+
+  const result = await exportTrial(root, {
+    out,
+    verify: true,
+    verifyFn: async () => ({ ok: false, exitCode: 1, summary: { failedTests: 2 }, logRef: "log_failed" })
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "TRIAL_VERIFICATION_FAILED");
+  assert.equal(result.error.details.verification.exitCode, 1);
+  assert.equal(fs.existsSync(out), false);
 });
 
 test("trial export schema is exposed through the CLI registry", () => {

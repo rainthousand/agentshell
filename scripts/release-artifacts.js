@@ -10,6 +10,7 @@ fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
 
 if (process.platform === "darwin") run("npm", ["run", "dashboard:build-app"]);
+if (process.platform === "darwin" && process.arch === "arm64") run("npm", ["run", "build:standalone"]);
 run("node", ["scripts/share-package.js", "--out-dir", outDir, "--name", "agentshell-codex-plugin", "--zip"]);
 const zip = path.join(outDir, "agentshell-codex-plugin.zip");
 const checksum = crypto.createHash("sha256").update(fs.readFileSync(zip)).digest("hex");

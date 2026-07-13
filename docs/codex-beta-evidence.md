@@ -1,17 +1,25 @@
 # Codex Beta Evidence
 
+For the external-user handoff and acceptance gates, see [External Beta Playbook](external-beta-playbook.md). Aggregate successful exports and failure envelopes with `npm run beta:funnel -- --input <evidence.json> [--input <failure.json> ...]`.
+
 AgentShell v1.0 needs evidence from real users and real Codex tasks, not only local
-fixtures. The user-facing collection step is one command:
+fixtures. The user-facing collection step can verify and export in one command:
 
 ```bash
-agentshell trial export
+agentshell trial export --verify --rating 5
 ```
 
 The command writes `agentshell-trial-<timestamp>.json` to the user's Desktop when
 available. A user who does not work in a terminal can ask Codex:
 
-> Please run `agentshell trial export` in this project after the tests pass, then
+> Please run `agentshell trial export --verify --rating 5` in this project, then
 > tell me where the exported file is.
+
+Use `agentshell trial status` when collection fails. It distinguishes a wrong
+directory, a missing test script, missing AgentShell activity, stale evidence, and
+a failed verification. From another directory, pass the project explicitly with
+`--project /path/to/project`; AgentShell never edits a missing test script
+automatically.
 
 An optional 1-5 usefulness rating can be included without adding a form:
 

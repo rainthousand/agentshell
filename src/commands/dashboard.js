@@ -5,13 +5,10 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 import { metrics } from "./metrics.js";
+import { resolvePackageRoot } from "../core/package-root.js";
 
 const PROTOCOL_VERSION = "agentshell.dashboard.v1";
 const DEFAULT_PORT = 4317;
-const ASSET_ROOT = path.resolve(import.meta.dirname, "..", "dashboard");
-const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..", "..");
-const DASHBOARD_APP = path.join(PACKAGE_ROOT, "desktop", "macos", "dist", "AgentShell Dashboard.app");
-const PLUGIN_MANIFEST = path.join(PACKAGE_ROOT, ".codex-plugin", "plugin.json");
 const ASSETS = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
@@ -23,15 +20,15 @@ export async function startDashboard(root, options = {}) {
   const singleton = options.singleton !== false;
   const runtime = runtimePaths(options);
   if (singleton) {
-    const existing = await claimDashboard(root, runtime);
+    const existing = await claimDashboard(root, runtime, options);
     if (existing) {
       const launch = launchSurface(existing.url, options);
-      return dashboardSession(null, existing, launch, true, async () => {});
+      return dashboardSession(null, existing, launch, true, async () => {}, options);
     }
   }
 
   const requestedPort = parsePort(options.port);
-  const server = createServer(root);
+  const server = createServer(root, options);
   let address;
   try {
     address = await listen(server, requestedPort);
@@ -43,7 +40,7 @@ export async function startDashboard(root, options = {}) {
   const metadata = {
     pid: process.pid,
     root: path.resolve(root),
-    version: pluginVersion(),
+    version: pluginVersion(options),
     port: address.port,
     url,
     startedAt: new Date().toISOString()
@@ -56,11 +53,11 @@ export async function startDashboard(root, options = {}) {
     closed = true;
     await closeServer(server);
     if (singleton) releaseRuntime(runtime, process.pid);
-    if (launch.surface === "desktop-window") stopNativeWindows();
+    if (isNativeSurface(launch.surface)) stopNativeWindows();
   };
   if (singleton && options.monitorParent !== false) monitorParent(close);
 
-  return dashboardSession(server, metadata, launch, false, close);
+  return dashboardSession(server, metadata, launch, false, close, options);
 }
 
 export async function dashboardStatus(options = {}) {
@@ -92,7 +89,7 @@ export async function stopDashboard(options = {}) {
   };
 }
 
-function dashboardSession(server, metadata, launch, reused, close) {
+function dashboardSession(server, metadata, launch, reused, close, options) {
   return {
     server,
     close,
@@ -106,7 +103,7 @@ function dashboardSession(server, metadata, launch, reused, close) {
       reused,
       opened: launch.opened,
       surface: launch.surface,
-      nativeAppAvailable: fs.existsSync(DASHBOARD_APP),
+      nativeAppAvailable: fs.existsSync(dashboardApp(options)),
       readOnly: true,
       privacy: {
         localOnly: true,
@@ -121,18 +118,25 @@ function dashboardSession(server, metadata, launch, reused, close) {
 
 function launchSurface(url, options) {
   if (options.open === false) return { opened: false, surface: "none" };
-  const preferred = options.surface || (process.platform === "darwin" ? "window" : "browser");
-  if (preferred === "window" && process.platform === "darwin" && fs.existsSync(DASHBOARD_APP)) {
+  const preferred = options.surface || (process.platform === "darwin" ? "menubar" : "browser");
+  const app = dashboardApp(options);
+  if (["menubar", "window"].includes(preferred) && process.platform === "darwin" && fs.existsSync(app)) {
     stopNativeWindows();
-    const result = spawnSync("open", [DASHBOARD_APP, "--args", "--url", url], {
+    const appArgs = [app, "--args", "--url", url];
+    if (preferred === "window") appArgs.push("--show-window");
+    const result = spawnSync("open", appArgs, {
       encoding: "utf8"
     });
-    if (result.status === 0) return { opened: true, surface: "desktop-window" };
+    if (result.status === 0) return { opened: true, surface: preferred === "window" ? "desktop-window" : "menu-bar" };
   }
   return {
     opened: openUrl(url),
-    surface: preferred === "window" ? "browser-fallback" : "browser"
+    surface: ["menubar", "window"].includes(preferred) ? "browser-fallback" : "browser"
   };
+}
+
+function isNativeSurface(surface) {
+  return surface === "menu-bar" || surface === "desktop-window";
 }
 
 function runtimePaths(options) {
@@ -145,16 +149,16 @@ function runtimePaths(options) {
   };
 }
 
-async function reusableDashboard(root, runtime) {
+async function reusableDashboard(root, runtime, options) {
   const state = readJson(runtime.state);
-  if (!state || state.root !== path.resolve(root) || state.version !== pluginVersion()) return null;
+  if (!state || state.root !== path.resolve(root) || state.version !== pluginVersion(options)) return null;
   if (!isProcessAlive(state.pid) || !await healthReady(state.url)) return null;
   return state;
 }
 
-async function claimDashboard(root, runtime) {
+async function claimDashboard(root, runtime, options) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
-    const reusable = await reusableDashboard(root, runtime);
+    const reusable = await reusableDashboard(root, runtime, options);
     if (reusable) return reusable;
 
     const state = readJson(runtime.state);
@@ -205,8 +209,13 @@ function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return null; }
 }
 
-function pluginVersion() {
-  try { return JSON.parse(fs.readFileSync(PLUGIN_MANIFEST, "utf8")).version || "unknown"; } catch { return "unknown"; }
+function pluginVersion(options) {
+  try {
+    const manifest = path.join(packageRoot(options), ".codex-plugin", "plugin.json");
+    return JSON.parse(fs.readFileSync(manifest, "utf8")).version || "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 function isProcessAlive(pid) {
@@ -250,7 +259,7 @@ function monitorParent(close) {
   timer.unref();
 }
 
-function createServer(root) {
+function createServer(root, options) {
   return http.createServer(async (request, response) => {
     setSecurityHeaders(response);
     try {
@@ -260,12 +269,23 @@ function createServer(root) {
         return sendJson(response, 200, { ok: true, protocolVersion: PROTOCOL_VERSION });
       }
       if (url.pathname === "/api/metrics") {
-        const report = await metrics(root, { compact: true, limit: url.searchParams.get("limit") || 500 });
-        return sendJson(response, 200, report);
+        const scope = url.searchParams.get("scope") || "global";
+        if (!["global", "workspace"].includes(scope)) {
+          return sendJson(response, 400, { ok: false, error: "INVALID_SCOPE", allowed: ["global", "workspace"] });
+        }
+        const report = await metrics(root, {
+          compact: true,
+          limit: url.searchParams.get("limit") || 500,
+          scope
+        });
+        return sendJson(response, 200, {
+          ...report,
+          dashboard: { ...report.dashboard, scope }
+        });
       }
       const asset = ASSETS.get(url.pathname);
       if (!asset) return sendJson(response, 404, { ok: false, error: "NOT_FOUND" });
-      return sendAsset(response, asset[0], asset[1]);
+      return sendAsset(response, asset[0], asset[1], options);
     } catch (error) {
       return sendJson(response, 500, { ok: false, error: "DASHBOARD_ERROR", message: error.message });
     }
@@ -297,14 +317,31 @@ function listen(server, requestedPort) {
   });
 }
 
-function sendAsset(response, fileName, contentType) {
-  const file = path.join(ASSET_ROOT, fileName);
+function sendAsset(response, fileName, contentType, options) {
+  const file = path.join(packageRoot(options), "src", "dashboard", fileName);
   if (!fs.existsSync(file)) return sendJson(response, 404, { ok: false, error: "ASSET_NOT_FOUND" });
   response.writeHead(200, {
     "Content-Type": contentType,
     "Cache-Control": "no-store"
   });
   response.end(fs.readFileSync(file));
+}
+
+function packageRoot(options = {}) {
+  return resolvePackageRoot({
+    packageRoot: options.packageRoot,
+    root: options.packageRoot,
+    homeDir: options.home,
+    codexHome: options.codexHome,
+    env: options.env,
+    executablePath: options.executablePath,
+    sourceRoot: options.sourceRoot,
+    installedCandidates: options.installedCandidates
+  });
+}
+
+function dashboardApp(options) {
+  return path.join(packageRoot(options), "desktop", "macos", "dist", "AgentShell Dashboard.app");
 }
 
 function sendJson(response, status, value) {

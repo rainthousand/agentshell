@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import os from "node:os";
+import fs from "node:fs";
+import path from "node:path";
+
 import { understand } from "./commands/understand.js";
 import { find } from "./commands/find.js";
 import { readFileAround, readFileRange } from "./commands/read.js";
@@ -18,30 +22,45 @@ import { doctor } from "./commands/doctor.js";
 import { start } from "./commands/start.js";
 import { pluginStatus } from "./commands/plugin-status.js";
 import { parsePluginValidateOptions, pluginValidate } from "./commands/plugin-validate.js";
-import { exportTrial } from "./commands/trial-export.js";
+import { exportTrial, trialStatus } from "./commands/trial-export.js";
 import { dashboardStatus, startDashboard, stopDashboard } from "./commands/dashboard.js";
+import { setupCodex } from "./commands/setup-codex.js";
 import { fail, printJson } from "./core/output.js";
 import { appendEvent, appendRunCommandStats } from "./core/store.js";
+import { registerWorkspace } from "./core/workspace-registry.js";
+import { resolvePackageRoot } from "./core/package-root.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
 const commandStartedAt = process.hrtime.bigint();
 
 async function main() {
+  if (command === "--version" || command === "-v" || command === "version") {
+    printJson({
+      ok: true,
+      protocolVersion: "agentshell.version.v1",
+      name: "agentshell",
+      version: "0.24.0"
+    });
+    return;
+  }
   if (!command || command === "--help" || command === "-h") {
     printJson({
       ok: true,
       name: "agentshell",
       version: "0.24.0",
       commands: [
+        "agentshell --version",
         "agentshell manual [--full|--topic <repair|plugin|benchmark|profile|onboarding|log-triage|reference>]",
         "agentshell start [--compact] [--profile]",
         "agentshell entry [--compact] [--profile]",
         "agentshell doctor",
         "agentshell plugin status [--compact] [--home <home>] [--marketplace <path>] [--cache-root <path>]",
         "agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]",
-        "agentshell trial export [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]",
-        "agentshell dashboard [--port N] [--window|--browser] [--no-open|--status|--stop]",
+        "agentshell trial status [--project <path>]",
+        "agentshell trial export [--verify] [--project <path>] [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]",
+        "agentshell dashboard [--port N] [--menubar|--window|--browser] [--daemon] [--no-open|--status|--stop]",
+        "agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--dry-run]",
         "agentshell understand [--compact]",
         "agentshell find <query>",
         "agentshell read <file> --lines A:B",
@@ -53,8 +72,8 @@ async function main() {
         "agentshell undo [operationId]",
         "agentshell history",
         "agentshell log get <logRef> --tail N",
-        "agentshell metrics [--compact] [--limit N] [--since 24h|7d|all]",
-        "agentshell metrics export --out <file> [--since 24h|7d|all]",
+        "agentshell metrics [--compact] [--limit N] [--since 24h|7d|all] [--scope workspace|global]",
+        "agentshell metrics export --out <file> [--since 24h|7d|all] [--scope workspace|global]",
         "agentshell metrics reset --confirm",
         "agentshell benchmark test",
         "agentshell diagnose test [--compact] [--profile]",
@@ -67,6 +86,28 @@ async function main() {
         "agentshell schema get <name>"
       ]
     });
+    return;
+  }
+
+  if (command === "setup") {
+    if (args[1] !== "codex") {
+      printJson(fail("INVALID_ARGUMENT", "Usage: agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--dry-run]"));
+      process.exitCode = 2;
+      return;
+    }
+    const action = args[2] && !args[2].startsWith("--") ? args[2] : "install";
+    const sourceFlag = args.indexOf("--source");
+    let source;
+    try {
+      source = sourceFlag >= 0 ? path.resolve(args[sourceFlag + 1]) : resolvePackageRoot();
+    } catch (error) {
+      printJson(fail("PACKAGE_ROOT_NOT_FOUND", error.message));
+      process.exitCode = 1;
+      return;
+    }
+    const result = await setupCodex(action, { source, dryRun: args.includes("--dry-run") });
+    printJson(result);
+    process.exitCode = result.ok ? 0 : 1;
     return;
   }
 
@@ -120,18 +161,24 @@ async function main() {
   }
 
   if (command === "trial") {
-    if (args[1] !== "export") {
-      emit(fail("INVALID_ARGUMENT", "Usage: agentshell trial export [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]"));
+    const action = args[1];
+    if (!["status", "export"].includes(action)) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell trial status [--project <path>] OR agentshell trial export [--verify] [--project <path>] [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]"));
       process.exitCode = 2;
       return;
     }
-    const options = parseTrialExportOptions(args.slice(2));
+    const options = action === "status"
+      ? parseTrialStatusOptions(args.slice(2))
+      : parseTrialExportOptions(args.slice(2));
     if (!options.ok) {
       emit(options);
       process.exitCode = 2;
       return;
     }
-    const result = await exportTrial(process.cwd(), options.value);
+    const projectRoot = options.value.project ? path.resolve(options.value.project) : process.cwd();
+    const result = action === "status"
+      ? trialStatus(projectRoot)
+      : await exportTrial(projectRoot, options.value);
     emit(result);
     process.exitCode = result.ok ? 0 : 1;
     return;
@@ -304,9 +351,11 @@ async function main() {
       const out = outFlag >= 0 ? args[outFlag + 1] : undefined;
       const sinceFlag = args.indexOf("--since");
       const since = sinceFlag >= 0 ? args[sinceFlag + 1] : undefined;
+      const scopeFlag = args.indexOf("--scope");
+      const scope = scopeFlag >= 0 ? args[scopeFlag + 1] : "workspace";
       const result = out
-        ? await exportMetrics(process.cwd(), out, { since })
-        : fail("INVALID_ARGUMENT", "Usage: agentshell metrics export --out <file> [--since 24h|7d|all]");
+        ? await exportMetrics(process.cwd(), out, { since, scope })
+        : fail("INVALID_ARGUMENT", "Usage: agentshell metrics export --out <file> [--since 24h|7d|all] [--scope workspace|global]");
       emit(result);
       process.exitCode = result.ok ? 0 : 2;
       return;
@@ -315,9 +364,17 @@ async function main() {
     const limit = limitFlag >= 0 ? args[limitFlag + 1] : undefined;
     const sinceFlag = args.indexOf("--since");
     const since = sinceFlag >= 0 ? args[sinceFlag + 1] : undefined;
+    const scopeFlag = args.indexOf("--scope");
+    const scope = scopeFlag >= 0 ? args[scopeFlag + 1] : "workspace";
+    if (!["workspace", "global"].includes(scope)) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell metrics [--compact] [--limit N] [--since 24h|7d|all] [--scope workspace|global]"));
+      process.exitCode = 2;
+      return;
+    }
     emit(await metrics(process.cwd(), {
       limit,
       since,
+      scope,
       compact: args.includes("--compact")
     }));
     return;
@@ -390,12 +447,31 @@ function emit(result) {
     const operationIds = operationIdsFor(result);
     if (operationIds.length > 0) event.operationIds = operationIds;
     appendEvent(process.cwd(), event);
+    if (shouldRegisterWorkspace(process.cwd())) registerWorkspace(process.cwd());
     if (result.runId && command !== "run") {
       appendRunCommandStats(process.cwd(), result.runId, event);
     }
   } catch {
     // Telemetry must never break the command the agent actually asked for.
   }
+}
+
+function shouldRegisterWorkspace(root) {
+  const resolved = canonicalPath(root);
+  const home = canonicalPath(os.homedir());
+  return resolved !== home
+    && resolved !== path.parse(resolved).root
+    && !temporaryRoots().some((temporary) => (
+    resolved === temporary || resolved.startsWith(`${temporary}${path.sep}`)
+  ));
+}
+
+function temporaryRoots() {
+  return [...new Set([os.tmpdir(), "/tmp", "/var/tmp"].map(canonicalPath))];
+}
+
+function canonicalPath(value) {
+  try { return fs.realpathSync.native(value); } catch { return path.resolve(value); }
 }
 
 function operationIdsFor(result) {
@@ -492,14 +568,18 @@ function parseTrialExportOptions(argv) {
   const options = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (["--out", "--id", "--fixture", "--rating"].includes(arg)) {
+    if (arg === "--verify") {
+      options.verify = true;
+      continue;
+    }
+    if (["--out", "--id", "--fixture", "--rating", "--project"].includes(arg)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) return fail("INVALID_ARGUMENT", `Missing value for ${arg}`);
       options[arg.slice(2)] = value;
       index += 1;
       continue;
     }
-    if (arg.startsWith("--out=") || arg.startsWith("--id=") || arg.startsWith("--fixture=") || arg.startsWith("--rating=")) {
+    if (arg.startsWith("--out=") || arg.startsWith("--id=") || arg.startsWith("--fixture=") || arg.startsWith("--rating=") || arg.startsWith("--project=")) {
       const [flag, ...parts] = arg.split("=");
       const value = parts.join("=");
       if (!value) return fail("INVALID_ARGUMENT", `Missing value for ${flag}`);
@@ -518,12 +598,27 @@ function parseTrialExportOptions(argv) {
   return { ok: true, value: options };
 }
 
+function parseTrialStatusOptions(argv) {
+  if (argv.length === 0) return { ok: true, value: {} };
+  if (argv.length === 2 && argv[0] === "--project" && argv[1] && !argv[1].startsWith("--")) {
+    return { ok: true, value: { project: argv[1] } };
+  }
+  if (argv.length === 1 && argv[0].startsWith("--project=") && argv[0].slice("--project=".length)) {
+    return { ok: true, value: { project: argv[0].slice("--project=".length) } };
+  }
+  return fail("INVALID_ARGUMENT", "Usage: agentshell trial status [--project <path>]");
+}
+
 function parseDashboardOptions(argv) {
   const options = { open: true };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--no-open") {
       options.open = false;
+      continue;
+    }
+    if (arg === "--daemon") {
+      options.monitorParent = false;
       continue;
     }
     if (arg === "--status" || arg === "--stop") {
@@ -533,10 +628,10 @@ function parseDashboardOptions(argv) {
       options.open = false;
       continue;
     }
-    if (arg === "--window" || arg === "--browser") {
+    if (arg === "--menubar" || arg === "--window" || arg === "--browser") {
       const surface = arg.slice(2);
       if (options.surface && options.surface !== surface) {
-        return fail("INVALID_ARGUMENT", "Choose either --window or --browser");
+        return fail("INVALID_ARGUMENT", "Choose one dashboard surface: --menubar, --window, or --browser");
       }
       options.surface = surface;
       continue;
@@ -560,8 +655,8 @@ function parseDashboardOptions(argv) {
     return fail("INVALID_ARGUMENT", "--port must be an integer from 0 to 65535");
   }
   options.port = port;
-  if (options.action && (options.surface || options.port !== undefined)) {
-    return fail("INVALID_ARGUMENT", "--status/--stop cannot be combined with surface or port options");
+  if (options.action && (options.surface || options.port !== undefined || options.monitorParent === false)) {
+    return fail("INVALID_ARGUMENT", "--status/--stop cannot be combined with surface, port, or --daemon options");
   }
   return { ok: true, value: options };
 }

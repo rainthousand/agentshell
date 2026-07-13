@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fail } from "../core/output.js";
+import { resolvePackageRoot } from "../core/package-root.js";
 
 const SCHEMAS = [
   "common",
@@ -29,6 +30,8 @@ const SCHEMAS = [
   "codex-plugin-trial-plan",
   "codex-plugin-trial-suite",
   "trial-export",
+  "trial-status",
+  "beta-funnel",
   "dashboard",
   "cold-start-benchmark",
   "real-project-eval",
@@ -67,7 +70,7 @@ export async function schema(root, action, name) {
   }
 
   const schemaPath = path.resolve(root, "schemas", `${name}.schema.json`);
-  const fallbackPath = path.resolve(import.meta.dirname, "..", "..", "schemas", `${name}.schema.json`);
+  const fallbackPath = path.join(resolvePackageRoot({ root }), "schemas", `${name}.schema.json`);
   const file = fs.existsSync(schemaPath) ? schemaPath : fallbackPath;
   return {
     protocolVersion: SCHEMA_GET_PROTOCOL_VERSION,

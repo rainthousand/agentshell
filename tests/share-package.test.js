@@ -31,6 +31,7 @@ test("share package builds a real-user handoff directory without runtime state",
   assert.equal(fs.existsSync(path.join(packageDir, "package.json")), true);
   assert.equal(fs.existsSync(path.join(packageDir, ".codex-plugin", "plugin.json")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "bin", "agentshell")), true);
+  assert.equal(fs.existsSync(path.join(packageDir, "bin", "agentshell-darwin-arm64")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "src", "cli.js")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "scripts", "install-for-codex-user.js")), true);
   assert.equal(fs.existsSync(path.join(packageDir, "scripts", "install-codex-plugin.js")), true);
@@ -52,28 +53,31 @@ test("share package builds a real-user handoff directory without runtime state",
   }
 
   const startHere = fs.readFileSync(path.join(packageDir, "START-HERE.md"), "utf8");
-  assert.match(startHere, /npm run install:codex/);
+  assert.match(startHere, /agentshell-darwin-arm64 setup codex install/);
   assert.match(startHere, /Double-click `install\.command`/);
   assert.match(startHere, /check-install\.command/);
-  assert.match(startHere, /agentshell trial export --rating 5/);
+  assert.match(startHere, /agentshell trial export --verify --rating 5/);
   assert.match(startHere, /not a public plugin release/i);
 
   const binMode = fs.statSync(path.join(packageDir, "bin", "agentshell")).mode;
   assert.notEqual(binMode & 0o111, 0, "bin/agentshell should remain executable");
   const installCommand = fs.readFileSync(path.join(packageDir, "install.command"), "utf8");
   assert.match(installCommand, /npm run install:codex/);
+  assert.match(installCommand, /agentshell-darwin-arm64.*setup codex install/);
   assert.match(installCommand, /agentshell-install\.log/);
   assert.match(installCommand, /PIPESTATUS/);
   const installCommandMode = fs.statSync(path.join(packageDir, "install.command")).mode;
   assert.notEqual(installCommandMode & 0o111, 0, "install.command should be executable");
   const checkInstallCommand = fs.readFileSync(path.join(packageDir, "check-install.command"), "utf8");
   assert.match(checkInstallCommand, /doctor:codex/);
+  assert.match(checkInstallCommand, /setup codex doctor/);
   assert.match(checkInstallCommand, /agentshell-install-check\.json/);
   const checkInstallCommandMode = fs.statSync(path.join(packageDir, "check-install.command")).mode;
   assert.notEqual(checkInstallCommandMode & 0o111, 0, "check-install.command should be executable");
   for (const action of ["update", "uninstall"]) {
     const file = path.join(packageDir, `${action}.command`);
     assert.match(fs.readFileSync(file, "utf8"), new RegExp(`npm run ${action}:codex`));
+    assert.match(fs.readFileSync(file, "utf8"), new RegExp(`setup codex ${action}`));
     assert.notEqual(fs.statSync(file).mode & 0o111, 0, `${action}.command should be executable`);
   }
 });

@@ -3,11 +3,13 @@
   "$id": "https://agentshell.local/schemas/metrics.schema.json",
   "title": "AgentShell Metrics Response",
   "type": "object",
-  "required": ["ok", "protocolVersion", "compact", "window", "totals", "savings", "latestRun", "measurement", "dashboard", "privacy"],
+  "required": ["ok", "protocolVersion", "compact", "scope", "workspaceCount", "window", "totals", "savings", "latestRun", "measurement", "dashboard", "privacy"],
   "properties": {
     "ok": { "const": true },
     "protocolVersion": { "const": "agentshell.metrics.v2" },
     "compact": { "type": "boolean" },
+    "scope": { "enum": ["workspace", "global"] },
+    "workspaceCount": { "type": "integer", "minimum": 1 },
     "window": { "$ref": "#/$defs/window" },
     "totals": { "$ref": "#/$defs/totals" },
     "savings": { "oneOf": [{ "$ref": "#/$defs/savings" }, { "type": "null" }] },
@@ -54,12 +56,13 @@
     },
     "privacy": {
       "type": "object",
-      "required": ["storage", "networkUpload", "includesFileContents", "includesCommandOutput"],
+      "required": ["storage", "networkUpload", "includesFileContents", "includesCommandOutput", "workspacePathsExposed"],
       "properties": {
-        "storage": { "const": "local-workspace-only" },
+        "storage": { "enum": ["local-workspace-only", "local-machine-registry"] },
         "networkUpload": { "const": false },
         "includesFileContents": { "const": false },
-        "includesCommandOutput": { "const": false }
+        "includesCommandOutput": { "const": false },
+        "workspacePathsExposed": { "const": false }
       },
       "additionalProperties": false
     },

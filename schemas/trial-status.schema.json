@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/trial-status.schema.json",
+  "title": "AgentShell Trial Status",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "status", "ready", "message", "project", "evidence", "suggestedNextActions"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.trial-status.v1" },
+    "status": { "enum": ["wrong-directory", "no-test-script", "no-agentshell-events", "stale-evidence", "failed-verification", "verification-missing", "ready"] },
+    "ready": { "type": "boolean" },
+    "message": { "type": "string" },
+    "project": { "type": "object" },
+    "evidence": { "type": "object" },
+    "suggestedNextActions": { "type": "array" }
+  },
+  "additionalProperties": false
+}

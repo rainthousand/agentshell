@@ -13,7 +13,7 @@
     "pid": { "type": "integer", "minimum": 1 },
     "reused": { "type": "boolean" },
     "opened": { "type": "boolean" },
-    "surface": { "enum": ["desktop-window", "browser", "browser-fallback", "none"] },
+    "surface": { "enum": ["menu-bar", "desktop-window", "browser", "browser-fallback", "none"] },
     "nativeAppAvailable": { "type": "boolean" },
     "readOnly": { "const": true },
     "privacy": {

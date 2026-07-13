@@ -47,6 +47,23 @@ test("agent policy installer updates only its managed block", () => {
   assert.match(text, /After/);
 });
 
+test("managed policy activates AgentShell from the real project root", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-policy-activation-"));
+  const target = path.join(dir, "AGENTS.md");
+
+  installAgentPolicy(target);
+  const text = fs.readFileSync(target, "utf8");
+
+  assert.match(text, /project root/);
+  assert.match(text, /never blindly run project commands from `\$HOME`/);
+  assert.match(text, /agentshell start --compact/);
+  assert.match(text, /resolve the newest version under .*plugins\/cache\/personal\/agentshell\//);
+  assert.match(text, /agentshell verify test --compact/);
+  assert.match(text, /agentshell trial status/);
+  assert.match(text, /agentshell trial export --verify --rating 1-5/);
+  assert.match(text, /Keep MCP deferred/);
+});
+
 test("agent policy installer dry run reports without writing", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-policy-dry-"));
   const target = path.join(dir, "AGENTS.md");

@@ -1,17 +1,28 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { resolvePackageRoot } from "../core/package-root.js";
 
 export const PLUGIN_STATUS_PROTOCOL_VERSION = "agentshell.plugin-status.v1";
 
 export function pluginStatus(root, options = {}) {
+  const packageRoot = resolvePackageRoot({
+    packageRoot: options.packageRoot,
+    root,
+    homeDir: options.home,
+    codexHome: options.codexHome,
+    env: options.env,
+    executablePath: options.executablePath,
+    sourceRoot: options.sourceRoot,
+    installedCandidates: options.installedCandidates
+  });
   const home = path.resolve(options.home || os.homedir());
   const marketplace = path.resolve(options.marketplace || path.join(home, ".agents", "plugins", "marketplace.json"));
   const cacheRoot = path.resolve(options.cacheRoot || path.join(home, ".codex", "plugins", "cache", "personal", "agentshell"));
   const checks = [];
   const paths = {
-    root: path.resolve(root),
-    manifest: path.join(path.resolve(root), ".codex-plugin", "plugin.json"),
+    root: packageRoot,
+    manifest: path.join(packageRoot, ".codex-plugin", "plugin.json"),
     marketplace,
     cacheRoot
   };

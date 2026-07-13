@@ -90,14 +90,30 @@ test("dashboard serves local read-only UI and metrics with security headers", as
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
     assert.match(html, /AgentShell Dashboard/);
-    assert.match(html, /Tokens saved/);
+    assert.match(html, /Verified savings/);
     assert.match(html, /Time saved/);
 
     const api = await fetch(new URL("/api/metrics", session.report.url));
     const data = await api.json();
     assert.equal(api.status, 200);
     assert.equal(data.protocolVersion, "agentshell.metrics.v2");
-    assert.equal(data.dashboard.totals.estimatedContextAvoidedTokens, 900);
+    assert.equal(data.dashboard.scope, "global");
+    assert.ok(data.dashboard.totals);
+
+    const projectApi = await fetch(new URL("/api/metrics?scope=workspace", session.report.url));
+    const projectData = await projectApi.json();
+    assert.equal(projectApi.status, 200);
+    assert.equal(projectData.dashboard.scope, "workspace");
+    assert.equal(projectData.dashboard.workspace.name, "dashboard-fixture");
+    assert.equal(projectData.dashboard.totals.estimatedContextAvoidedTokens, 900);
+
+    const invalidScope = await fetch(new URL("/api/metrics?scope=machine", session.report.url));
+    assert.equal(invalidScope.status, 400);
+    assert.deepEqual(await invalidScope.json(), {
+      ok: false,
+      error: "INVALID_SCOPE",
+      allowed: ["global", "workspace"]
+    });
 
     const denied = await fetch(new URL("/api/metrics", session.report.url), { method: "POST" });
     assert.equal(denied.status, 405);

@@ -14,16 +14,42 @@ test("help returns command list as JSON", () => {
   assert.equal(result.status, 0);
   const output = JSON.parse(result.stdout);
   assert.equal(output.ok, true);
+  assert.ok(output.commands.includes("agentshell --version"));
   assert.ok(output.commands.includes("agentshell understand [--compact]"));
   assert.ok(output.commands.includes("agentshell doctor"));
   assert.ok(output.commands.includes("agentshell plugin status [--compact] [--home <home>] [--marketplace <path>] [--cache-root <path>]"));
   assert.ok(output.commands.includes("agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]"));
-  assert.ok(output.commands.includes("agentshell trial export [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]"));
-  assert.ok(output.commands.includes("agentshell dashboard [--port N] [--window|--browser] [--no-open|--status|--stop]"));
+  assert.ok(output.commands.includes("agentshell trial status [--project <path>]"));
+  assert.ok(output.commands.includes("agentshell trial export [--verify] [--project <path>] [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]"));
+  assert.ok(output.commands.includes("agentshell dashboard [--port N] [--menubar|--window|--browser] [--daemon] [--no-open|--status|--stop]"));
   assert.ok(output.commands.includes("agentshell manual [--full|--topic <repair|plugin|benchmark|profile|onboarding|log-triage|reference>]"));
   assert.ok(output.commands.includes("agentshell start [--compact] [--profile]"));
   assert.ok(output.commands.includes("agentshell entry [--compact] [--profile]"));
   assert.ok(output.commands.includes("agentshell fix test [--fast|--safe|--dry-run] [--compact] [--profile]"));
+});
+
+test("version returns a machine-readable product version", () => {
+  const result = spawnSync("node", ["src/cli.js", "--version"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.protocolVersion, "agentshell.version.v1");
+  assert.equal(output.version, "0.24.0");
+});
+
+test("dashboard accepts only one explicit surface", () => {
+  const result = spawnSync("node", ["src/cli.js", "dashboard", "--menubar", "--browser"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 2);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.ok, false);
+  assert.match(output.error.message, /Choose one dashboard surface/);
 });
 
 test("understand returns a versioned workspace summary", () => {
@@ -151,7 +177,7 @@ test("node src/cli.js manual --full preserves complete command map", () => {
   assert.ok(output.commandMap.some((entry) => entry.command === "agentshell doctor"));
   assert.ok(output.commandMap.some((entry) => entry.command === "agentshell read <file> --around <query>"));
   assert.ok(output.commandMap.some((entry) => entry.command === "agentshell log get <logRef> --tail N"));
-  assert.ok(output.commandMap.some((entry) => entry.command === "agentshell metrics --compact [--limit N]"));
+  assert.ok(output.commandMap.some((entry) => entry.command === "agentshell metrics --compact [--limit N] [--scope workspace|global]"));
   assert.ok(output.commandMap.some((entry) => entry.command.includes("agentshell change suggest --dry-run --compact")));
   assert.ok(output.commandMap.some((entry) => entry.command === "agentshell benchmark test"));
   assert.ok(output.commandMap.some((entry) => entry.command === "agentshell diagnose test [--compact]"));
