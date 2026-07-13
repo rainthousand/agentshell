@@ -1,0 +1,7 @@
+{
+  "name": "typescript-literal-mismatch-real-project",
+  "type": "module",
+  "scripts": {
+    "test": "node test/typecheck.cjs"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "candidates": [
+    {
+      "id": "chalk",
+      "name": "Chalk",
+      "url": "https://github.com/chalk/chalk",
+      "expectedFailureClass": "unknown",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "notes": "Register first; checkout only after license, size, and test stability look suitable."
+    },
+    {
+      "id": "sindresorhus-is",
+      "name": "sindresorhus/is",
+      "source": "sindresorhus/is",
+      "expectedFailureClass": "typescript-diagnostic",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "notes": "Owner/repo slugs are accepted without download and stay skipped in manifest drafts."
+    },
+    {
+      "id": "local-prepared-example",
+      "name": "Local prepared example",
+      "repoPath": "examples/failing-test-demo",
+      "expectedFailureClass": "missing-object-property",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "notes": "Local entries can graduate to examples/real-projects.json after reviewing score, blockers, and test command."
+    }
+  ]
+}

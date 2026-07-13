@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/understand.schema.json",
+  "title": "AgentShell Understand Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "workspace", "stack", "scripts", "git", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.understand.v1" },
+        "workspace": { "$ref": "#/$defs/workspace" },
+        "stack": { "$ref": "#/$defs/stack" },
+        "scripts": { "$ref": "#/$defs/scripts" },
+        "git": { "$ref": "#/$defs/git" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "workspace", "stack", "scripts", "git", "nextAction"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.understand.v1" },
+        "compact": { "const": true },
+        "workspace": { "$ref": "#/$defs/compactWorkspace" },
+        "stack": { "$ref": "#/$defs/stack" },
+        "scripts": { "$ref": "#/$defs/scripts" },
+        "git": { "$ref": "#/$defs/compactGit" },
+        "nextAction": { "type": ["string", "null"] }
+      }
+    },
+    {
+      "$ref": "common.schema.json#/$defs/error"
+    }
+  ],
+  "$defs": {
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "name"],
+      "properties": {
+        "root": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "compactWorkspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["languages", "packageManager", "frameworks"],
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "packageManager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", null] },
+        "frameworks": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "scripts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "test": { "type": "string" },
+        "lint": { "type": "string" },
+        "build": { "type": "string" },
+        "dev": { "type": "string" }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["available", "branch", "dirty", "changedFiles"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "branch": { "type": ["string", "null"] },
+        "dirty": { "type": "boolean" },
+        "changedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "changedFilesTotal": { "type": "integer", "minimum": 0 },
+        "changedFilesTruncated": { "type": "boolean" }
+      }
+    },
+    "compactGit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["available", "branch", "dirty", "changedFilesTotal"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "branch": { "type": ["string", "null"] },
+        "dirty": { "type": "boolean" },
+        "changedFilesTotal": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

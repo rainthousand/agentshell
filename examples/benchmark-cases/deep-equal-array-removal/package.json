@@ -1,0 +1,7 @@
+{
+  "name": "agentshell-benchmark-deep-equal-array-removal",
+  "type": "module",
+  "scripts": {
+    "test": "node test/tags.test.js"
+  }
+}

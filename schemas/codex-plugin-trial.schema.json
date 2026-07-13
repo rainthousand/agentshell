@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/codex-plugin-trial.schema.json",
+  "title": "AgentShell Codex Plugin Trial Report",
+  "type": "object",
+  "required": [
+    "ok",
+    "protocolVersion",
+    "generatedAt",
+    "name",
+    "summary",
+    "compactReport",
+    "evidence",
+    "trials",
+    "purpose",
+    "recommendation"
+  ],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.codex-plugin-trial.v1" },
+    "generatedAt": { "type": "string" },
+    "name": { "type": "string" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "compactReport": { "$ref": "#/$defs/compactReport" },
+    "evidence": { "$ref": "#/$defs/evidence" },
+    "trials": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/trialResult" }
+    },
+    "purpose": { "type": "string" },
+    "recommendation": { "type": "string" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": [
+        "total",
+        "averageScore",
+        "byInterpretation",
+        "byHost",
+        "totalOutputTokens",
+        "totalDurationMs",
+        "averageOutputTokens",
+        "averageDurationMs",
+        "totalAgentShellCommands",
+        "totalNoisyRawCommands",
+        "unobservedNoiseRuns"
+      ],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "averageScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "byInterpretation": { "$ref": "#/$defs/interpretationCounts" },
+        "byHost": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/hostSummary" }
+        },
+        "totalOutputTokens": { "type": "integer", "minimum": 0 },
+        "totalDurationMs": { "type": "integer", "minimum": 0 },
+        "averageOutputTokens": { "type": "integer", "minimum": 0 },
+        "averageDurationMs": { "type": "integer", "minimum": 0 },
+        "totalAgentShellCommands": { "type": "integer", "minimum": 0 },
+        "totalNoisyRawCommands": { "type": "integer", "minimum": 0 },
+        "unobservedNoiseRuns": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "interpretationCounts": {
+      "type": "object",
+      "required": ["strong", "usable", "weak"],
+      "properties": {
+        "strong": { "type": "integer", "minimum": 0 },
+        "usable": { "type": "integer", "minimum": 0 },
+        "weak": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "hostSummary": {
+      "type": "object",
+      "required": ["total", "averageScore", "strong", "usable", "weak", "totalOutputTokens", "totalDurationMs"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "averageScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "strong": { "type": "integer", "minimum": 0 },
+        "usable": { "type": "integer", "minimum": 0 },
+        "weak": { "type": "integer", "minimum": 0 },
+        "totalOutputTokens": { "type": "integer", "minimum": 0 },
+        "totalDurationMs": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "compactReport": {
+      "type": "object",
+      "required": [
+        "runs",
+        "completedRuns",
+        "placeholderRuns",
+        "successRate",
+        "averageScore",
+        "strongRate",
+        "tokens",
+        "speed",
+        "commands",
+        "evidenceStatus",
+        "claimReadiness"
+      ],
+      "properties": {
+        "runs": { "type": "integer", "minimum": 0 },
+        "completedRuns": { "type": "integer", "minimum": 0 },
+        "placeholderRuns": { "type": "integer", "minimum": 0 },
+        "successRate": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "averageScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "strongRate": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "tokens": {
+          "type": "object",
+          "required": ["total", "averagePerRun"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "averagePerRun": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "speed": {
+          "type": "object",
+          "required": ["totalDurationMs", "averageDurationMs"],
+          "properties": {
+            "totalDurationMs": { "type": "integer", "minimum": 0 },
+            "averageDurationMs": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "commands": {
+          "type": "object",
+          "required": ["totalAgentShell", "totalNoisyRaw", "unobservedNoiseRuns"],
+          "properties": {
+            "totalAgentShell": { "type": "integer", "minimum": 0 },
+            "totalNoisyRaw": { "type": "integer", "minimum": 0 },
+            "unobservedNoiseRuns": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "evidenceStatus": { "enum": ["complete", "incomplete"] },
+        "claimReadiness": {
+          "enum": ["ready-for-product-evidence", "not-ready-fill-placeholder-run-logs"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["status", "completedRuns", "placeholderRuns", "claimReadiness"],
+      "properties": {
+        "status": { "enum": ["complete", "incomplete"] },
+        "completedRuns": { "type": "integer", "minimum": 0 },
+        "placeholderRuns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "claimReadiness": {
+          "enum": ["ready-for-product-evidence", "not-ready-fill-placeholder-run-logs"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "trialResult": {
+      "type": "object",
+      "required": ["id", "kind", "sourcePath", "host", "fixture", "score", "interpretation", "metrics", "criteria", "finalVerification", "evidence", "notes"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["trial", "collect"] },
+        "sourcePath": { "type": ["string", "null"] },
+        "host": { "enum": ["codex", "claude", "cursor", "windsurf", "agents-md", "other"] },
+        "fixture": { "type": ["string", "null"] },
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "interpretation": { "enum": ["strong", "usable", "weak"] },
+        "metrics": { "$ref": "#/$defs/metrics" },
+        "criteria": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/criterion" }
+        },
+        "finalVerification": {
+          "type": ["object", "null"],
+          "required": ["ok", "command", "summary"],
+          "properties": {
+            "ok": { "type": "boolean" },
+            "command": { "type": ["string", "null"] },
+            "summary": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "observability": { "$ref": "#/$defs/observability" },
+        "evidence": { "$ref": "#/$defs/trialEvidence" },
+        "notes": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "observability": {
+      "type": "object",
+      "required": ["nonAgentShellCommands", "noiseControl", "scoreAdjustment"],
+      "properties": {
+        "nonAgentShellCommands": { "type": "boolean" },
+        "noiseControl": { "enum": ["observed", "unobserved"] },
+        "scoreAdjustment": { "type": "integer", "maximum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "trialEvidence": {
+      "type": "object",
+      "required": ["complete", "placeholderFields"],
+      "properties": {
+        "complete": { "type": "boolean" },
+        "placeholderFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "commandCount",
+        "agentShellCommandCount",
+        "noisyRawCommandCount",
+        "firstAgentShellCommandIndex",
+        "firstNoisyRawCommandIndex",
+        "totalOutputTokens",
+        "totalDurationMs",
+        "averageOutputTokensPerCommand",
+        "averageDurationMsPerCommand"
+      ],
+      "properties": {
+        "commandCount": { "type": "integer", "minimum": 0 },
+        "agentShellCommandCount": { "type": "integer", "minimum": 0 },
+        "noisyRawCommandCount": { "type": "integer", "minimum": 0 },
+        "firstAgentShellCommandIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "firstNoisyRawCommandIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "totalOutputTokens": { "type": "integer", "minimum": 0 },
+        "totalDurationMs": { "type": "integer", "minimum": 0 },
+        "averageOutputTokensPerCommand": { "type": "integer", "minimum": 0 },
+        "averageDurationMsPerCommand": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "criterion": {
+      "type": "object",
+      "required": ["points", "max", "ok", "reason"],
+      "properties": {
+        "points": { "type": "integer", "minimum": 0 },
+        "max": { "type": "integer", "minimum": 0 },
+        "ok": { "type": "boolean" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

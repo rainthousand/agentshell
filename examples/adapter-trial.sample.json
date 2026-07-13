@@ -1,0 +1,32 @@
+{
+  "host": "codex",
+  "fixture": "examples/failing-test-demo",
+  "commands": [
+    {
+      "command": "agentshell start --compact",
+      "outputTokens": 180,
+      "durationMs": 120
+    },
+    {
+      "command": "agentshell fix test --fast --compact",
+      "outputTokens": 310,
+      "durationMs": 850
+    },
+    {
+      "command": "agentshell verify test",
+      "outputTokens": 160,
+      "durationMs": 420
+    },
+    {
+      "command": "agentshell run status --compact",
+      "outputTokens": 120,
+      "durationMs": 80
+    }
+  ],
+  "finalVerification": {
+    "ok": true,
+    "command": "agentshell verify test",
+    "summary": "tests passed; rollback command available in run status"
+  },
+  "notes": "No broad raw logs were needed."
+}

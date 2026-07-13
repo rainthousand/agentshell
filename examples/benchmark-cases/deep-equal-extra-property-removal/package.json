@@ -1,0 +1,7 @@
+{
+  "name": "deep-equal-extra-property-removal-benchmark",
+  "type": "module",
+  "scripts": {
+    "test": "node test/user.test.js"
+  }
+}

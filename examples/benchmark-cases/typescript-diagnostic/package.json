@@ -1,0 +1,6 @@
+{
+  "name": "benchmark-typescript-diagnostic",
+  "scripts": {
+    "test": "node test/typecheck.cjs"
+  }
+}

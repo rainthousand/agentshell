@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/trial-export.schema.json",
+  "title": "AgentShell Trial Export Result",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "file", "summary", "privacy", "nextAction"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.trial-export.v1" },
+    "file": { "type": "string" },
+    "summary": {
+      "type": "object",
+      "required": ["trialId", "eventCount", "finalVerificationOk", "evidenceReady", "estimatedAgentShellTokens", "observedDurationMs", "tokenSavingsPercentVsRawVerify"],
+      "properties": {
+        "trialId": { "type": "string" },
+        "eventCount": { "type": "integer", "minimum": 0 },
+        "finalVerificationOk": { "type": "boolean" },
+        "evidenceReady": { "type": "boolean" },
+        "estimatedAgentShellTokens": { "type": "integer", "minimum": 0 },
+        "observedDurationMs": { "type": "integer", "minimum": 0 },
+        "tokenSavingsPercentVsRawVerify": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["redacted", "omitted", "reviewBeforeSharing"],
+      "properties": {
+        "redacted": { "const": true },
+        "omitted": { "type": "array", "items": { "type": "string" } },
+        "reviewBeforeSharing": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "nextAction": { "type": "string" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/strategy-intake.schema.json",
+  "title": "AgentShell Strategy Intake Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "generatedAt", "name", "summary", "samples"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.strategy-intake.v1" },
+    "generatedAt": { "type": "string" },
+    "name": { "type": "string" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "samples": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sample" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "failureClass": {
+      "enum": [
+        "typescript-literal-mismatch",
+        "typescript-missing-property",
+        "typescript-primitive-literal-mismatch",
+        "typescript-property-suggestion",
+        "import-path",
+        "deep-equal-array-elements",
+        "deep-equal-array-removal",
+        "deep-equal-missing-property",
+        "literal-replacement",
+        "unknown"
+      ]
+    },
+    "priority": {
+      "enum": ["high", "medium", "needs-review", "needs-reproduction", "blocked"]
+    },
+    "host": {
+      "enum": ["codex", "claude", "cursor", "windsurf", "agents-md", "other"]
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "readyForImplementation", "blocked", "byPriority", "byFailureClass"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "readyForImplementation": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "byPriority": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/priority" },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "byFailureClass": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/failureClass" },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sample": {
+      "type": "object",
+      "required": [
+        "id",
+        "source",
+        "host",
+        "failureClass",
+        "currentOutcome",
+        "priority",
+        "readyForImplementation",
+        "blockers",
+        "evidence",
+        "notes"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "source": { "type": ["string", "null"] },
+        "host": { "$ref": "#/$defs/host" },
+        "failureClass": { "$ref": "#/$defs/failureClass" },
+        "currentOutcome": { "type": "string" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "readyForImplementation": { "type": "boolean" },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "notes": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["hasAgentShellFirst", "hasLogSnippet", "commandCount"],
+      "properties": {
+        "hasAgentShellFirst": { "type": "boolean" },
+        "hasLogSnippet": { "type": "boolean" },
+        "commandCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

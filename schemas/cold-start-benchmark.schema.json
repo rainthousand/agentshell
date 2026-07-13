@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/cold-start-benchmark.schema.json",
+  "title": "AgentShell Cold Start Benchmark Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "protocolVersion", "runs", "cwd", "cli", "note", "summary", "commands"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.cold-start-benchmark.v1" },
+    "runs": { "type": "integer", "minimum": 1 },
+    "cwd": { "type": "string" },
+    "cli": { "type": "string" },
+    "note": { "type": "string" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commandCount", "totalCommandInvocations", "fastestAverageWallTimeMs", "slowestAverageWallTimeMs", "totalAverageEstimatedTokens"],
+      "properties": {
+        "commandCount": { "type": "integer", "minimum": 0 },
+        "totalCommandInvocations": { "type": "integer", "minimum": 0 },
+        "fastestAverageWallTimeMs": { "type": "integer", "minimum": 0 },
+        "slowestAverageWallTimeMs": { "type": "integer", "minimum": 0 },
+        "totalAverageEstimatedTokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/command" }
+    }
+  },
+  "$defs": {
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "command", "ok", "summary", "runs"],
+      "properties": {
+        "id": { "enum": ["help", "manual", "plugin-validate-compact", "start-compact"] },
+        "command": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "summary": { "$ref": "#/$defs/commandSummary" },
+        "runs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/run" }
+        }
+      }
+    },
+    "commandSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "averageWallTimeMs",
+        "averageStdoutChars",
+        "averageEstimatedTokens",
+        "averageProfileTotalMs",
+        "averageProfileMeasuredMs",
+        "averageProfileSubprocessMs",
+        "averageProcessOverheadMs",
+        "total"
+      ],
+      "properties": {
+        "averageWallTimeMs": { "type": "integer", "minimum": 0 },
+        "averageStdoutChars": { "type": "integer", "minimum": 0 },
+        "averageEstimatedTokens": { "type": "integer", "minimum": 0 },
+        "averageProfileTotalMs": { "type": ["integer", "null"], "minimum": 0 },
+        "averageProfileMeasuredMs": { "type": ["integer", "null"], "minimum": 0 },
+        "averageProfileSubprocessMs": { "type": ["integer", "null"], "minimum": 0 },
+        "averageProcessOverheadMs": { "type": ["integer", "null"], "minimum": 0 },
+        "total": { "$ref": "#/$defs/totals" }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wallTimeMs", "stdoutChars", "stderrChars", "estimatedTokens", "profileTotalMs", "profileMeasuredMs", "profileSubprocessMs", "profileCount"],
+      "properties": {
+        "wallTimeMs": { "type": "integer", "minimum": 0 },
+        "stdoutChars": { "type": "integer", "minimum": 0 },
+        "stderrChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "profileTotalMs": { "type": "integer", "minimum": 0 },
+        "profileMeasuredMs": { "type": "integer", "minimum": 0 },
+        "profileSubprocessMs": { "type": "integer", "minimum": 0 },
+        "profileCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run", "status", "wallTimeMs", "stdoutChars", "stderrChars", "estimatedTokens", "profileTotalMs", "profileMeasuredMs", "profileSubprocessMs"],
+      "properties": {
+        "run": { "type": "integer", "minimum": 1 },
+        "status": { "type": ["integer", "null"] },
+        "wallTimeMs": { "type": "integer", "minimum": 0 },
+        "stdoutChars": { "type": "integer", "minimum": 0 },
+        "stderrChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "profileTotalMs": { "type": ["integer", "null"], "minimum": 0 },
+        "profileMeasuredMs": { "type": ["integer", "null"], "minimum": 0 },
+        "profileSubprocessMs": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "deep-equal-array-primitive-replacement-benchmark",
+  "type": "module",
+  "scripts": {
+    "test": "node test/tags.test.js"
+  }
+}

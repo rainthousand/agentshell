@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/benchmark.schema.json",
+  "title": "AgentShell Benchmark Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "type", "command", "raw", "agentshell", "reduction", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.benchmark.v1" },
+        "type": { "type": "string" },
+        "command": { "type": "string" },
+        "raw": { "$ref": "#/$defs/measurement" },
+        "agentshell": { "$ref": "#/$defs/agentshellMeasurement" },
+        "reduction": {
+          "type": "object",
+          "required": ["charsSaved", "percentSaved"],
+          "properties": {
+            "charsSaved": { "type": "integer", "minimum": 0 },
+            "percentSaved": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "measurement": {
+      "type": "object",
+      "required": ["exitCode", "durationMs", "chars", "estimatedTokens"],
+      "properties": {
+        "exitCode": { "type": ["integer", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "chars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "agentshellMeasurement": {
+      "type": "object",
+      "required": ["exitCode", "durationMs", "chars", "estimatedTokens", "logRef", "summary", "relatedFiles"],
+      "properties": {
+        "exitCode": { "type": ["integer", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "chars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "logRef": { "type": "string" },
+        "summary": {
+          "type": "object",
+          "required": ["mainError", "failedTests"],
+          "properties": {
+            "mainError": { "type": ["string", "null"] },
+            "failedTests": { "type": ["integer", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "relatedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "real-project-typescript-primitive-literal",
+  "scripts": {
+    "test": "node test/typecheck.cjs"
+  }
+}

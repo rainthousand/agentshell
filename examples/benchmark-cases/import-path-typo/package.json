@@ -1,0 +1,7 @@
+{
+  "name": "benchmark-import-path-typo",
+  "type": "module",
+  "scripts": {
+    "test": "node test/user.test.js"
+  }
+}

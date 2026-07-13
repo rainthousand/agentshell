@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/start.schema.json",
+  "title": "AgentShell Start Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "steps", "doctor", "understand", "next", "summary", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.start.v1" },
+        "steps": { "$ref": "#/$defs/steps" },
+        "doctor": { "$ref": "doctor.schema.json#/oneOf/0" },
+        "understand": { "$ref": "#/$defs/compactUnderstand" },
+        "next": { "$ref": "run-next.schema.json#/oneOf/0" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        },
+        "profile": { "$ref": "common.schema.json#/$defs/profile" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "steps", "summary", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.start.v1" },
+        "compact": { "const": true },
+        "steps": { "$ref": "#/$defs/steps" },
+        "summary": { "$ref": "#/$defs/compactSummary" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        },
+        "profile": { "$ref": "common.schema.json#/$defs/profile" }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "steps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doctor", "understand", "next"],
+      "properties": {
+        "doctor": { "const": "agentshell doctor" },
+        "understand": { "const": "agentshell understand --compact" },
+        "next": { "const": "agentshell run next" }
+      }
+    },
+    "compactUnderstand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "workspace", "stack", "scripts", "git", "nextAction"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.understand.v1" },
+        "compact": { "const": true },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" }
+          }
+        },
+        "stack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["languages", "packageManager", "frameworks"],
+          "properties": {
+            "languages": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "packageManager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", null] },
+            "frameworks": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "scripts": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["available", "branch", "dirty", "changedFilesTotal"],
+          "properties": {
+            "available": { "type": "boolean" },
+            "branch": { "type": ["string", "null"] },
+            "dirty": { "type": "boolean" },
+            "changedFilesTotal": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "nextAction": { "type": ["string", "null"] }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "workspace", "packageManager", "languages", "frameworks", "scripts", "activeRunPresent", "nextCommand", "errorCount", "warningCount"],
+      "properties": {
+        "status": { "enum": ["ready", "warning", "blocked"] },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "name"],
+          "properties": {
+            "root": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        },
+        "packageManager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", null] },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "frameworks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scripts": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "activeRunPresent": { "type": "boolean" },
+        "nextCommand": { "type": ["string", "null"] },
+        "errorCount": { "type": "integer", "minimum": 0 },
+        "warningCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "compactSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "workspace", "packageManager", "languages", "frameworks", "scripts", "activeRunPresent", "nextCommand", "errorCount", "warningCount"],
+      "properties": {
+        "status": { "enum": ["ready", "warning", "blocked"] },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" }
+          }
+        },
+        "packageManager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", null] },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "frameworks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scripts": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "activeRunPresent": { "type": "boolean" },
+        "nextCommand": { "type": ["string", "null"] },
+        "errorCount": { "type": "integer", "minimum": 0 },
+        "warningCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

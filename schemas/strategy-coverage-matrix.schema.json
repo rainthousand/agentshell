@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/strategy-coverage-matrix.schema.json",
+  "title": "AgentShell Strategy Coverage Matrix",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "generatedAt", "source", "summary", "strategies"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.strategy-coverage-matrix.v1" },
+    "generatedAt": { "type": "string" },
+    "source": {
+      "type": "object",
+      "required": ["strategyEnum", "unitTests", "benchmarkCases", "realProjectFixtures", "docs"],
+      "properties": {
+        "strategyEnum": { "type": "string" },
+        "unitTests": { "type": "array", "items": { "type": "string" } },
+        "benchmarkCases": { "type": "array", "items": { "type": "string" } },
+        "realProjectFixtures": { "type": "array", "items": { "type": "string" } },
+        "docs": {
+          "type": "array",
+          "items": { "enum": ["readme", "docs", "skill", "manual"] }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["totalStrategies", "covered", "missing"],
+      "properties": {
+        "totalStrategies": { "type": "integer", "minimum": 0 },
+        "covered": { "$ref": "#/$defs/coverageCounts" },
+        "missing": { "$ref": "#/$defs/missingCoverage" }
+      },
+      "additionalProperties": false
+    },
+    "strategies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/strategyRow" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "strategy": {
+      "enum": [
+        "missing-object-property",
+        "deep-equal-missing-property",
+        "deep-equal-array-elements",
+        "deep-equal-array-removal",
+        "deep-equal-extra-property-removal",
+        "deep-equal-array-primitive-replacement",
+        "array-length",
+        "literal-replacement",
+        "join-separator-literal",
+        "string-case-transform",
+        "truthy-return",
+        "missing-named-export",
+        "import-path",
+        "typescript-missing-property",
+        "typescript-primitive-literal-mismatch",
+        "typescript-literal-mismatch",
+        "typescript-property-suggestion"
+      ]
+    },
+    "coverageCounts": {
+      "type": "object",
+      "required": ["unitTests", "benchmarkCases", "realProjectFixtures", "docs"],
+      "properties": {
+        "unitTests": { "type": "integer", "minimum": 0 },
+        "benchmarkCases": { "type": "integer", "minimum": 0 },
+        "realProjectFixtures": { "type": "integer", "minimum": 0 },
+        "docs": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "missingCoverage": {
+      "type": "object",
+      "required": ["unitTests", "benchmarkCases", "realProjectFixtures", "docs"],
+      "properties": {
+        "unitTests": { "type": "array", "items": { "$ref": "#/$defs/strategy" } },
+        "benchmarkCases": { "type": "array", "items": { "$ref": "#/$defs/strategy" } },
+        "realProjectFixtures": { "type": "array", "items": { "$ref": "#/$defs/strategy" } },
+        "docs": { "type": "array", "items": { "$ref": "#/$defs/strategy" } }
+      },
+      "additionalProperties": false
+    },
+    "strategyRow": {
+      "type": "object",
+      "required": ["strategy", "coverage", "matches"],
+      "properties": {
+        "strategy": { "$ref": "#/$defs/strategy" },
+        "coverage": {
+          "type": "object",
+          "required": ["unitTests", "benchmarkCases", "realProjectFixtures", "docs"],
+          "properties": {
+            "unitTests": { "type": "boolean" },
+            "benchmarkCases": { "type": "boolean" },
+            "realProjectFixtures": { "type": "boolean" },
+            "docs": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "matches": {
+          "type": "object",
+          "required": ["unitTests", "benchmarkCases", "realProjectFixtures", "docs"],
+          "properties": {
+            "unitTests": { "type": "array", "items": { "$ref": "#/$defs/match" } },
+            "benchmarkCases": { "type": "array", "items": { "$ref": "#/$defs/match" } },
+            "realProjectFixtures": { "type": "array", "items": { "$ref": "#/$defs/match" } },
+            "docs": { "$ref": "#/$defs/docsMatches" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "docsMatches": {
+      "type": "object",
+      "required": ["bySource", "matches"],
+      "properties": {
+        "bySource": {
+          "type": "object",
+          "required": ["readme", "docs", "skill", "manual"],
+          "properties": {
+            "readme": { "type": "array", "items": { "$ref": "#/$defs/match" } },
+            "docs": { "type": "array", "items": { "$ref": "#/$defs/match" } },
+            "skill": { "type": "array", "items": { "$ref": "#/$defs/match" } },
+            "manual": { "type": "array", "items": { "$ref": "#/$defs/match" } }
+          },
+          "additionalProperties": false
+        },
+        "matches": { "type": "array", "items": { "$ref": "#/$defs/sourceMatch" } }
+      },
+      "additionalProperties": false
+    },
+    "match": {
+      "type": "object",
+      "required": ["file", "line"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": ["integer", "string"], "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "sourceMatch": {
+      "type": "object",
+      "required": ["file", "line", "source"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": ["integer", "string"], "minimum": 1 },
+        "source": { "enum": ["readme", "docs", "skill", "manual"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

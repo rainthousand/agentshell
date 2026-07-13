@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/plugin-validate.schema.json",
+  "title": "AgentShell Plugin Validate Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "mode", "checkedAt", "status", "plugin", "paths", "summary", "checks", "pluginStatus", "nextAction", "suggestedNextActions"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.plugin-validate.v1" },
+        "mode": { "enum": ["source-only", "installed"] },
+        "checkedAt": { "type": "string" },
+        "status": { "enum": ["ready", "warning", "blocked"] },
+        "plugin": { "$ref": "#/$defs/plugin" },
+        "paths": { "$ref": "#/$defs/paths" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/check" }
+        },
+        "pluginStatus": {
+          "oneOf": [
+            { "$ref": "#/$defs/pluginStatusSummary" },
+            { "type": "null" }
+          ]
+        },
+        "nextAction": {
+          "oneOf": [
+            { "$ref": "#/$defs/nextAction" },
+            { "type": "null" }
+          ]
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "profile": { "$ref": "common.schema.json#/$defs/profile" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "mode", "checkedAt", "status", "plugin", "summary", "cachePath", "pluginStatus", "nextAction", "suggestedNextActions"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.plugin-validate.v1" },
+        "compact": { "const": true },
+        "mode": { "enum": ["source-only", "installed"] },
+        "checkedAt": { "type": "string" },
+        "status": { "enum": ["ready", "warning", "blocked"] },
+        "plugin": { "$ref": "#/$defs/plugin" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "cachePath": { "type": ["string", "null"] },
+        "pluginStatus": {
+          "oneOf": [
+            { "$ref": "#/$defs/pluginStatusSummary" },
+            { "type": "null" }
+          ]
+        },
+        "nextAction": {
+          "oneOf": [
+            { "$ref": "#/$defs/nextAction" },
+            { "type": "null" }
+          ]
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "profile": { "$ref": "common.schema.json#/$defs/profile" }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "authorName", "developerName"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "version": { "type": ["string", "null"] },
+        "authorName": { "type": ["string", "null"] },
+        "developerName": { "type": ["string", "null"] }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "manifest", "packageJson", "marketplace", "cacheRoot", "cachePath"],
+      "properties": {
+        "root": { "type": "string" },
+        "manifest": { "type": "string" },
+        "packageJson": { "type": "string" },
+        "marketplace": { "type": "string" },
+        "cacheRoot": { "type": "string" },
+        "cachePath": { "type": ["string", "null"] }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "passed", "failed", "warnings"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name", "ok", "severity", "category", "suggestedNextActions"],
+      "properties": {
+        "name": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "severity": { "enum": ["error", "warning"] },
+        "category": { "enum": ["source", "schema", "docs", "installed"] },
+        "error": { "type": "string" },
+        "details": { "type": "object" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "pluginStatusSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "summary", "cachePath"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.plugin-status.v1" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "cachePath": { "type": ["string", "null"] }
+      }
+    },
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason", "text"],
+      "properties": {
+        "command": { "type": ["string", "null"] },
+        "reason": { "type": "string" },
+        "text": { "type": "string" }
+      }
+    }
+  }
+}

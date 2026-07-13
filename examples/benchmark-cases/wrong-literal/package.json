@@ -1,0 +1,7 @@
+{
+  "name": "benchmark-wrong-literal",
+  "type": "module",
+  "scripts": {
+    "test": "node test/status.test.js"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "host": "codex",
+  "fixture": "examples/failing-test-demo",
+  "source": "manual-transcript",
+  "events": [
+    {
+      "type": "command",
+      "command": "agentshell start --compact",
+      "stdout": "{\"ok\":true,\"summary\":{\"next\":\"fix test\"}}",
+      "durationMs": 120
+    },
+    {
+      "type": "command",
+      "command": "agentshell fix test --fast --compact",
+      "stdout": "{\"ok\":true,\"status\":\"passed\",\"rollbackCommand\":\"agentshell undo op_123\"}",
+      "durationMs": 850
+    },
+    {
+      "type": "command",
+      "command": "agentshell verify test",
+      "stdout": "{\"ok\":true,\"summary\":{\"failedTests\":0}}",
+      "durationMs": 420
+    },
+    {
+      "type": "command",
+      "command": "agentshell run status --compact",
+      "stdout": "{\"ok\":true,\"rollbackCommand\":\"agentshell undo op_123\"}",
+      "durationMs": 80
+    }
+  ],
+  "finalVerification": {
+    "ok": true,
+    "command": "agentshell verify test",
+    "summary": "tests passed; rollback command available in run status"
+  },
+  "notes": "Collected from a manual Codex adapter trial. Token counts are estimated from command output."
+}

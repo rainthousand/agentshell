@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/codex-plugin-trial-template.schema.json",
+  "title": "AgentShell Codex Plugin Trial Template Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "generatedAt", "id", "fixture", "jsonTemplate", "markdown", "nextActions"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.codex-plugin-trial-template.v1" },
+    "generatedAt": { "type": "string" },
+    "id": { "type": "string" },
+    "fixture": { "type": "string" },
+    "jsonTemplate": { "$ref": "#/$defs/runLogTemplate" },
+    "markdown": { "type": "string" },
+    "nextActions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "runLogTemplate": {
+      "type": "object",
+      "required": ["id", "host", "fixture", "source", "events", "finalVerification", "notes"],
+      "properties": {
+        "id": { "type": "string" },
+        "host": { "const": "codex" },
+        "fixture": { "type": "string" },
+        "source": { "type": "string" },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/event" }
+        },
+        "finalVerification": { "$ref": "#/$defs/finalVerification" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["type", "command", "stdout", "durationMs"],
+      "properties": {
+        "type": { "const": "command" },
+        "command": { "type": "string" },
+        "stdout": { "type": "string" },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "finalVerification": {
+      "type": "object",
+      "required": ["ok", "command", "summary"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "command": { "type": "string" },
+        "summary": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

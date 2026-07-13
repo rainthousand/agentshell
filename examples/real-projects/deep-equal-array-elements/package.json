@@ -1,0 +1,7 @@
+{
+  "name": "real-project-deep-equal-array-elements",
+  "type": "module",
+  "scripts": {
+    "test": "node test/tags.test.js"
+  }
+}

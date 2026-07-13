@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/run-clear.schema.json",
+  "title": "AgentShell Run Clear Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "cleared", "runId", "summary"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.run-clear.v1" },
+        "cleared": { "type": "boolean" },
+        "runId": { "type": ["string", "null"] },
+        "summary": {
+          "oneOf": [
+            { "$ref": "run.schema.json#/$defs/summary" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ]
+}

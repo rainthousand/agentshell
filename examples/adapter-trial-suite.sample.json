@@ -1,0 +1,41 @@
+{
+  "name": "adapter-trial-suite-sample",
+  "trials": [
+    {
+      "id": "codex-scored-sample",
+      "kind": "trial",
+      "path": "adapter-trial.sample.json"
+    },
+    {
+      "id": "codex-collected-sample",
+      "kind": "collect",
+      "path": "adapter-trial-collect.sample.json"
+    },
+    {
+      "id": "claude-raw-first-example",
+      "kind": "trial",
+      "input": {
+        "host": "claude",
+        "fixture": "examples/failing-test-demo",
+        "commands": [
+          {
+            "command": "npm test",
+            "outputTokens": 1200,
+            "durationMs": 900
+          },
+          {
+            "command": "cat test/user.test.js",
+            "outputTokens": 500,
+            "durationMs": 50
+          },
+          {
+            "command": "agentshell diagnose test --compact",
+            "outputTokens": 260,
+            "durationMs": 280
+          }
+        ],
+        "notes": "Example weak run that starts from raw shell output."
+      }
+    }
+  ]
+}

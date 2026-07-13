@@ -1,0 +1,30 @@
+{
+  "name": "strategy-intake-sample",
+  "samples": [
+    {
+      "id": "ts-union-literal",
+      "source": "real-codex-run",
+      "host": "codex",
+      "failureClass": "typescript-literal-mismatch",
+      "logSnippet": "Type '\"draft\"' is not assignable to type '\"ready\" | \"done\"'.",
+      "commands": [
+        "agentshell diagnose test --compact",
+        "agentshell change suggest --dry-run --compact"
+      ],
+      "currentOutcome": "unsupported",
+      "notes": "Needs a concrete sample before expanding beyond unique primitive literal replacements."
+    },
+    {
+      "id": "import-alias-path",
+      "source": "real-codex-run",
+      "host": "codex",
+      "failureClass": "import-path",
+      "logSnippet": "Cannot find module '@/lib/user'",
+      "commands": [
+        "agentshell diagnose test --compact"
+      ],
+      "currentOutcome": "unsupported",
+      "notes": "Alias resolution should wait for a real project with stable tsconfig/jsconfig paths."
+    }
+  ]
+}

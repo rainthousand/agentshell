@@ -1,0 +1,510 @@
+#!/usr/bin/env node
+import { understand } from "./commands/understand.js";
+import { find } from "./commands/find.js";
+import { readFileAround, readFileRange } from "./commands/read.js";
+import { verify } from "./commands/verify.js";
+import { change, fillChange, suggestChange } from "./commands/change.js";
+import { undo } from "./commands/undo.js";
+import { history } from "./commands/history.js";
+import { manual } from "./commands/manual.js";
+import { getLog } from "./commands/log.js";
+import { metrics } from "./commands/metrics.js";
+import { benchmark } from "./commands/benchmark.js";
+import { schema } from "./commands/schema.js";
+import { diagnose } from "./commands/diagnose.js";
+import { fix } from "./commands/fix.js";
+import { runStatus } from "./commands/run-status.js";
+import { doctor } from "./commands/doctor.js";
+import { start } from "./commands/start.js";
+import { pluginStatus } from "./commands/plugin-status.js";
+import { parsePluginValidateOptions, pluginValidate } from "./commands/plugin-validate.js";
+import { exportTrial } from "./commands/trial-export.js";
+import { startDashboard } from "./commands/dashboard.js";
+import { fail, printJson } from "./core/output.js";
+import { appendEvent, appendRunCommandStats } from "./core/store.js";
+
+const args = process.argv.slice(2);
+const command = args[0];
+const commandStartedAt = process.hrtime.bigint();
+
+async function main() {
+  if (!command || command === "--help" || command === "-h") {
+    printJson({
+      ok: true,
+      name: "agentshell",
+      version: "0.24.0",
+      commands: [
+        "agentshell manual [--full|--topic <repair|plugin|benchmark|profile|onboarding|log-triage|reference>]",
+        "agentshell start [--compact] [--profile]",
+        "agentshell entry [--compact] [--profile]",
+        "agentshell doctor",
+        "agentshell plugin status [--compact] [--home <home>] [--marketplace <path>] [--cache-root <path>]",
+        "agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]",
+        "agentshell trial export [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]",
+        "agentshell dashboard [--port N] [--window|--browser] [--no-open]",
+        "agentshell understand [--compact]",
+        "agentshell find <query>",
+        "agentshell read <file> --lines A:B",
+        "agentshell read <file> --around <query>",
+        "agentshell verify test [--tail N]",
+        "agentshell change suggest [--dry-run] [--apply] [--compact]",
+        "agentshell change fill <template.json> <fill.json> [--apply]",
+        "agentshell change <change.json>",
+        "agentshell undo [operationId]",
+        "agentshell history",
+        "agentshell log get <logRef> --tail N",
+        "agentshell metrics [--compact] [--limit N]",
+        "agentshell benchmark test",
+        "agentshell diagnose test [--compact] [--profile]",
+        "agentshell fix test [--fast|--safe|--dry-run] [--compact] [--profile]",
+        "agentshell run next",
+        "agentshell run status [--compact]",
+        "agentshell run latest [--compact]",
+        "agentshell run clear",
+        "agentshell schema list",
+        "agentshell schema get <name>"
+      ]
+    });
+    return;
+  }
+
+  if (command === "manual") {
+    const options = parseManualOptions(args.slice(1));
+    if (!options.ok) {
+      emit(options);
+      process.exitCode = 2;
+      return;
+    }
+    const result = await manual(options.value);
+    emit(result);
+    process.exitCode = result.ok ? 0 : 2;
+    return;
+  }
+
+  if (command === "start" || command === "entry") {
+    emit(await start(process.cwd(), {
+      compact: args.includes("--compact"),
+      profile: args.includes("--profile")
+    }));
+    return;
+  }
+
+  if (command === "doctor") {
+    emit(await doctor(process.cwd()));
+    return;
+  }
+
+  if (command === "plugin") {
+    const action = args[1] || "status";
+    if (!["status", "validate"].includes(action)) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell plugin status [--compact] [--home <home>] [--marketplace <path>] [--cache-root <path>] OR agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]"));
+      process.exitCode = 2;
+      return;
+    }
+    const options = action === "status"
+      ? parsePluginStatusOptions(args.slice(2))
+      : parsePluginValidateOptions(args.slice(2));
+    if (!options.ok) {
+      emit(options);
+      process.exitCode = 2;
+      return;
+    }
+    const result = action === "status"
+      ? pluginStatus(process.cwd(), options.value)
+      : await pluginValidate(process.cwd(), options.value);
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "trial") {
+    if (args[1] !== "export") {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell trial export [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]"));
+      process.exitCode = 2;
+      return;
+    }
+    const options = parseTrialExportOptions(args.slice(2));
+    if (!options.ok) {
+      emit(options);
+      process.exitCode = 2;
+      return;
+    }
+    const result = await exportTrial(process.cwd(), options.value);
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "dashboard") {
+    const options = parseDashboardOptions(args.slice(1));
+    if (!options.ok) {
+      emit(options);
+      process.exitCode = 2;
+      return;
+    }
+    const session = await startDashboard(process.cwd(), options.value);
+    emit(session.report);
+    const close = () => session.server.close(() => process.exit(0));
+    process.once("SIGINT", close);
+    process.once("SIGTERM", close);
+    return;
+  }
+
+  if (command === "understand") {
+    emit(await understand(process.cwd(), {
+      compact: args.includes("--compact")
+    }));
+    return;
+  }
+
+  if (command === "find") {
+    const query = args.slice(1).join(" ").trim();
+    if (!query) {
+      emit(fail("INVALID_ARGUMENT", "Missing search query"));
+      process.exitCode = 2;
+      return;
+    }
+    emit(await find(process.cwd(), query));
+    return;
+  }
+
+  if (command === "read") {
+    const file = args[1];
+    const linesFlag = args.indexOf("--lines");
+    const aroundFlag = args.indexOf("--around");
+    const lines = linesFlag >= 0 ? args[linesFlag + 1] : undefined;
+    const around = aroundFlag >= 0 ? args.slice(aroundFlag + 1).join(" ").trim() : undefined;
+    if (!file || (!lines && !around)) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell read <file> --lines A:B OR agentshell read <file> --around <query>"));
+      process.exitCode = 2;
+      return;
+    }
+    emit(lines
+      ? await readFileRange(process.cwd(), file, lines)
+      : await readFileAround(process.cwd(), file, around));
+    return;
+  }
+
+  if (command === "verify") {
+    const type = args[1];
+    if (type !== "test") {
+      emit(fail("INVALID_ARGUMENT", "Only `agentshell verify test` is supported"));
+      process.exitCode = 2;
+      return;
+    }
+    const tailFlag = args.indexOf("--tail");
+    const tail = tailFlag >= 0 ? args[tailFlag + 1] : undefined;
+    const result = await verify(process.cwd(), type, { tail });
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "log") {
+    const subcommand = args[1];
+    const logRef = args[2];
+    const tailFlag = args.indexOf("--tail");
+    const tail = tailFlag >= 0 ? args[tailFlag + 1] : undefined;
+    if (subcommand !== "get") {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell log get <logRef> --tail N"));
+      process.exitCode = 2;
+      return;
+    }
+    const result = await getLog(process.cwd(), logRef, { tail });
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "change") {
+    if (args[1] === "suggest") {
+      const result = await suggestChange(process.cwd(), {
+        apply: args.includes("--apply"),
+        dryRun: args.includes("--dry-run"),
+        compact: args.includes("--compact")
+      });
+      emit(result);
+      process.exitCode = result.ok ? 0 : 1;
+      return;
+    }
+    if (args[1] === "fill") {
+      const templateFile = args[2];
+      const fillFile = args[3];
+      if (!templateFile || !fillFile) {
+        emit(fail("INVALID_ARGUMENT", "Usage: agentshell change fill <template.json> <fill.json>"));
+        process.exitCode = 2;
+        return;
+      }
+      const result = await fillChange(process.cwd(), templateFile, fillFile, {
+        apply: args.includes("--apply")
+      });
+      emit(result);
+      process.exitCode = result.ok ? 0 : 1;
+      return;
+    }
+    const changeFile = args[1];
+    if (!changeFile) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell change <change.json>"));
+      process.exitCode = 2;
+      return;
+    }
+    const result = await change(process.cwd(), changeFile);
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "undo") {
+    const result = await undo(process.cwd(), args[1]);
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "history") {
+    emit(await history(process.cwd()));
+    return;
+  }
+
+  if (command === "run") {
+    const action = args[1] || "status";
+    if (!["next", "status", "latest", "clear"].includes(action)) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell run next OR agentshell run status [--compact] OR agentshell run latest [--compact] OR agentshell run clear"));
+      process.exitCode = 2;
+      return;
+    }
+    emit(await runStatus(process.cwd(), action, {
+      compact: args.includes("--compact")
+    }));
+    return;
+  }
+
+  if (command === "metrics") {
+    const limitFlag = args.indexOf("--limit");
+    const limit = limitFlag >= 0 ? args[limitFlag + 1] : undefined;
+    emit(await metrics(process.cwd(), {
+      limit,
+      compact: args.includes("--compact")
+    }));
+    return;
+  }
+
+  if (command === "benchmark") {
+    const type = args[1];
+    const result = await benchmark(process.cwd(), type);
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "diagnose") {
+    const type = args[1];
+    const result = await diagnose(process.cwd(), type, {
+      compact: args.includes("--compact"),
+      profile: args.includes("--profile")
+    });
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "fix") {
+    const type = args[1];
+    const policy = parseFixPolicy(args);
+    if (!policy.ok) {
+      emit(policy);
+      process.exitCode = 2;
+      return;
+    }
+    const result = await fix(process.cwd(), type, {
+      dryRun: args.includes("--dry-run"),
+      compact: args.includes("--compact"),
+      profile: args.includes("--profile"),
+      policy: policy.value
+    });
+    emit(result);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (command === "schema") {
+    emit(await schema(process.cwd(), args[1], args[2]));
+    return;
+  }
+
+  emit(fail("UNKNOWN_COMMAND", `Unknown command: ${command}`));
+  process.exitCode = 2;
+}
+
+main().catch((error) => {
+  emit(fail("UNEXPECTED_ERROR", error.message));
+  process.exitCode = 1;
+});
+
+function emit(result) {
+  const outputChars = printJson(result);
+  if (command === "metrics") return;
+  try {
+    const event = {
+      command: command || "help",
+      args,
+      ok: result.ok === true,
+      outputChars,
+      estimatedTokens: Math.ceil(outputChars / 4),
+      durationMs: Number(process.hrtime.bigint() - commandStartedAt) / 1e6
+    };
+    appendEvent(process.cwd(), event);
+    if (result.runId && command !== "run") {
+      appendRunCommandStats(process.cwd(), result.runId, event);
+    }
+  } catch {
+    // Telemetry must never break the command the agent actually asked for.
+  }
+}
+
+function parseFixPolicy(args) {
+  const flags = [
+    args.includes("--fast") ? "fast" : null,
+    args.includes("--safe") ? "safe" : null
+  ].filter(Boolean);
+  const policyFlag = args.indexOf("--policy");
+  if (policyFlag >= 0) {
+    const value = args[policyFlag + 1];
+    if (!value || value.startsWith("--")) {
+      return fail("INVALID_ARGUMENT", "Usage: agentshell fix test [--fast|--safe|--dry-run] [--compact] [--profile]");
+    }
+    flags.push(value);
+  }
+  const unique = [...new Set(flags)];
+  if (unique.length > 1) {
+    return fail("INVALID_ARGUMENT", "Choose one fix policy: --fast or --safe", {
+      policies: unique
+    });
+  }
+  if (unique[0] && !["fast", "safe"].includes(unique[0])) {
+    return fail("INVALID_ARGUMENT", "Fix policy must be `fast` or `safe`", {
+      policy: unique[0]
+    });
+  }
+  return { ok: true, value: unique[0] || null };
+}
+
+function parseManualOptions(argv) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--full") {
+      options.full = true;
+      continue;
+    }
+    if (arg === "--topic") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) {
+        return fail("INVALID_ARGUMENT", "Missing value for --topic");
+      }
+      options.topic = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--topic=")) {
+      options.topic = arg.slice("--topic=".length);
+      continue;
+    }
+    return fail("INVALID_ARGUMENT", `Unknown manual argument: ${arg}`);
+  }
+  if (options.full && options.topic) {
+    return fail("INVALID_ARGUMENT", "Choose either --full or --topic, not both");
+  }
+  return { ok: true, value: options };
+}
+
+function parsePluginStatusOptions(argv) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--home" || arg === "--marketplace" || arg === "--cache-root") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) {
+        return fail("INVALID_ARGUMENT", `Missing value for ${arg}`);
+      }
+      const key = arg === "--cache-root" ? "cacheRoot" : arg.slice(2);
+      options[key] = value;
+      index += 1;
+      continue;
+    }
+    if (arg === "--compact") {
+      options.compact = true;
+      continue;
+    }
+    return fail("INVALID_ARGUMENT", `Unknown plugin status argument: ${arg}`);
+  }
+  return { ok: true, value: options };
+}
+
+function parseTrialExportOptions(argv) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (["--out", "--id", "--fixture", "--rating"].includes(arg)) {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) return fail("INVALID_ARGUMENT", `Missing value for ${arg}`);
+      options[arg.slice(2)] = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--out=") || arg.startsWith("--id=") || arg.startsWith("--fixture=") || arg.startsWith("--rating=")) {
+      const [flag, ...parts] = arg.split("=");
+      const value = parts.join("=");
+      if (!value) return fail("INVALID_ARGUMENT", `Missing value for ${flag}`);
+      options[flag.slice(2)] = value;
+      continue;
+    }
+    return fail("INVALID_ARGUMENT", `Unknown trial export argument: ${arg}`);
+  }
+  if (options.rating !== undefined) {
+    const rating = Number(options.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return fail("INVALID_ARGUMENT", "--rating must be an integer from 1 to 5");
+    }
+    options.rating = rating;
+  }
+  return { ok: true, value: options };
+}
+
+function parseDashboardOptions(argv) {
+  const options = { open: true };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--no-open") {
+      options.open = false;
+      continue;
+    }
+    if (arg === "--window" || arg === "--browser") {
+      const surface = arg.slice(2);
+      if (options.surface && options.surface !== surface) {
+        return fail("INVALID_ARGUMENT", "Choose either --window or --browser");
+      }
+      options.surface = surface;
+      continue;
+    }
+    if (arg === "--port") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) return fail("INVALID_ARGUMENT", "Missing value for --port");
+      options.port = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--port=")) {
+      options.port = arg.slice("--port=".length);
+      if (!options.port) return fail("INVALID_ARGUMENT", "Missing value for --port");
+      continue;
+    }
+    return fail("INVALID_ARGUMENT", `Unknown dashboard argument: ${arg}`);
+  }
+  const port = options.port === undefined ? undefined : Number(options.port);
+  if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65535)) {
+    return fail("INVALID_ARGUMENT", "--port must be an integer from 0 to 65535");
+  }
+  options.port = port;
+  return { ok: true, value: options };
+}

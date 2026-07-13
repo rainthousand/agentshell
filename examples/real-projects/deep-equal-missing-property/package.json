@@ -1,0 +1,7 @@
+{
+  "name": "deep-equal-missing-property-real-project",
+  "type": "module",
+  "scripts": {
+    "test": "node test/user.test.js"
+  }
+}

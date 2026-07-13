@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/adapter-trial-collect.schema.json",
+  "title": "AgentShell Adapter Trial Collection Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "generatedAt", "source", "trial", "scoreReport", "summary"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.adapter-trial-collect.v1" },
+    "generatedAt": { "type": "string" },
+    "source": { "type": ["string", "null"] },
+    "trial": { "$ref": "#/$defs/trial" },
+    "scoreReport": { "$ref": "#/$defs/scoreReport" },
+    "summary": { "$ref": "#/$defs/summary" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "trial": {
+      "type": "object",
+      "required": ["host", "fixture", "commands", "finalVerification", "notes"],
+      "properties": {
+        "host": { "enum": ["codex", "claude", "cursor", "windsurf", "agents-md", "other"] },
+        "fixture": { "type": ["string", "null"] },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "finalVerification": {
+          "anyOf": [
+            { "$ref": "#/$defs/finalVerification" },
+            { "type": "null" }
+          ]
+        },
+        "notes": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "scoreReport": {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "generatedAt", "host", "fixture", "score", "interpretation", "criteria", "metrics", "commands", "finalVerification", "notes"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.adapter-trial.v1" },
+        "generatedAt": { "type": "string" },
+        "host": { "enum": ["codex", "claude", "cursor", "windsurf", "agents-md", "other"] },
+        "fixture": { "type": ["string", "null"] },
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "interpretation": { "enum": ["strong", "usable", "weak"] },
+        "criteria": { "type": "object" },
+        "metrics": { "type": "object" },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "finalVerification": {
+          "anyOf": [
+            { "$ref": "#/$defs/finalVerification" },
+            { "type": "null" }
+          ]
+        },
+        "notes": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "summary": {
+      "type": "object",
+      "required": ["host", "fixture", "score", "interpretation", "commands", "agentShellCommands", "noisyRawCommands", "totalOutputTokens", "totalDurationMs"],
+      "properties": {
+        "host": { "enum": ["codex", "claude", "cursor", "windsurf", "agents-md", "other"] },
+        "fixture": { "type": ["string", "null"] },
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "interpretation": { "enum": ["strong", "usable", "weak"] },
+        "commands": { "type": "integer", "minimum": 0 },
+        "agentShellCommands": { "type": "integer", "minimum": 0 },
+        "noisyRawCommands": { "type": "integer", "minimum": 0 },
+        "totalOutputTokens": { "type": "integer", "minimum": 0 },
+        "totalDurationMs": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "command": {
+      "type": "object",
+      "required": ["command", "outputTokens", "durationMs"],
+      "properties": {
+        "command": { "type": "string" },
+        "outputTokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "finalVerification": {
+      "type": "object",
+      "required": ["ok", "command", "summary"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "command": { "type": ["string", "null"] },
+        "summary": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

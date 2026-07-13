@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/diagnose.schema.json",
+  "title": "AgentShell Diagnose Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "runId", "type", "status", "compact", "verificationOk", "verification", "fixPlan", "changeTemplate", "focusedReads", "symbols", "symbolMatches", "implementationReads", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.diagnose.v1" },
+        "runId": { "type": "string" },
+        "type": { "type": "string" },
+        "status": { "enum": ["passed", "failed"] },
+        "compact": { "type": "boolean" },
+        "verificationOk": { "type": "boolean" },
+        "verification": {
+          "type": "object",
+          "required": ["operationId", "protocolVersion", "type", "exitCode", "durationMs", "summary", "relatedFiles", "logRef"],
+          "properties": {
+            "operationId": { "type": "string" },
+            "protocolVersion": { "const": "agentshell.verify.v1" },
+            "type": { "type": "string" },
+            "exitCode": { "type": ["integer", "null"] },
+            "durationMs": { "type": "integer", "minimum": 0 },
+            "cacheHit": { "type": "boolean" },
+            "cacheKey": { "type": ["string", "null"] },
+            "summary": {
+              "type": "object",
+              "required": ["mainError", "failedTests"],
+              "properties": {
+                "mainError": { "type": ["string", "null"] },
+                "failedTests": { "type": ["integer", "null"] }
+              },
+              "additionalProperties": false
+            },
+            "relatedFiles": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "logRef": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "fixPlan": {
+          "type": "object",
+          "required": ["confidence", "target", "nextCommand"],
+          "properties": {
+            "confidence": { "enum": ["none", "low", "medium", "high"] },
+            "target": {
+              "oneOf": [
+                {
+                "type": "object",
+                "required": ["file", "expectedHash", "range", "symbol", "intent"],
+                "properties": {
+                  "file": { "type": "string" },
+                  "expectedHash": { "type": "string", "pattern": "^sha256:" },
+                  "range": {
+                    "type": "object",
+                    "required": ["start", "end"],
+                    "properties": {
+                      "start": { "type": "integer", "minimum": 1 },
+                      "end": { "type": "integer", "minimum": 1 }
+                    },
+                    "additionalProperties": false
+                  },
+                  "symbol": { "type": ["string", "null"] },
+                  "intent": { "type": "string" }
+                },
+                "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            },
+            "nextCommand": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "changeTemplate": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["path", "replacementRequired"],
+              "properties": {
+                "path": { "type": "string" },
+                "replacementRequired": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        },
+        "focusedReads": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/readRef" }
+        },
+        "symbols": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "symbolMatches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["symbol", "total", "matches"],
+            "properties": {
+              "symbol": { "type": "string" },
+              "total": { "type": "integer", "minimum": 0 },
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["file", "line"],
+                  "properties": {
+                    "file": { "type": "string" },
+                    "line": { "type": "integer", "minimum": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "implementationReads": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/readRef" }
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        },
+        "profile": { "$ref": "common.schema.json#/$defs/profile" }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "readRef": {
+      "type": "object",
+      "required": ["ok", "file", "hash", "range", "matchedLine", "totalLines"],
+      "properties": {
+        "ok": { "const": true },
+        "file": { "type": "string" },
+        "hash": { "type": "string", "pattern": "^sha256:" },
+        "range": {
+          "type": "object",
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "type": "integer", "minimum": 1 },
+            "end": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "matchedLine": { "type": ["integer", "null"] },
+        "totalLines": { "type": "integer", "minimum": 0 },
+        "content": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "fullRead": {
+      "type": "object",
+      "required": ["ok", "file", "hash", "range", "matchedLine", "totalLines", "content"],
+      "properties": {
+        "ok": { "const": true },
+        "file": { "type": "string" },
+        "hash": { "type": "string", "pattern": "^sha256:" },
+        "range": {
+          "type": "object",
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "type": "integer", "minimum": 1 },
+            "end": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "matchedLine": { "type": ["integer", "null"] },
+        "totalLines": { "type": "integer", "minimum": 0 },
+        "content": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

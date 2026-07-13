@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/fix.schema.json",
+  "title": "AgentShell Fix Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "dryRun", "runId", "status", "suggestedNextActions"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.fix.v1" },
+    "compact": { "type": "boolean" },
+    "dryRun": { "type": "boolean" },
+    "policy": { "enum": ["fast", "safe"] },
+    "runId": { "type": ["string", "null"] },
+    "status": { "enum": ["passed", "failing", "previewed"] },
+    "diagnosis": { "type": ["object", "null"] },
+    "suggestion": { "type": ["object", "null"] },
+    "finalVerification": { "type": ["object", "null"] },
+    "runSummary": { "type": ["object", "null"] },
+    "target": { "type": ["object", "null"] },
+    "preview": { "type": ["object", "null"] },
+    "changedFiles": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "verification": { "type": ["object", "null"] },
+    "rollbackCommand": { "type": ["string", "null"] },
+    "nextBestAction": { "type": ["string", "null"] },
+    "profile": {
+      "anyOf": [
+        { "$ref": "common.schema.json#/$defs/profile" },
+        { "type": "null" }
+      ]
+    },
+    "suggestedNextActions": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/benchmark-suite.schema.json",
+  "title": "AgentShell Benchmark Suite Report",
+  "type": "object",
+  "required": ["ok", "casesRoot", "cases"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "casesRoot": { "type": "string" },
+    "cases": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/caseReport" }
+    },
+    "thresholds": { "$ref": "#/$defs/thresholds" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "caseReport": {
+      "type": "object",
+      "required": ["ok", "source", "rows"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "source": { "type": "string" },
+        "rows": {
+          "type": "object",
+          "required": ["raw", "split", "fix"],
+          "properties": {
+            "raw": { "$ref": "#/$defs/row" },
+            "split": { "$ref": "#/$defs/row" },
+            "fix": { "$ref": "#/$defs/row" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "row": {
+      "type": "object",
+      "required": ["ok", "name", "workspace", "commands", "chars", "tokens", "durationMs", "rollbackAvailable", "rollbackCommand", "events"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "name": { "enum": ["raw", "split", "fix"] },
+        "workspace": { "type": "string" },
+        "commands": { "type": "integer", "minimum": 0 },
+        "chars": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "rollbackAvailable": { "type": "boolean" },
+        "rollbackCommand": { "type": ["string", "null"] },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/event" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["command", "status", "chars", "tokens", "durationMs", "rollbackAvailable", "rollbackCommand"],
+      "properties": {
+        "command": { "type": "string" },
+        "status": { "type": ["integer", "null"] },
+        "chars": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "rollbackAvailable": { "type": "boolean" },
+        "rollbackCommand": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "thresholds": {
+      "type": "object",
+      "required": ["ok", "mode", "maxFixTokens", "checks"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "mode": { "const": "ci" },
+        "maxFixTokens": { "type": "integer", "minimum": 1 },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/check" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": ["name", "ok"],
+      "properties": {
+        "name": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "case": { "type": "string" },
+        "row": { "enum": ["raw", "split", "fix"] },
+        "expected": { "type": "boolean" },
+        "actual": { "type": ["boolean", "integer", "null"] },
+        "max": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

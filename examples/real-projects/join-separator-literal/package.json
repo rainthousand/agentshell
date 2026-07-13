@@ -1,0 +1,7 @@
+{
+  "name": "join-separator-literal-real-project",
+  "type": "module",
+  "scripts": {
+    "test": "node test/status.test.js"
+  }
+}

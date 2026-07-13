@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/dashboard.schema.json",
+  "title": "AgentShell Dashboard Start Result",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "url", "host", "port", "opened", "surface", "nativeAppAvailable", "readOnly", "privacy", "nextAction"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.dashboard.v1" },
+    "url": { "type": "string", "pattern": "^http://127\\.0\\.0\\.1:" },
+    "host": { "const": "127.0.0.1" },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "opened": { "type": "boolean" },
+    "surface": { "enum": ["desktop-window", "browser", "browser-fallback", "none"] },
+    "nativeAppAvailable": { "type": "boolean" },
+    "readOnly": { "const": true },
+    "privacy": {
+      "type": "object",
+      "required": ["localOnly", "networkUpload", "servesFileContents", "servesCommandOutput"],
+      "properties": {
+        "localOnly": { "const": true },
+        "networkUpload": { "const": false },
+        "servesFileContents": { "const": false },
+        "servesCommandOutput": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "nextAction": { "type": "string" }
+  },
+  "additionalProperties": false
+}

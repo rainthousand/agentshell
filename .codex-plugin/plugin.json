@@ -1,0 +1,33 @@
+{
+  "name": "agentshell",
+  "version": "0.24.0+codex.20260713041257",
+  "description": "A structured local CLI and Codex skill for AI coding agents.",
+  "author": {
+    "name": "Alvin"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "cli",
+    "codex",
+    "structured-output"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AgentShell",
+    "shortDescription": "Structured shell commands for AI coding agents.",
+    "longDescription": "AgentShell helps Codex check local readiness, inspect projects, fix supported failing tests in one compact command, diagnose failures, generate and fill hash-checked change templates, track task-level run status, search code, read file ranges, run tests with compact JSON output, store logs by reference, report context metrics, expose JSON schemas, generate adapter instructions, and apply edits with undo support.",
+    "developerName": "Alvin",
+    "category": "Productivity",
+    "capabilities": [
+      "CLI",
+      "Structured Output"
+    ],
+    "defaultPrompt": [
+      "Use AgentShell to inspect this repo.",
+      "Use AgentShell to fix supported failing tests.",
+      "Compare raw shell output with AgentShell JSON."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

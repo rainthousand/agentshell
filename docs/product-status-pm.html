@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentShell 产品现状与量化评估</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #647084;
+      --line: #dce2ec;
+      --brand: #2563eb;
+      --brand-soft: #e8f0ff;
+      --good: #0f8a5f;
+      --good-soft: #e8f7f1;
+      --warn: #9a5b00;
+      --warn-soft: #fff3db;
+      --shadow: 0 14px 40px rgba(22, 32, 51, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.55;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 36px 24px 56px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.45fr 0.9fr;
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero-main {
+      padding: 34px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: 38px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .lead {
+      max-width: 760px;
+      color: #31405a;
+      font-size: 17px;
+    }
+
+    .hero-side {
+      padding: 24px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .status-row:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .value {
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .section {
+      margin-top: 24px;
+      padding: 24px;
+    }
+
+    .metric {
+      padding: 20px;
+      min-height: 150px;
+    }
+
+    .metric .big {
+      margin: 8px 0 4px;
+      font-size: 34px;
+      line-height: 1;
+      font-weight: 850;
+    }
+
+    .metric .caption {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--good);
+      background: var(--good-soft);
+    }
+
+    .pill.warn {
+      color: var(--warn);
+      background: var(--warn-soft);
+    }
+
+    .bar {
+      height: 10px;
+      margin-top: 14px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #edf1f7;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--brand);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #34425b;
+      background: #f1f4f9;
+      font-size: 13px;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .num {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      font-weight: 750;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .feature {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+    }
+
+    .feature p {
+      font-size: 14px;
+    }
+
+    .note {
+      padding: 16px 18px;
+      border-radius: 8px;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #eef2f8;
+      color: #23314a;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .grid.cols-4,
+      .grid.cols-3,
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 30px;
+      }
+
+      .page {
+        padding: 22px 14px 42px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="panel hero-main">
+        <div class="eyebrow">AgentShell · PM Brief · 2026-07-09</div>
+        <h1>面向 AI Agent 的本地结构化命令行</h1>
+        <p class="lead">
+          AgentShell 的当前定位是 Codex/Claude Code/Cursor 等 coding agent 的本地插件与 CLI 辅助层：
+          把原本给人看的长日志、搜索输出和中间步骤，压缩成 agent 可直接消费的 JSON，减少 token、减少命令轮次，并在支持的失败测试场景里自动完成诊断、保守修复、验证和回滚指引。
+        </p>
+      </div>
+      <aside class="panel hero-side">
+        <div class="status-row">
+          <span class="label">当前插件版本</span>
+          <span class="value">0.24.0+codex.20260709092018</span>
+        </div>
+        <div class="status-row">
+          <span class="label">插件安装态验证</span>
+          <span class="value">27/27 passed</span>
+        </div>
+        <div class="status-row">
+          <span class="label">插件状态检查</span>
+          <span class="value">9/9 passed</span>
+        </div>
+        <div class="status-row">
+          <span class="label">最新完整测试</span>
+          <span class="value">161/161 passed</span>
+        </div>
+        <div class="status-row">
+          <span class="label">当前策略覆盖</span>
+          <span class="value">17/17 repair classes</span>
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid cols-4">
+      <article class="panel metric">
+        <span class="pill">Token 降本</span>
+        <div class="big">79.8%</div>
+        <p class="caption">checked-in repair fixtures：full matrix 22,112 tokens → fix-first 4,459 tokens。</p>
+        <div class="bar"><span style="width:79.8%"></span></div>
+      </article>
+      <article class="panel metric">
+        <span class="pill">速度提升</span>
+        <div class="big">62.5%</div>
+        <p class="caption">同一 checked-in fixture 对比：arm duration 16,962ms → 6,287ms。</p>
+        <div class="bar"><span style="width:62.5%"></span></div>
+      </article>
+      <article class="panel metric">
+        <span class="pill">稳定性</span>
+        <div class="big">51/51</div>
+        <p class="caption">17 个修复类 fixture，fix-first repeated runs 全部通过。</p>
+        <div class="bar"><span style="width:100%"></span></div>
+      </article>
+      <article class="panel metric">
+        <span class="pill">真实项目烟测</span>
+        <div class="big">96.3%</div>
+        <p class="caption">3 个本地真实项目快路径 token 降低：15,789 → 581。</p>
+        <div class="bar"><span style="width:96.3%"></span></div>
+      </article>
+    </section>
+
+    <section class="panel section">
+      <h2>产品现状</h2>
+      <div class="cards">
+        <div class="feature">
+          <h3>1. Codex 本地插件已可用</h3>
+          <p>当前已经有 Codex 插件形态，包含 AgentShell skill、CLI、schemas、adapter 文档、插件自验证和本地发布链路。重启 Codex 后已确认加载新版插件。</p>
+        </div>
+        <div class="feature">
+          <h3>2. 快速修复路径已跑通</h3>
+          <p><code>agentshell fix test --fast --compact</code> 能在支持的 JS/TS 失败测试上完成诊断、建议、应用、验证，并返回 rollback/undo 指引。</p>
+        </div>
+        <div class="feature">
+          <h3>3. 评估体系已经产品化</h3>
+          <p>已有 benchmark suite、real-project eval、strategy coverage、cold-start benchmark、adapter scorecard、adapter trial collector、adapter trial suite。</p>
+        </div>
+        <div class="feature">
+          <h3>4. MCP 暂缓，CLI/插件优先</h3>
+          <p>MCP 被保留为低优先级 TODO。当前验证重点是本地 CLI + Codex plugin 是否已经能带来速度和 token 收益。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>核心量化对比</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>评估场景</th>
+            <th>基线</th>
+            <th>AgentShell 路径</th>
+            <th>Token 变化</th>
+            <th>速度变化</th>
+            <th>结论</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Checked-in repair fixtures</td>
+            <td>raw + split + fix 全量矩阵</td>
+            <td><code>fix-first</code>，成功后跳过 raw/split</td>
+            <td class="num">22,112 → 4,459，降低 79.8%</td>
+            <td class="num">16,962ms → 6,287ms，降低 62.5%</td>
+            <td>推荐作为插件 fast path 的主证据。</td>
+          </tr>
+          <tr>
+            <td>Repair repeated stability</td>
+            <td>单次修复结果</td>
+            <td>17 个 repair classes，每个重复 3 次</td>
+            <td class="num">平均 262.3 tokens / repair</td>
+            <td class="num">平均 369.8ms / repair</td>
+            <td>51/51 repeated repair runs passed。</td>
+          </tr>
+          <tr>
+            <td>3 个本地真实项目 smoke</td>
+            <td>full: raw + split + fix</td>
+            <td><code>fix-first</code> only</td>
+            <td class="num">15,789 → 581，降低 96.3%</td>
+            <td class="num">329,168ms → 60,496ms，降低 81.6%</td>
+            <td>证明健康真实项目上低成本 pass-through 可行。</td>
+          </tr>
+          <tr>
+            <td>真实项目 arm 对比</td>
+            <td>raw test output</td>
+            <td>fix compact output</td>
+            <td class="num">10,543 → 581，降低 94.5%</td>
+            <td class="num">104,084ms → 82,455ms，降低 20.8%</td>
+            <td>fix 路径显著省 token，速度受测试套件本身影响。</td>
+          </tr>
+          <tr>
+            <td>Cold start local sample</td>
+            <td>普通 Node CLI 启动</td>
+            <td>compact command + profile</td>
+            <td class="num">help 340，manual 2,198，start compact 356 tokens</td>
+            <td class="num">40ms-105ms avg wall time</td>
+            <td>当前瓶颈更像进程启动、子进程测试、输出体积，而不是 JS 语言本身。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid cols-3" style="margin-top: 24px;">
+      <article class="panel metric">
+        <span class="pill">Adapter Trial</span>
+        <div class="big">100/100</div>
+        <p class="caption">样例 trial scorecard：首两条命令、fast repair、compact context、verification、safety、noise control 全部命中。</p>
+      </article>
+      <article class="panel metric">
+        <span class="pill">Trial Suite</span>
+        <div class="big">2/3</div>
+        <p class="caption">样例 suite 中 2 个 Codex strong run、1 个 Claude raw-first weak run，用于展示跨 host 聚合对比。</p>
+      </article>
+      <article class="panel metric">
+        <span class="pill">覆盖面</span>
+        <div class="big">17</div>
+        <p class="caption">支持并验证的保守修复类型，包括 import path、missing export、TS diagnostic、deepEqual、literal、string case 等。</p>
+      </article>
+      <article class="panel metric">
+        <span class="pill warn">边界</span>
+        <div class="big">Local</div>
+        <p class="caption">当前证据来自本地 fixture 和本地真实项目快照，尚不是跨机器、跨团队、线上遥测口径。</p>
+      </article>
+    </section>
+
+    <section class="panel section">
+      <h2>已具备的功能清单</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>能力模块</th>
+            <th>代表命令 / 产物</th>
+            <th>产品价值</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Agent 入口与路由</td>
+            <td><code>start --compact</code>, <code>manual --topic repair</code></td>
+            <td>让 agent 低成本知道下一步该怎么做，减少盲目跑命令。</td>
+          </tr>
+          <tr>
+            <td>结构化项目理解</td>
+            <td><code>understand --compact</code>, <code>find</code>, <code>read --lines</code></td>
+            <td>替代大段 grep/cat 输出，控制上下文窗口成本。</td>
+          </tr>
+          <tr>
+            <td>失败测试修复</td>
+            <td><code>fix test --fast --compact</code>, <code>diagnose test --compact</code></td>
+            <td>把诊断、定位、修改、验证压缩成 agent 友好的结构化结果。</td>
+          </tr>
+          <tr>
+            <td>安全编辑</td>
+            <td><code>change suggest</code>, hash-checked edits, <code>undo</code></td>
+            <td>降低 agent 误改文件的风险，提供可回滚路径。</td>
+          </tr>
+          <tr>
+            <td>评估与证据</td>
+            <td>benchmark suite, real-project eval, adapter trial</td>
+            <td>把“更快、更省 token”变成可重复生成的评估报告。</td>
+          </tr>
+          <tr>
+            <td>Codex 插件自维护</td>
+            <td><code>plugin validate</code>, <code>plugin smoke</code>, local release</td>
+            <td>确保插件发布、安装、缓存、schema、skill 文档一致。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel section">
+      <h2>PM 视角结论</h2>
+      <div class="cards">
+        <div class="feature">
+          <h3>短期价值已经明确</h3>
+          <p>当前不是单纯“更好看的 CLI”，而是把 agent 使用终端的单位成本降下来。核心收益集中在 token 节省、命令轮次减少、失败测试修复链路标准化。</p>
+        </div>
+        <div class="feature">
+          <h3>下一阶段要证明外部泛化</h3>
+          <p>现在最需要的是把 adapter trial 跑到更多真实 host 和真实 repo 上，形成 Codex/Claude/Cursor 横向对比，而不是继续只堆功能。</p>
+        </div>
+        <div class="feature">
+          <h3>速度收益要分层表达</h3>
+          <p>AgentShell 自身命令很轻，但总耗时常被目标项目测试套件主导。所以对外应强调“减少 agent 轮次与输出成本”，速度指标作为同场景比较。</p>
+        </div>
+        <div class="feature">
+          <h3>产品路线应继续插件优先</h3>
+          <p>Codex 插件路径已经可验证、可发布、可自检。MCP 可以保留，但当前更高优先级是 adapter trial collector 和真实项目评估扩展。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <h2>注意事项</h2>
+      <div class="note">
+        Token 是基于 <code>ceil(chars / 4)</code> 的估算，不是模型 tokenizer 的精确值；duration 是本机命令耗时，不能直接承诺为跨机器 SLA。
+        真实项目 smoke 主要证明低成本 pass-through，不等同于真实 bug repair 泛化已完全解决。当前最强 repair 证据仍来自 17 类 checked-in repair fixtures。
+      </div>
+      <div class="source-list">
+        <div>数据来源：<code>README.md</code>, <code>docs/real-project-evidence.md</code>, <code>docs/performance-analysis.md</code></div>
+        <div>关键 artifacts：<code>artifacts/real-project-eval.strategy-coverage-full.json</code>, <code>artifacts/real-project-eval.strategy-coverage.fix-first-runs3.json</code>, <code>artifacts/real-project-eval.batch7.fix-first-runs3.json</code>, <code>artifacts/cold-start.performance-batch.json</code></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

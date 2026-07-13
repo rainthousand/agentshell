@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/codex-plugin-trial-plan.schema.json",
+  "title": "AgentShell Codex Plugin Trial Plan Report",
+  "type": "object",
+  "required": [
+    "ok",
+    "protocolVersion",
+    "generatedAt",
+    "name",
+    "fixture",
+    "runCount",
+    "outDir",
+    "suiteManifestPath",
+    "suiteManifest",
+    "runs",
+    "markdown",
+    "nextActions"
+  ],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.codex-plugin-trial-plan.v1" },
+    "generatedAt": { "type": "string" },
+    "name": { "type": "string" },
+    "fixture": { "type": "string" },
+    "runCount": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "outDir": { "type": "string" },
+    "suiteManifestPath": { "type": "string" },
+    "suiteManifest": { "$ref": "#/$defs/suiteManifest" },
+    "runs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/run" }
+    },
+    "markdown": { "type": "string" },
+    "nextActions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "suiteManifest": {
+      "type": "object",
+      "required": ["name", "runs"],
+      "properties": {
+        "name": { "type": "string" },
+        "runs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/manifestRun" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "manifestRun": {
+      "type": "object",
+      "required": ["id", "path", "notes"],
+      "properties": {
+        "id": { "type": "string" },
+        "path": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": ["id", "fixture", "jsonPath", "markdownPath"],
+      "properties": {
+        "id": { "type": "string" },
+        "fixture": { "type": "string" },
+        "jsonPath": { "type": "string" },
+        "markdownPath": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

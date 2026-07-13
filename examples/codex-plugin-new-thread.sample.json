@@ -1,0 +1,32 @@
+{
+  "id": "codex-new-thread-sample",
+  "host": "codex",
+  "fixture": "examples/failing-test-demo",
+  "source": "manual-new-thread-transcript",
+  "events": [
+    {
+      "type": "command",
+      "command": "agentshell start --compact",
+      "stdout": "{\"ok\":true,\"protocolVersion\":\"agentshell.start.v1\",\"compact\":true,\"summary\":{\"status\":\"ready\"}}",
+      "durationMs": 140
+    },
+    {
+      "type": "command",
+      "command": "agentshell fix test --fast --compact",
+      "stdout": "{\"ok\":true,\"protocolVersion\":\"agentshell.fix.v1\",\"status\":\"passed\",\"rollbackCommand\":\"agentshell undo op_sample\"}",
+      "durationMs": 920
+    },
+    {
+      "type": "command",
+      "command": "agentshell run status --compact",
+      "stdout": "{\"ok\":true,\"protocolVersion\":\"agentshell.run-status.v1\",\"summary\":{\"status\":\"passed\"},\"rollbackCommand\":\"agentshell undo op_sample\"}",
+      "durationMs": 80
+    }
+  ],
+  "finalVerification": {
+    "ok": true,
+    "command": "agentshell fix test --fast --compact",
+    "summary": "New Codex thread loaded the AgentShell plugin skill, used AgentShell first, applied a supported repair, verified success, and preserved rollback guidance."
+  },
+  "notes": "Sample shape for a real Codex new-thread plugin-effect run. Replace stdout snippets and durations with observed command output."
+}

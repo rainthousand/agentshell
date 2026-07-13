@@ -1,0 +1,7 @@
+{
+  "name": "real-project-string-case-transform",
+  "type": "module",
+  "scripts": {
+    "test": "node test/format.test.js"
+  }
+}

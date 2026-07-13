@@ -1,0 +1,7 @@
+{
+  "name": "agentshell-benchmark-deep-equal-missing-property",
+  "type": "module",
+  "scripts": {
+    "test": "node test/user.test.js"
+  }
+}

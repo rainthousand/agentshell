@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/product-readiness.schema.json",
+  "title": "AgentShell Product Readiness Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "mode", "generatedAt", "status", "summary", "checks"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.product-readiness.v1" },
+    "mode": { "enum": ["standard", "heavy-dry-run", "heavy"] },
+    "generatedAt": { "type": "string" },
+    "status": { "enum": ["ready", "blocked"] },
+    "summary": { "$ref": "#/$defs/summary" },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "blockingFailed", "warningsFailed"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "blockingFailed": { "type": "integer", "minimum": 0 },
+        "warningsFailed": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": ["id", "name", "severity", "status", "details"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "severity": { "enum": ["blocking", "warning"] },
+        "status": { "enum": ["pass", "fail"] },
+        "details": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

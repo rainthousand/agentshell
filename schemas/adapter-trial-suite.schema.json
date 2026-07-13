@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/adapter-trial-suite.schema.json",
+  "title": "AgentShell Adapter Trial Suite Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "generatedAt", "name", "summary", "trials"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.adapter-trial-suite.v1" },
+    "generatedAt": { "type": "string" },
+    "name": { "type": "string" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "trials": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/trialResult" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": [
+        "total",
+        "averageScore",
+        "byInterpretation",
+        "byHost",
+        "totalOutputTokens",
+        "totalDurationMs",
+        "totalAgentShellCommands",
+        "totalNoisyRawCommands"
+      ],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "averageScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "byInterpretation": { "$ref": "#/$defs/interpretationCounts" },
+        "byHost": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/hostSummary" }
+        },
+        "totalOutputTokens": { "type": "integer", "minimum": 0 },
+        "totalDurationMs": { "type": "integer", "minimum": 0 },
+        "totalAgentShellCommands": { "type": "integer", "minimum": 0 },
+        "totalNoisyRawCommands": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "interpretationCounts": {
+      "type": "object",
+      "required": ["strong", "usable", "weak"],
+      "properties": {
+        "strong": { "type": "integer", "minimum": 0 },
+        "usable": { "type": "integer", "minimum": 0 },
+        "weak": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "hostSummary": {
+      "type": "object",
+      "required": ["total", "averageScore", "strong", "usable", "weak", "totalOutputTokens", "totalDurationMs"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "averageScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "strong": { "type": "integer", "minimum": 0 },
+        "usable": { "type": "integer", "minimum": 0 },
+        "weak": { "type": "integer", "minimum": 0 },
+        "totalOutputTokens": { "type": "integer", "minimum": 0 },
+        "totalDurationMs": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "trialResult": {
+      "type": "object",
+      "required": ["id", "kind", "sourcePath", "host", "fixture", "score", "interpretation", "metrics", "criteria", "notes"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["trial", "collect"] },
+        "sourcePath": { "type": ["string", "null"] },
+        "host": { "enum": ["codex", "claude", "cursor", "windsurf", "agents-md", "other"] },
+        "fixture": { "type": ["string", "null"] },
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "interpretation": { "enum": ["strong", "usable", "weak"] },
+        "metrics": { "type": "object" },
+        "criteria": { "type": "object" },
+        "notes": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

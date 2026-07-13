@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/run-next.schema.json",
+  "title": "AgentShell Run Next Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "runId", "status", "command", "reason"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.run-next.v1" },
+        "runId": { "type": ["string", "null"] },
+        "status": { "enum": ["idle", "in_progress", "failing", "passed"] },
+        "command": { "type": ["string", "null"] },
+        "reason": { "type": "string" },
+        "rollbackCommand": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "real-project-missing-named-export",
+  "type": "module",
+  "scripts": {
+    "test": "node test/status.test.js"
+  }
+}

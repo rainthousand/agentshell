@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/change-fill.schema.json",
+  "title": "AgentShell Change Fill Spec",
+  "type": "object",
+  "properties": {
+    "reason": { "type": "string" },
+    "editIndex": { "type": "integer", "minimum": 0 },
+    "replacement": { "type": "string" },
+    "replacements": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "anyOf": [
+    { "required": ["replacement"] },
+    { "required": ["replacements"] }
+  ],
+  "additionalProperties": false
+}

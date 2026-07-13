@@ -1,0 +1,6 @@
+{
+  "name": "real-project-typescript-property-suggestion",
+  "scripts": {
+    "test": "node test/typecheck.cjs"
+  }
+}

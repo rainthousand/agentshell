@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/real-project-candidates.schema.json",
+  "title": "AgentShell Real Project Candidate Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "generatedAt", "projects", "summary", "manifestDraft"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.real-project-candidates.v1" },
+    "generatedAt": { "type": "string" },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "summary": { "$ref": "#/$defs/summary" },
+    "manifestDraft": { "$ref": "#/$defs/manifestDraft" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "project": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "source",
+        "sourceType",
+        "checkoutRequired",
+        "repoPath",
+        "exists",
+        "packageManager",
+        "packageManagerSpec",
+        "nodeEngine",
+        "dependencySummary",
+        "workspaceSummary",
+        "language",
+        "scripts",
+        "testCommand",
+        "setupCommand",
+        "setupLinks",
+        "fileSummary",
+        "candidateScore",
+        "recommendedUse",
+        "blockers",
+        "warnings",
+        "notes",
+        "manifestEntry"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "source": { "type": "string" },
+        "sourceType": { "enum": ["local", "remote"] },
+        "checkoutRequired": { "type": "boolean" },
+        "repoPath": { "type": ["string", "null"] },
+        "exists": { "type": "boolean" },
+        "packageManager": { "type": ["string", "null"] },
+        "packageManagerSpec": { "type": ["string", "null"] },
+        "nodeEngine": { "type": ["string", "null"] },
+        "dependencySummary": { "$ref": "#/$defs/dependencySummary" },
+        "workspaceSummary": { "$ref": "#/$defs/workspaceSummary" },
+        "language": { "enum": ["javascript", "typescript", "unknown"] },
+        "scripts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "testCommand": { "type": ["string", "null"] },
+        "setupCommand": { "type": ["string", "null"] },
+        "setupLinks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/setupLink" }
+        },
+        "fileSummary": { "$ref": "#/$defs/fileSummary" },
+        "candidateScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "recommendedUse": { "type": "string" },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "notes": { "type": ["string", "null"] },
+        "manifestEntry": { "$ref": "#/$defs/manifestProject" }
+      },
+      "additionalProperties": false
+    },
+    "fileSummary": {
+      "type": "object",
+      "required": ["total", "js", "ts", "jsx", "tsx", "test", "snapshots", "packageJson"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "js": { "type": "integer", "minimum": 0 },
+        "ts": { "type": "integer", "minimum": 0 },
+        "jsx": { "type": "integer", "minimum": 0 },
+        "tsx": { "type": "integer", "minimum": 0 },
+        "test": { "type": "integer", "minimum": 0 },
+        "snapshots": { "type": "integer", "minimum": 0 },
+        "packageJson": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "dependencySummary": {
+      "type": "object",
+      "required": ["dependencies", "devDependencies", "peerDependencies", "total"],
+      "properties": {
+        "dependencies": { "type": "integer", "minimum": 0 },
+        "devDependencies": { "type": "integer", "minimum": 0 },
+        "peerDependencies": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "workspaceSummary": {
+      "type": "object",
+      "required": [
+        "detected",
+        "packageJsonWorkspaces",
+        "pnpmWorkspaceYaml",
+        "lernaJson",
+        "turboJson",
+        "nxJson",
+        "packageJsonWorkspaceCount",
+        "indicators"
+      ],
+      "properties": {
+        "detected": { "type": "boolean" },
+        "packageJsonWorkspaces": { "type": "boolean" },
+        "pnpmWorkspaceYaml": { "type": "boolean" },
+        "lernaJson": { "type": "boolean" },
+        "turboJson": { "type": "boolean" },
+        "nxJson": { "type": "boolean" },
+        "packageJsonWorkspaceCount": { "type": "integer", "minimum": 0 },
+        "indicators": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "package-json-workspaces",
+              "pnpm-workspace-yaml",
+              "lerna-json",
+              "turbo-json",
+              "nx-json"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "local", "remote", "checkoutRequired", "runnableDrafts", "blocked", "averageScore"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "local": { "type": "integer", "minimum": 0 },
+        "remote": { "type": "integer", "minimum": 0 },
+        "checkoutRequired": { "type": "integer", "minimum": 0 },
+        "runnableDrafts": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "averageScore": { "type": "integer", "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "manifestDraft": {
+      "type": "object",
+      "required": ["version", "projects"],
+      "properties": {
+        "version": { "const": 1 },
+        "projects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/manifestProject" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "manifestProject": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "repoPath",
+        "setupCommand",
+        "setupLinks",
+        "testCommand",
+        "skip",
+        "skipReason",
+        "expectedFailureClass",
+        "allowedStrategies",
+        "metrics"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "repoPath": { "type": "string" },
+        "setupCommand": { "type": ["string", "null"] },
+        "setupLinks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/setupLink" }
+        },
+        "testCommand": { "type": ["string", "null"] },
+        "skip": { "type": "boolean" },
+        "skipReason": { "type": ["string", "null"] },
+        "expectedFailureClass": { "type": "string" },
+        "allowedStrategies": {
+          "type": "array",
+          "items": { "enum": ["raw", "split", "fix"] }
+        },
+        "metrics": {
+          "type": "array",
+          "items": { "enum": ["tokens", "durationMs", "success", "safety", "generalization"] }
+        }
+      },
+      "additionalProperties": false
+    },
+    "setupLink": {
+      "type": "object",
+      "required": ["source", "target"],
+      "properties": {
+        "source": { "type": "string" },
+        "target": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

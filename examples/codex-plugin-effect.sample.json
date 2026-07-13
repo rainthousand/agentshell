@@ -1,0 +1,44 @@
+{
+  "name": "codex-plugin-effect-sample",
+  "trials": [
+    {
+      "id": "codex-raw-baseline",
+      "kind": "trial",
+      "input": {
+        "host": "codex",
+        "fixture": "examples/failing-test-demo",
+        "commands": [
+          { "command": "npm test", "outputTokens": 3713, "durationMs": 1200 },
+          { "command": "sed -n '1,160p' test/user.test.js", "outputTokens": 400, "durationMs": 40 },
+          { "command": "sed -n '1,160p' src/user.js", "outputTokens": 260, "durationMs": 35 },
+          { "command": "npm test", "outputTokens": 3713, "durationMs": 1100 }
+        ],
+        "finalVerification": {
+          "ok": false,
+          "command": "npm test",
+          "summary": "Raw-first baseline emits noisy output before structured diagnosis."
+        },
+        "notes": "Representative raw shell-first Codex path for comparison."
+      }
+    },
+    {
+      "id": "codex-plugin-agentshell",
+      "kind": "trial",
+      "input": {
+        "host": "codex",
+        "fixture": "examples/failing-test-demo",
+        "commands": [
+          { "command": "agentshell start --compact", "outputTokens": 170, "durationMs": 220 },
+          { "command": "agentshell fix test --fast --compact", "outputTokens": 262, "durationMs": 820 },
+          { "command": "agentshell run status --compact", "outputTokens": 204, "durationMs": 70 }
+        ],
+        "finalVerification": {
+          "ok": true,
+          "command": "agentshell fix test --fast --compact",
+          "summary": "AgentShell-first Codex plugin path applies and verifies a supported repair with rollback guidance."
+        },
+        "notes": "Expected plugin-guided path when Codex follows the AgentShell skill."
+      }
+    }
+  ]
+}

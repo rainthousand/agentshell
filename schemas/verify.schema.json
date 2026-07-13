@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/verify.schema.json",
+  "title": "AgentShell Verify Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "operationId", "type", "command", "exitCode", "durationMs", "summary", "relatedFiles", "logRef", "suggestedNextActions"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.verify.v1" },
+        "runId": { "type": "string" },
+        "operationId": { "type": "string" },
+        "type": { "type": "string" },
+        "command": { "type": "string" },
+        "fullCommand": { "type": "string" },
+        "exitCode": { "type": ["integer", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "cacheHit": { "type": "boolean" },
+        "cacheKey": { "type": "string" },
+        "cacheSourceLogRef": { "type": "string" },
+        "verificationMode": { "enum": ["full", "related-test-file"] },
+        "relatedTestFile": { "type": "string" },
+        "relatedTestFileSource": { "enum": ["options", "cache"] },
+        "relatedTestFileVerification": {
+          "type": "object",
+          "required": ["ok", "command", "exitCode", "durationMs", "summary", "relatedTestFile", "logRef"],
+          "properties": {
+            "ok": { "type": "boolean" },
+            "command": { "type": "string" },
+            "exitCode": { "type": ["integer", "null"] },
+            "durationMs": { "type": "integer", "minimum": 0 },
+            "summary": {
+              "type": "object",
+              "required": ["mainError", "failedTests"],
+              "properties": {
+                "mainError": { "type": ["string", "null"] },
+                "failedTests": { "type": ["integer", "null"] }
+              },
+              "additionalProperties": false
+            },
+            "relatedTestFile": { "type": ["string", "null"] },
+            "logRef": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "summary": {
+          "type": "object",
+          "required": ["mainError", "failedTests"],
+          "properties": {
+            "mainError": { "type": ["string", "null"] },
+            "failedTests": { "type": ["integer", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "relatedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "logRef": { "type": "string" },
+        "logTail": { "type": "string" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ]
+}

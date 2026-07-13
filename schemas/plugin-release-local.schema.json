@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/plugin-release-local.schema.json",
+  "title": "AgentShell Plugin Release Local Report",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "dryRun", "skipCodexAdd", "startedAt", "finishedAt", "plugin", "steps"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.plugin-release-local.v1" },
+        "dryRun": { "type": "boolean" },
+        "skipCodexAdd": { "type": "boolean" },
+        "startedAt": { "type": "string" },
+        "finishedAt": { "type": "string" },
+        "plugin": {
+          "oneOf": [
+            { "$ref": "#/$defs/pluginSummary" },
+            { "type": "null" }
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fullStep" }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "status", "dryRun", "skipCodexAdd", "startedAt", "finishedAt", "durationMs", "plugin", "summary", "failedStep", "steps"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.plugin-release-local.v1" },
+        "compact": { "const": true },
+        "status": { "enum": ["ready", "blocked"] },
+        "dryRun": { "type": "boolean" },
+        "skipCodexAdd": { "type": "boolean" },
+        "startedAt": { "type": "string" },
+        "finishedAt": { "type": "string" },
+        "durationMs": { "type": ["integer", "null"], "minimum": 0 },
+        "plugin": {
+          "oneOf": [
+            { "$ref": "#/$defs/pluginSummary" },
+            { "type": "null" }
+          ]
+        },
+        "summary": { "$ref": "#/$defs/summary" },
+        "failedStep": {
+          "oneOf": [
+            { "$ref": "#/$defs/failedStep" },
+            { "type": "null" }
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/compactStep" }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "passed", "failed", "skipped"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "pluginSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "authorName", "developerName"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "version": { "type": ["string", "null"] },
+        "authorName": { "type": ["string", "null"] },
+        "developerName": { "type": ["string", "null"] }
+      }
+    },
+    "fullStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "command", "status", "ok"],
+      "properties": {
+        "name": { "type": "string" },
+        "command": { "type": "string" },
+        "status": { "type": ["integer", "string", "null"] },
+        "ok": { "type": "boolean" },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" },
+        "reason": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+    "compactStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "ok"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": ["integer", "string", "null"] },
+        "ok": { "type": "boolean" },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+    "failedStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "error"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": ["integer", "string", "null"] },
+        "error": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

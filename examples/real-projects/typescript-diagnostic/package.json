@@ -1,0 +1,6 @@
+{
+  "name": "real-project-typescript-diagnostic",
+  "scripts": {
+    "test": "node test/typecheck.cjs"
+  }
+}

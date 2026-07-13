@@ -1,0 +1,7 @@
+{
+  "name": "array-length-benchmark",
+  "type": "module",
+  "scripts": {
+    "test": "node test/items.test.js"
+  }
+}

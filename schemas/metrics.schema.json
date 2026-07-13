@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/metrics.schema.json",
+  "title": "AgentShell Metrics Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "window", "totals", "savings", "latestRun", "measurement", "dashboard", "privacy"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.metrics.v2" },
+    "compact": { "type": "boolean" },
+    "window": { "$ref": "#/$defs/window" },
+    "totals": { "$ref": "#/$defs/totals" },
+    "savings": { "oneOf": [{ "$ref": "#/$defs/savings" }, { "type": "null" }] },
+    "byCommand": {
+      "type": "object",
+      "propertyNames": { "type": "string", "minLength": 1 },
+      "additionalProperties": { "$ref": "#/$defs/commandStats" }
+    },
+    "topCommands": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/topCommand" }
+    },
+    "recentEvents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "latestRun": { "oneOf": [{ "$ref": "#/$defs/latestRun" }, { "type": "null" }] },
+    "measurement": { "$ref": "#/$defs/measurement" },
+    "dashboard": { "$ref": "#/$defs/dashboard" },
+    "privacy": { "$ref": "#/$defs/privacy" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "measurement": {
+      "type": "object",
+      "required": ["scope", "measured", "estimated", "unavailable"],
+      "properties": {
+        "scope": { "const": "agentshell-local-tooling" },
+        "measured": { "type": "array", "items": { "type": "string" } },
+        "estimated": { "type": "array", "items": { "type": "string" } },
+        "unavailable": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["storage", "networkUpload", "includesFileContents", "includesCommandOutput"],
+      "properties": {
+        "storage": { "const": "local-workspace-only" },
+        "networkUpload": { "const": false },
+        "includesFileContents": { "const": false },
+        "includesCommandOutput": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "dashboard": {
+      "type": "object",
+      "required": ["generatedAt", "workspace", "health", "totals", "latestTask", "trend"],
+      "properties": {
+        "generatedAt": { "type": "string" },
+        "workspace": {
+          "type": "object",
+          "required": ["name"],
+          "properties": { "name": { "type": "string" } },
+          "additionalProperties": false
+        },
+        "health": { "enum": ["ready", "attention", "idle"] },
+        "totals": { "$ref": "#/$defs/dashboardTotals" },
+        "latestTask": { "oneOf": [{ "$ref": "#/$defs/dashboardTask" }, { "type": "null" }] },
+        "trend": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/trendTask" } }
+      },
+      "additionalProperties": false
+    },
+    "dashboardTotals": {
+      "type": "object",
+      "required": ["tasks", "managedRuns", "operations", "toolCalls", "passed", "successRate", "commandCount", "averageCommandsPerTask", "agentShellOutputTokens", "rawVerifyTokens", "estimatedContextAvoidedTokens", "contextAvoidedPercent", "executionMs", "workflowElapsedMs", "estimatedTimeSavedMs"],
+      "properties": {
+        "tasks": { "type": "integer", "minimum": 0 },
+        "managedRuns": { "type": "integer", "minimum": 0 },
+        "operations": { "type": "integer", "minimum": 0 },
+        "toolCalls": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "successRate": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "commandCount": { "type": "integer", "minimum": 0 },
+        "averageCommandsPerTask": { "type": ["number", "null"], "minimum": 0 },
+        "agentShellOutputTokens": { "type": "integer", "minimum": 0 },
+        "rawVerifyTokens": { "type": "integer", "minimum": 0 },
+        "estimatedContextAvoidedTokens": { "type": ["integer", "null"], "minimum": 0 },
+        "contextAvoidedPercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "executionMs": { "type": "number", "minimum": 0 },
+        "workflowElapsedMs": { "type": "number", "minimum": 0 },
+        "estimatedTimeSavedMs": { "type": ["number", "null"], "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "dashboardTask": {
+      "allOf": [
+        { "$ref": "#/$defs/trendTask" },
+        {
+          "type": "object",
+          "required": ["commandCount", "changedFileCount", "verificationOk"],
+          "properties": {
+            "commandCount": { "type": "integer", "minimum": 0 },
+            "changedFileCount": { "type": "integer", "minimum": 0 },
+            "verificationOk": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "trendTask": {
+      "type": "object",
+      "required": ["id", "status", "estimatedTokens", "executionMs", "workflowElapsedMs", "finishedAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "enum": ["in_progress", "failing", "passed"] },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "executionMs": { "type": "number", "minimum": 0 },
+        "workflowElapsedMs": { "type": "number", "minimum": 0 },
+        "finishedAt": { "type": ["string", "null"] }
+      }
+    },
+    "window": {
+      "type": "object",
+      "required": ["events", "limit"],
+      "properties": {
+        "events": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500 }
+      },
+      "additionalProperties": false
+    },
+    "totals": {
+      "type": "object",
+      "required": ["agentShellOutputChars", "agentShellEstimatedTokens", "verifyRawOutputChars", "verifyRawEstimatedTokens"],
+      "properties": {
+        "agentShellOutputChars": { "type": "integer", "minimum": 0 },
+        "agentShellEstimatedTokens": { "type": "integer", "minimum": 0 },
+        "verifyRawOutputChars": { "type": "integer", "minimum": 0 },
+        "verifyRawEstimatedTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "savings": {
+      "type": "object",
+      "required": ["charsSavedVsRawVerify", "percentSavedVsRawVerify"],
+      "properties": {
+        "charsSavedVsRawVerify": { "type": "integer", "minimum": 0 },
+        "percentSavedVsRawVerify": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "commandStats": {
+      "type": "object",
+      "required": ["count", "outputChars", "estimatedTokens"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "outputChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "topCommand": {
+      "type": "object",
+      "required": ["command", "count", "outputChars", "estimatedTokens"],
+      "properties": {
+        "command": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "outputChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["command", "args", "ok", "outputChars", "estimatedTokens", "createdAt"],
+      "properties": {
+        "command": { "type": "string" },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ok": { "type": "boolean" },
+        "outputChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "createdAt": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "latestRun": {
+      "type": "object",
+      "required": ["runId", "status", "commandCount", "nodeCount", "outputChars", "estimatedTokens", "durationMs", "diagnosis", "latestChange", "latestVerify", "rollbackCommand", "nextBestAction"],
+      "properties": {
+        "runId": { "type": "string" },
+        "status": { "enum": ["in_progress", "failing", "passed"] },
+        "commandCount": { "type": "integer", "minimum": 0 },
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "outputChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "diagnosis": { "oneOf": [{ "$ref": "#/$defs/diagnosisSummary" }, { "type": "null" }] },
+        "latestChange": { "oneOf": [{ "$ref": "#/$defs/changeSummary" }, { "type": "null" }] },
+        "latestVerify": { "oneOf": [{ "$ref": "#/$defs/verifySummary" }, { "type": "null" }] },
+        "rollbackCommand": { "type": ["string", "null"] },
+        "nextBestAction": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "diagnosisSummary": {
+      "type": "object",
+      "required": ["verificationOk", "logRef", "confidence", "targetFile"],
+      "properties": {
+        "verificationOk": { "type": "boolean" },
+        "logRef": { "type": "string" },
+        "confidence": { "type": ["string", "null"] },
+        "targetFile": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "changeSummary": {
+      "type": "object",
+      "required": ["ok", "changedFiles"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "changedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "verifySummary": {
+      "type": "object",
+      "required": ["ok", "logRef", "summary"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "logRef": { "type": "string" },
+        "summary": { "$ref": "#/$defs/testSummary" }
+      },
+      "additionalProperties": false
+    },
+    "testSummary": {
+      "type": "object",
+      "required": ["mainError", "failedTests"],
+      "properties": {
+        "mainError": { "type": ["string", "null"] },
+        "failedTests": { "type": ["integer", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

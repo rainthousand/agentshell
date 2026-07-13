@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/manual.schema.json",
+  "title": "AgentShell Manual Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "name", "version", "purpose", "firstPass", "primaryCommands", "topics", "full", "rules"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.manual.v1" },
+        "compact": { "const": true },
+        "name": { "const": "AgentShell" },
+        "version": { "type": "string" },
+        "purpose": { "type": "string" },
+        "firstPass": { "$ref": "#/$defs/commandEntry" },
+        "primaryCommands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/commandEntry" }
+        },
+        "topics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/topicEntry" }
+        },
+        "full": { "const": "agentshell manual --full" },
+        "rules": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "name", "version", "topic", "workflow", "rules", "full"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.manual.v1" },
+        "compact": { "const": true },
+        "name": { "const": "AgentShell" },
+        "version": { "type": "string" },
+        "topic": {
+          "enum": ["repair", "plugin", "benchmark", "profile", "onboarding", "log-triage", "reference"]
+        },
+        "workflow": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "full": { "const": "agentshell manual --full" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "name", "version", "purpose", "commandMap", "rules", "workflow"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.manual.v1" },
+        "compact": { "const": false },
+        "name": { "const": "AgentShell" },
+        "version": { "type": "string" },
+        "purpose": { "type": "string" },
+        "commandMap": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/commandEntry" }
+        },
+        "rules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "workflow": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "commandEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "need": { "type": "string" },
+        "command": { "type": "string" },
+        "fallback": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "topicEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "command"],
+      "properties": {
+        "name": {
+          "enum": ["repair", "plugin", "benchmark", "profile", "onboarding", "log-triage", "reference"]
+        },
+        "command": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "string-case-transform-benchmark",
+  "type": "module",
+  "scripts": {
+    "test": "node test/format.test.js"
+  }
+}

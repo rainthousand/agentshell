@@ -1,0 +1,6 @@
+{
+  "name": "benchmark-typescript-property-suggestion",
+  "scripts": {
+    "test": "node test/typecheck.cjs"
+  }
+}

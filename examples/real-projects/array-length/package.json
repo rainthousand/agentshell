@@ -1,0 +1,7 @@
+{
+  "name": "real-project-array-length",
+  "type": "module",
+  "scripts": {
+    "test": "node test/items.test.js"
+  }
+}

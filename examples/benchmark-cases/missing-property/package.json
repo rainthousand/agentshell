@@ -1,0 +1,7 @@
+{
+  "name": "benchmark-missing-property",
+  "type": "module",
+  "scripts": {
+    "test": "node test/user.test.js"
+  }
+}

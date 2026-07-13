@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/run.schema.json",
+  "title": "AgentShell Run Status Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "run", "summary"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.run-status.v1" },
+    "compact": { "type": "boolean" },
+    "run": { "oneOf": [{ "$ref": "#/$defs/run" }, { "type": "null" }] },
+    "summary": { "oneOf": [{ "$ref": "#/$defs/summary" }, { "type": "null" }] }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "run": {
+      "type": "object",
+      "required": ["id", "status", "startedAt", "updatedAt", "nodes", "commandStats"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "enum": ["in_progress", "failing", "passed"] },
+        "startedAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/runNode" }
+        },
+        "commandStats": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/commandStat" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "runNode": {
+      "type": "object",
+      "required": ["type", "ok", "createdAt"],
+      "properties": {
+        "type": { "enum": ["diagnose", "change", "verify"] },
+        "ok": { "type": "boolean" },
+        "verificationOk": { "type": "boolean" },
+        "summary": { "$ref": "#/$defs/testSummary" },
+        "logRef": { "type": "string" },
+        "fixPlan": { "$ref": "#/$defs/fixPlan" },
+        "changeTemplate": {
+          "oneOf": [{ "$ref": "#/$defs/changeTemplate" }, { "type": "null" }]
+        },
+        "operationId": { "type": ["string", "null"] },
+        "template": { "type": "string" },
+        "changedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "diffSummary": { "type": ["string", "null"] },
+        "exitCode": { "type": ["integer", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "cacheHit": { "type": "boolean" },
+        "cacheKey": { "type": "string" },
+        "rawOutputChars": { "type": "integer", "minimum": 0 },
+        "rawEstimatedTokens": { "type": "integer", "minimum": 0 },
+        "verificationMode": { "enum": ["full", "related-test-file"] },
+        "fullCommand": { "type": ["string", "null"] },
+        "relatedTestFile": { "type": ["string", "null"] },
+        "createdAt": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "commandStat": {
+      "type": "object",
+      "required": ["command", "args", "ok", "outputChars", "estimatedTokens", "createdAt"],
+      "properties": {
+        "command": { "type": "string" },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ok": { "type": "boolean" },
+        "outputChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "createdAt": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "fixPlan": {
+      "type": "object",
+      "required": ["confidence", "target", "nextCommand"],
+      "properties": {
+        "confidence": { "enum": ["none", "low", "medium", "high"] },
+        "target": {
+          "oneOf": [{ "$ref": "#/$defs/fixTarget" }, { "type": "null" }]
+        },
+        "nextCommand": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "fixTarget": {
+      "type": "object",
+      "required": ["file", "expectedHash", "range", "symbol", "intent"],
+      "properties": {
+        "file": { "type": "string" },
+        "expectedHash": { "type": "string", "pattern": "^sha256:" },
+        "range": { "$ref": "#/$defs/range" },
+        "symbol": { "type": ["string", "null"] },
+        "intent": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "range": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 1 },
+        "end": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "changeTemplate": {
+      "type": "object",
+      "required": ["path", "replacementRequired"],
+      "properties": {
+        "path": { "type": "string" },
+        "replacementRequired": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["runId", "status", "commandCount", "nodeCount", "outputChars", "estimatedTokens", "durationMs", "diagnosis", "latestChange", "latestVerify", "rollbackCommand", "nextBestAction"],
+      "properties": {
+        "runId": { "type": "string" },
+        "status": { "enum": ["in_progress", "failing", "passed"] },
+        "commandCount": { "type": "integer", "minimum": 0 },
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "outputChars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "diagnosis": { "oneOf": [{ "$ref": "#/$defs/diagnosisSummary" }, { "type": "null" }] },
+        "latestChange": { "oneOf": [{ "$ref": "#/$defs/changeSummary" }, { "type": "null" }] },
+        "latestVerify": { "oneOf": [{ "$ref": "#/$defs/verifySummary" }, { "type": "null" }] },
+        "rollbackCommand": { "type": ["string", "null"] },
+        "nextBestAction": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "diagnosisSummary": {
+      "type": "object",
+      "required": ["verificationOk", "logRef", "confidence", "targetFile"],
+      "properties": {
+        "verificationOk": { "type": "boolean" },
+        "logRef": { "type": "string" },
+        "confidence": { "type": ["string", "null"] },
+        "targetFile": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "changeSummary": {
+      "type": "object",
+      "required": ["ok", "changedFiles"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "changedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "verifySummary": {
+      "type": "object",
+      "required": ["ok", "logRef", "summary"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "logRef": { "type": "string" },
+        "summary": { "$ref": "#/$defs/testSummary" }
+      },
+      "additionalProperties": false
+    },
+    "testSummary": {
+      "type": "object",
+      "required": ["mainError", "failedTests"],
+      "properties": {
+        "mainError": { "type": ["string", "null"] },
+        "failedTests": { "type": ["integer", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "deep-equal-array-primitive-replacement-real-project",
+  "type": "module",
+  "scripts": {
+    "test": "node test/tags.test.js"
+  }
+}

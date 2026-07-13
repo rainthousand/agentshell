@@ -1,0 +1,7 @@
+{
+  "name": "benchmark-truthy-return",
+  "type": "module",
+  "scripts": {
+    "test": "node test/ready.test.js"
+  }
+}

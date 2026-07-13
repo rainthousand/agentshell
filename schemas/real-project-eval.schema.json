@@ -1,0 +1,467 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/real-project-eval.schema.json",
+  "title": "AgentShell Real Project Eval Report",
+  "type": "object",
+  "required": ["ok", "manifest", "runs", "mode", "concurrency", "armConcurrency", "projects", "summary"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "manifest": { "type": ["string", "null"] },
+    "runs": { "type": "integer", "minimum": 1 },
+    "mode": { "enum": ["full", "fix-first"] },
+    "concurrency": { "type": "integer", "minimum": 1 },
+    "armConcurrency": { "type": "integer", "minimum": 1 },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "summary": { "$ref": "#/$defs/summary" },
+    "artifacts": { "$ref": "#/$defs/artifacts" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "project": {
+      "type": "object",
+      "required": ["id", "name", "repoPath", "expectedFailureClass", "allowedStrategies", "metrics", "effectiveArmConcurrency", "skippedArms", "evaluation", "status", "availability", "ok", "commands", "classification"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "repoPath": { "type": ["string", "null"] },
+        "skipRepairArms": { "type": "boolean" },
+        "expectedFailureClass": { "type": "string" },
+        "allowedStrategies": {
+          "type": "array",
+          "items": { "enum": ["baseline", "raw", "diagnose", "split", "fix"] }
+        },
+        "metrics": {
+          "type": "array",
+          "items": { "enum": ["tokens", "durationMs", "speed", "success", "safety", "generalization"] }
+        },
+        "effectiveArmConcurrency": { "type": "integer", "minimum": 1 },
+        "skippedArms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skippedArm" }
+        },
+        "armsConfig": { "$ref": "#/$defs/armsConfig" },
+        "evaluation": { "$ref": "#/$defs/evaluation" },
+        "classification": { "$ref": "#/$defs/classification" },
+        "status": { "enum": ["pass", "fail", "missing", "skipped"] },
+        "availability": { "enum": ["runnable", "missing", "skipped"] },
+        "ok": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "arms": { "$ref": "#/$defs/arms" },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "skippedArm": {
+      "type": "object",
+      "required": ["name", "reason"],
+      "properties": {
+        "name": { "enum": ["raw", "split", "fix"] },
+        "reason": { "enum": ["fix-succeeded"] }
+      },
+      "additionalProperties": false
+    },
+    "armsConfig": {
+      "type": "object",
+      "properties": {
+        "raw": { "$ref": "#/$defs/armConfig" },
+        "split": { "$ref": "#/$defs/armConfig" },
+        "fix": { "$ref": "#/$defs/armConfig" }
+      },
+      "additionalProperties": false
+    },
+    "armConfig": {
+      "type": "object",
+      "required": ["enabled", "command"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "command": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "arms": {
+      "type": "object",
+      "properties": {
+        "raw": { "$ref": "#/$defs/arm" },
+        "split": { "$ref": "#/$defs/arm" },
+        "fix": { "$ref": "#/$defs/arm" }
+      },
+      "additionalProperties": false
+    },
+    "arm": {
+      "type": "object",
+      "required": ["name", "ok", "success", "tokens", "durationMs", "commands"],
+      "properties": {
+        "name": { "enum": ["raw", "split", "fix"] },
+        "ok": { "type": "boolean" },
+        "success": { "type": "boolean" },
+        "runs": { "type": "integer", "minimum": 1 },
+        "successRuns": { "type": "integer", "minimum": 0 },
+        "failureRuns": { "type": "integer", "minimum": 0 },
+        "successRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "averageTokens": { "type": "integer", "minimum": 0 },
+        "averageDurationMs": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" },
+        "artifact": { "type": "string" },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "runResults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/armRun" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "armRun": {
+      "type": "object",
+      "required": ["run", "name", "ok", "success", "tokens", "durationMs", "commands"],
+      "properties": {
+        "run": { "type": "integer", "minimum": 1 },
+        "name": { "enum": ["raw", "split", "fix"] },
+        "ok": { "type": "boolean" },
+        "success": { "type": "boolean" },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "command": {
+      "type": "object",
+      "required": ["name", "command", "status", "durationMs", "chars", "tokens"],
+      "properties": {
+        "name": { "type": "string" },
+        "command": { "type": "string" },
+        "status": { "type": ["integer", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "chars": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "evaluation": {
+      "type": "object",
+      "required": ["tokens", "durationMs", "success", "safety", "generalization"],
+      "properties": {
+        "tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "durationMs": { "type": ["integer", "null"], "minimum": 0 },
+        "success": { "type": ["boolean", "null"] },
+        "safety": { "enum": ["checked", "pending", "failed", "unknown", "not-applicable", null] },
+        "generalization": { "enum": ["covered", "unsupported", "unknown", "not-applicable", null] }
+      },
+      "additionalProperties": false
+    },
+    "classification": {
+      "type": "object",
+      "required": ["expectedFailureClass", "status", "reason", "rawFailureObserved", "repairAttempted", "repairSucceeded", "unsupportedReasons", "suggestedNextActions"],
+      "properties": {
+        "expectedFailureClass": { "type": "string" },
+        "status": { "enum": ["pass", "fail", "missing", "skipped"] },
+        "reason": { "type": ["string", "null"] },
+        "rawFailureObserved": { "type": ["boolean", "null"] },
+        "repairAttempted": { "type": "boolean" },
+        "repairSucceeded": { "type": ["boolean", "null"] },
+        "unsupportedReasons": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/unsupportedReason" }
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "pass", "fail", "skipped", "missing", "runnable", "skippedArms", "failureClasses", "unsupported", "evaluation"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "pass": { "type": "integer", "minimum": 0 },
+        "fail": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 },
+        "runnable": { "type": "integer", "minimum": 0 },
+        "arms": {
+          "type": "object",
+          "properties": {
+            "raw": { "$ref": "#/$defs/armSummary" },
+            "split": { "$ref": "#/$defs/armSummary" },
+            "fix": { "$ref": "#/$defs/armSummary" }
+          },
+          "additionalProperties": false
+        },
+        "skippedArms": { "$ref": "#/$defs/skippedArmSummary" },
+        "failureClasses": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/failureClassSummary" }
+        },
+        "unsupported": { "$ref": "#/$defs/unsupportedSummary" },
+        "evaluation": { "$ref": "#/$defs/evaluationSummary" }
+      },
+      "additionalProperties": false
+    },
+    "failureClassSummary": {
+      "type": "object",
+      "required": ["total", "pass", "fail", "missing", "skipped", "repairAttempted", "repairSucceeded", "unsupported"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "pass": { "type": "integer", "minimum": 0 },
+        "fail": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "repairAttempted": { "type": "integer", "minimum": 0 },
+        "repairSucceeded": { "type": "integer", "minimum": 0 },
+        "unsupported": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "unsupportedSummary": {
+      "type": "object",
+      "required": ["totalProjects", "totalArms", "reasons", "projects"],
+      "properties": {
+        "totalProjects": { "type": "integer", "minimum": 0 },
+        "totalArms": { "type": "integer", "minimum": 0 },
+        "reasons": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "projects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unsupportedProject" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "unsupportedProject": {
+      "type": "object",
+      "required": ["id", "expectedFailureClass", "status", "reasons", "suggestedNextActions"],
+      "properties": {
+        "id": { "type": "string" },
+        "expectedFailureClass": { "type": "string" },
+        "status": { "enum": ["pass", "fail", "missing", "skipped"] },
+        "reasons": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/unsupportedReason" }
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluationSummary": {
+      "type": "object",
+      "required": ["safety", "generalization"],
+      "properties": {
+        "safety": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "generalization": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "skippedArmSummary": {
+      "type": "object",
+      "required": ["total", "raw", "split", "fix"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "raw": { "type": "integer", "minimum": 0 },
+        "split": { "type": "integer", "minimum": 0 },
+        "fix": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "armSummary": {
+      "type": "object",
+      "required": ["total", "success", "tokens", "durationMs"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "success": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "runs": { "type": "integer", "minimum": 0 },
+        "successRuns": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["directory", "summary", "files"],
+      "properties": {
+        "directory": { "type": "string" },
+        "summary": { "type": "string" },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactFile" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifactFile": {
+      "type": "object",
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "enum": ["summary", "arm"] },
+        "project": { "type": "string" },
+        "arm": { "enum": ["raw", "split", "fix"] },
+        "path": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "artifactSummary": {
+      "type": "object",
+      "required": ["type", "ok", "manifest", "summary", "projects", "files"],
+      "properties": {
+        "type": { "const": "real-project-eval-summary" },
+        "ok": { "type": "boolean" },
+        "manifest": { "type": ["string", "null"] },
+        "summary": { "$ref": "#/$defs/summary" },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "status", "availability", "ok", "reason", "artifacts"],
+            "properties": {
+              "id": { "type": "string" },
+              "status": { "enum": ["pass", "fail", "missing", "skipped"] },
+              "availability": { "enum": ["runnable", "missing", "skipped"] },
+              "ok": { "type": "boolean" },
+              "reason": { "type": ["string", "null"] },
+              "artifacts": {
+                "type": "object",
+                "properties": {
+                  "raw": { "type": "string" },
+                  "split": { "type": "string" },
+                  "fix": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactFile" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifactArm": {
+      "type": "object",
+      "required": ["type", "project", "arm", "commands", "runs"],
+      "properties": {
+        "type": { "const": "real-project-eval-arm" },
+        "project": {
+          "type": "object",
+          "required": ["id", "name", "repoPath"],
+          "properties": {
+            "id": { "type": "string" },
+            "name": { "type": "string" },
+            "repoPath": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "arm": { "$ref": "#/$defs/artifactArmSummary" },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactCommand" }
+        },
+        "runs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactArmRun" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifactArmSummary": {
+      "type": "object",
+      "required": ["name", "ok", "success", "runs", "successRuns", "failureRuns", "successRate", "tokens", "durationMs", "averageTokens", "averageDurationMs", "reason"],
+      "properties": {
+        "name": { "enum": ["raw", "split", "fix"] },
+        "ok": { "type": "boolean" },
+        "success": { "type": "boolean" },
+        "runs": { "type": "integer", "minimum": 1 },
+        "successRuns": { "type": "integer", "minimum": 0 },
+        "failureRuns": { "type": "integer", "minimum": 0 },
+        "successRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "averageTokens": { "type": "integer", "minimum": 0 },
+        "averageDurationMs": { "type": "integer", "minimum": 0 },
+        "reason": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "artifactArmRun": {
+      "type": "object",
+      "required": ["run", "ok", "success", "tokens", "durationMs", "reason", "commands"],
+      "properties": {
+        "run": { "type": "integer", "minimum": 1 },
+        "ok": { "type": "boolean" },
+        "success": { "type": "boolean" },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "reason": { "type": ["string", "null"] },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactCommand" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifactCommand": {
+      "type": "object",
+      "required": ["name", "command", "status", "durationMs", "chars", "tokens", "output"],
+      "properties": {
+        "name": { "type": "string" },
+        "command": { "type": "string" },
+        "status": { "type": ["integer", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "chars": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "output": {
+          "type": "object",
+          "required": ["stdout", "stderr"],
+          "properties": {
+            "stdout": { "$ref": "#/$defs/compactStream" },
+            "stderr": { "$ref": "#/$defs/compactStream" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "compactStream": {
+      "type": "object",
+      "required": ["chars", "truncated"],
+      "properties": {
+        "chars": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" },
+        "text": { "type": "string" },
+        "head": { "type": "string" },
+        "tail": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

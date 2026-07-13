@@ -1,0 +1,45 @@
+{
+  "name": "codex-plugin-new-thread-suite-sample",
+  "runs": [
+    {
+      "id": "sample-run-1",
+      "path": "codex-plugin-new-thread.sample.json",
+      "notes": "Sample real Codex new-thread run using the AgentShell plugin first."
+    },
+    {
+      "id": "sample-run-2",
+      "input": {
+        "id": "inline-codex-run",
+        "host": "codex",
+        "fixture": "examples/failing-test-demo",
+        "source": "manual-new-thread-transcript",
+        "events": [
+          {
+            "type": "command",
+            "command": "agentshell start --compact",
+            "stdout": "{\"ok\":true,\"protocolVersion\":\"agentshell.start.v1\",\"compact\":true}",
+            "durationMs": 150
+          },
+          {
+            "type": "command",
+            "command": "agentshell fix test --fast --compact",
+            "stdout": "{\"ok\":true,\"protocolVersion\":\"agentshell.fix.v1\",\"status\":\"passed\",\"rollbackCommand\":\"agentshell undo op_inline\"}",
+            "durationMs": 850
+          },
+          {
+            "type": "command",
+            "command": "agentshell run status --compact",
+            "stdout": "{\"ok\":true,\"protocolVersion\":\"agentshell.run-status.v1\",\"status\":\"passed\",\"rollbackCommand\":\"agentshell undo op_inline\"}",
+            "durationMs": 90
+          }
+        ],
+        "finalVerification": {
+          "ok": true,
+          "command": "agentshell fix test --fast --compact",
+          "summary": "The inline sample followed the expected AgentShell plugin path and preserved rollback guidance."
+        },
+        "notes": "Inline sample for manifest shape validation."
+      }
+    }
+  ]
+}

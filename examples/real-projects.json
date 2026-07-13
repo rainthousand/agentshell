@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "id": "checked-in-runnable-fixture",
+      "name": "Checked-in runnable fixture",
+      "repoPath": "examples/failing-test-demo",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "missing-object-property",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "healthy-node-baseline",
+      "name": "Healthy Node baseline fixture",
+      "repoPath": "examples/real-projects/healthy-node-baseline",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "skipRepairArms": true,
+      "expectedFailureClass": "none",
+      "allowedStrategies": ["raw"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "import-path-typo-real-project",
+      "name": "Import path typo real-project fixture",
+      "repoPath": "examples/real-projects/import-path-typo",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "import-path",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "typescript-diagnostic-real-project",
+      "name": "TypeScript diagnostic real-project fixture",
+      "repoPath": "examples/real-projects/typescript-diagnostic",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "typescript-missing-property",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "typescript-property-suggestion-real-project",
+      "name": "TypeScript property suggestion real-project fixture",
+      "repoPath": "examples/real-projects/typescript-property-suggestion",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "typescript-property-suggestion",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "typescript-primitive-literal-real-project",
+      "name": "TypeScript primitive literal real-project fixture",
+      "repoPath": "examples/real-projects/typescript-primitive-literal",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "typescript-primitive-literal-mismatch",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "literal-replacement-real-project",
+      "name": "Literal replacement real-project fixture",
+      "repoPath": "examples/real-projects/literal-replacement",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "literal-replacement",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "deep-equal-array-elements-real-project",
+      "name": "Deep equal array elements real-project fixture",
+      "repoPath": "examples/real-projects/deep-equal-array-elements",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "deep-equal-array-elements",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "deep-equal-missing-property-real-project",
+      "name": "Deep equal missing property real-project fixture",
+      "repoPath": "examples/real-projects/deep-equal-missing-property",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "deep-equal-missing-property",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "deep-equal-array-removal-real-project",
+      "name": "Deep equal array removal real-project fixture",
+      "repoPath": "examples/real-projects/deep-equal-array-removal",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "deep-equal-array-removal",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "deep-equal-extra-property-removal-real-project",
+      "name": "Deep equal extra property removal real-project fixture",
+      "repoPath": "examples/real-projects/deep-equal-extra-property-removal",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "deep-equal-extra-property-removal",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "deep-equal-array-primitive-replacement-real-project",
+      "name": "Deep equal array primitive replacement real-project fixture",
+      "repoPath": "examples/real-projects/deep-equal-array-primitive-replacement",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "deep-equal-array-primitive-replacement",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "array-length-real-project",
+      "name": "Array length real-project fixture",
+      "repoPath": "examples/real-projects/array-length",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "array-length",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "string-case-transform-real-project",
+      "name": "String case transform real-project fixture",
+      "repoPath": "examples/real-projects/string-case-transform",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "string-case-transform",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "join-separator-literal-real-project",
+      "name": "Join separator literal real-project fixture",
+      "repoPath": "examples/real-projects/join-separator-literal",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "join-separator-literal",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "truthy-return-real-project",
+      "name": "Truthy return real-project fixture",
+      "repoPath": "examples/real-projects/truthy-return",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "truthy-return",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "missing-named-export-real-project",
+      "name": "Missing named export real-project fixture",
+      "repoPath": "examples/real-projects/missing-named-export",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "missing-named-export",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "typescript-literal-mismatch-real-project",
+      "name": "TypeScript literal mismatch real-project fixture",
+      "repoPath": "examples/real-projects/typescript-literal-mismatch",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "typescript-literal-mismatch",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "sample-missing-local-project",
+      "name": "Sample missing local project",
+      "repoPath": "examples/real-projects/sample-local-project",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "unknown",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    },
+    {
+      "id": "sample-skipped-external-project",
+      "name": "Sample skipped external project",
+      "repoPath": "../external-real-project",
+      "skip": true,
+      "skipReason": "example-manifest-placeholder",
+      "setupCommand": null,
+      "testCommand": "npm test",
+      "expectedFailureClass": "unknown",
+      "allowedStrategies": ["raw", "split", "fix"],
+      "metrics": ["tokens", "durationMs", "success", "safety", "generalization"]
+    }
+  ]
+}

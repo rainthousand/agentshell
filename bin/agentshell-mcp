@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { startStdioServer } from "../src/mcp/server.js";
+
+await startStdioServer();

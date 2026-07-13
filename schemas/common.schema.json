@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/common.schema.json",
+  "title": "AgentShell Common Types",
+  "type": "object",
+  "$defs": {
+    "protocolVersion": {
+      "type": "string",
+      "pattern": "^agentshell\\.[a-z0-9-]+\\.v[0-9]+$"
+    },
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "DENIED_PATH",
+        "FILE_NOT_FOUND",
+        "FILE_OUTSIDE_WORKSPACE",
+        "FIX_SUGGESTION_UNAVAILABLE",
+        "HASH_MISMATCH",
+        "INVALID_ARGUMENT",
+        "INVALID_CHANGE",
+        "INVALID_FILL",
+        "INVALID_RANGE",
+        "LOG_NOT_FOUND",
+        "NO_CHANGE_SUGGESTION",
+        "NOT_A_FILE",
+        "OPERATION_NOT_FOUND",
+        "OPERATION_NOT_UNDOABLE",
+        "PACKAGE_NOT_FOUND",
+        "QUERY_NOT_FOUND",
+        "RANGE_TOO_LARGE",
+        "SCHEMA_NOT_FOUND",
+        "SCRIPT_NOT_FOUND",
+        "SNAPSHOT_NOT_FOUND",
+        "SUGGESTION_UNAVAILABLE",
+        "TEMPLATE_NOT_FOUND",
+        "UNKNOWN_COMMAND",
+        "UNEXPECTED_ERROR"
+      ]
+    },
+    "unsupportedReason": {
+      "type": "string",
+      "enum": [
+        "no-active-diagnosis",
+        "no-change-template",
+        "unsupported-pattern",
+        "low-confidence",
+        "ambiguous-target",
+        "unsafe-change",
+        "missing-context"
+      ]
+    },
+    "suggestedNextAction": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "required": ["totalMs", "measuredMs", "unmeasuredMs", "phases"],
+      "properties": {
+        "totalMs": { "type": "integer", "minimum": 0 },
+        "measuredMs": { "type": "integer", "minimum": 0 },
+        "unmeasuredMs": { "type": "integer", "minimum": 0 },
+        "subprocessMs": { "type": "integer", "minimum": 0 },
+        "note": { "type": "string" },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "durationMs"],
+            "properties": {
+              "name": { "type": "string" },
+              "durationMs": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/errorCode" },
+        "message": { "type": "string" },
+        "details": { "type": "object" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "failure": {
+      "type": "object",
+      "required": ["ok", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "error": { "$ref": "#/$defs/error" }
+      },
+      "additionalProperties": false
+    },
+    "unsupportedResult": {
+      "type": "object",
+      "required": ["ok", "supported", "unsupportedReason", "message", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "supported": { "const": false },
+        "unsupportedReason": { "$ref": "#/$defs/unsupportedReason" },
+        "message": { "type": "string" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

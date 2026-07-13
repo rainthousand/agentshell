@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/doctor.schema.json",
+  "title": "AgentShell Doctor Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "status", "workspace", "runtime", "package", "state", "activeRun", "git", "checks", "summary", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.doctor.v1" },
+        "status": { "enum": ["ready", "warning", "blocked"] },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "name"],
+          "properties": {
+            "root": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node"],
+          "properties": {
+            "node": { "$ref": "#/$defs/node" }
+          }
+        },
+        "package": { "$ref": "#/$defs/package" },
+        "state": { "$ref": "#/$defs/state" },
+        "activeRun": { "$ref": "#/$defs/activeRun" },
+        "git": { "$ref": "#/$defs/git" },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/check" }
+        },
+        "summary": { "$ref": "#/$defs/summary" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    {
+      "$ref": "common.schema.json#/$defs/error"
+    }
+  ],
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "required", "ok"],
+      "properties": {
+        "version": { "type": "string" },
+        "required": { "type": "string" },
+        "ok": { "type": "boolean" }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["found", "manager", "scripts"],
+      "properties": {
+        "found": { "type": "boolean" },
+        "manager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", null] },
+        "scripts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["test", "build", "lint"],
+          "properties": {
+            "test": { "type": ["string", "null"] },
+            "build": { "type": ["string", "null"] },
+            "lint": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "preferredPath", "writable", "fallbackUsed", "error"],
+      "properties": {
+        "path": { "type": "string" },
+        "preferredPath": { "type": "string" },
+        "writable": { "type": "boolean" },
+        "fallbackUsed": { "type": "boolean" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["available", "branch", "dirty", "changedFiles"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "branch": { "type": ["string", "null"] },
+        "dirty": { "type": "boolean" },
+        "changedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "changedFilesTotal": { "type": "integer", "minimum": 0 },
+        "changedFilesTruncated": { "type": "boolean" }
+      }
+    },
+    "activeRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "runId", "status", "updatedAt", "commandCount", "nodeCount", "nextBestAction", "rollbackCommand", "error"],
+      "properties": {
+        "present": { "type": "boolean" },
+        "runId": { "type": ["string", "null"] },
+        "status": { "type": ["string", "null"], "enum": ["in_progress", "failing", "passed", null] },
+        "updatedAt": { "type": ["string", "null"] },
+        "commandCount": { "type": "integer", "minimum": 0 },
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "nextBestAction": { "type": ["string", "null"] },
+        "rollbackCommand": { "type": ["string", "null"] },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ok", "severity", "message"],
+      "properties": {
+        "name": { "enum": ["node", "package-json", "test-script", "state-dir", "active-run", "git"] },
+        "ok": { "type": "boolean" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errorCount", "warningCount", "checkCount"],
+      "properties": {
+        "errorCount": { "type": "integer", "minimum": 0 },
+        "warningCount": { "type": "integer", "minimum": 0 },
+        "checkCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}
