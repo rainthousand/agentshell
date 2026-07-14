@@ -405,7 +405,7 @@ agentshell verify test
 In short: `start --compact -> fix/diagnose/verify`.
 
 Keep MCP as a later, lower-priority integration path; the local CLI and plugin
-flow are the supported first path for v0.24.
+flow are the supported first path for v0.25.
 
 ```bash
 npm run plugin:validate
@@ -453,6 +453,7 @@ Always use the current hash returned by `agentshell read`.
 
 ## More
 
+- [v0.25 release notes](docs/release-notes-v0.25.md)
 - [v0.24 release notes](docs/release-notes-v0.24.md)
 - [Quickstart](docs/quickstart.md)
 - [Product status for PMs](docs/product-status-pm.html)

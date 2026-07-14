@@ -5,14 +5,22 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
 const tagIndex = args.indexOf("--tag");
-const tag = tagIndex >= 0 ? args[tagIndex + 1] : process.env.GITHUB_REF_NAME || null;
+const explicitTag = tagIndex >= 0;
+const githubTagRef =
+  process.env.GITHUB_REF_TYPE === "tag" || process.env.GITHUB_REF?.startsWith("refs/tags/");
+const tag = explicitTag
+  ? args[tagIndex + 1] || null
+  : githubTagRef
+    ? process.env.GITHUB_REF_NAME || process.env.GITHUB_REF?.slice("refs/tags/".length) || null
+    : null;
+const requiresTagMatch = explicitTag || githubTagRef;
 const packageJson = read("package.json");
 const manifest = read(".codex-plugin/plugin.json");
 const manifestBase = String(manifest.version || "").split("+", 1)[0];
 const checks = {
   packageVersion: /^\d+\.\d+\.\d+$/.test(packageJson.version),
   manifestMatchesPackage: manifestBase === packageJson.version,
-  tagMatchesPackage: !tag || tag === `v${packageJson.version}`,
+  tagMatchesPackage: !requiresTagMatch || tag === `v${packageJson.version}`,
   licensePresent: fs.existsSync(path.join(root, "LICENSE")),
   changelogPresent: fs.existsSync(path.join(root, "CHANGELOG.md")),
   ciPresent: fs.existsSync(path.join(root, ".github", "workflows", "ci.yml")),

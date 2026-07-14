@@ -150,11 +150,36 @@ test("codex plugin trial collector marks placeholder run logs as incomplete evid
   ]);
 });
 
-test("codex plugin trial collector CLI accepts a suite manifest for compact 3-run evidence", () => {
-  const result = spawnSync("node", [
+test("codex plugin trial collector CLI accepts a suite manifest for compact 3-run evidence", (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-codex-plugin-suite-"));
+  const manifestPath = path.join(tempRoot, "suite.json");
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+
+  const runs = Array.from({ length: 3 }, (_, index) => ({
+    id: `codex-real-run-0${index + 1}`,
+    input: {
+      ...strongInput,
+      id: `codex-real-run-0${index + 1}`,
+      events: strongInput.events.map((event) => ({
+        ...event,
+        stdout: "PASTE_COMPACT_JSON_STDOUT_HERE",
+        durationMs: 0
+      })),
+      finalVerification: {
+        ...strongInput.finalVerification,
+        summary: "REPLACE_WITH_FINAL_VERIFICATION_SUMMARY"
+      }
+    }
+  }));
+  fs.writeFileSync(manifestPath, JSON.stringify({
+    name: "codex-plugin-real-run-plan",
+    runs
+  }, null, 2));
+
+  const result = spawnSync(process.execPath, [
     "scripts/codex-plugin-trial-collect.js",
     "--manifest",
-    "artifacts/codex-plugin-real-3run/suite.json"
+    manifestPath
   ], {
     cwd: process.cwd(),
     encoding: "utf8"

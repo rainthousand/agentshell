@@ -158,7 +158,7 @@ per-fixture stability across real Codex new-thread runs.
 
 For end-to-end speed and token measurement, see [codex-e2e-benchmark.md](codex-e2e-benchmark.md).
 For healthy real-project plugin-path evidence, see [real-project-evidence.md](real-project-evidence.md).
-For the v0.24 release checklist and current public notes, see [release-notes-v0.24.md](release-notes-v0.24.md).
+For the v0.25 release checklist and current public notes, see [release-notes-v0.25.md](release-notes-v0.25.md).
 
 ## Update Loop
 

@@ -577,7 +577,7 @@ check("benchmark evidence points at current real-project evidence", () => {
 });
 
 check("release notes match current protocol and verification state", () => {
-  const notes = fs.readFileSync(path.join(installedPath, "docs", "release-notes-v0.24.md"), "utf8");
+  const notes = fs.readFileSync(path.join(installedPath, "docs", "release-notes-v0.25.md"), "utf8");
   assert(notes.includes("Related-test-file verification"), "release notes do not mention related-test-file verification");
   assert(notes.includes("agentshell.plugin-release-local.v1"), "release notes do not mention plugin-release-local protocol");
   assert(notes.includes("agentshell.plugin-smoke.v1"), "release notes do not mention plugin-smoke protocol");

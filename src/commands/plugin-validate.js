@@ -325,7 +325,7 @@ function addDocumentationChecks(checks, root) {
   const protocol = readText(path.join(root, "docs", "protocol.md"));
   const versioning = readText(path.join(root, "docs", "protocol-versioning.md"));
   const flow = readText(path.join(root, "docs", "codex-plugin-flow.md"));
-  const notes = readText(path.join(root, "docs", "release-notes-v0.24.md"));
+  const notes = readText(path.join(root, "docs", "release-notes-v0.25.md"));
   addCheck(checks, {
     name: "docs mention plugin validate protocol",
     category: "docs",
