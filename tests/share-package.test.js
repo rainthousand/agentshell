@@ -7,7 +7,9 @@ import path from "node:path";
 
 import { buildSharePackage, writeZip } from "../scripts/share-package.js";
 
-test("share package builds a real-user handoff directory without runtime state", () => {
+test("share package builds a real-user handoff directory without runtime state", {
+  skip: !fs.existsSync(path.resolve("bin", "agentshell-darwin-arm64"))
+}, () => {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-share-package-"));
   const report = buildSharePackage(process.cwd(), {
     outDir,

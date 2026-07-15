@@ -16,6 +16,7 @@ const findings = [];
 walk(root, (file) => {
   const relative = path.relative(root, file);
   if (relative === "scripts/security-scan.js") return;
+  if (relative === path.join("bin", "agentshell-darwin-arm64")) return;
   const content = fs.readFileSync(file, "utf8");
   for (const [kind, pattern] of patterns) {
     pattern.lastIndex = 0;

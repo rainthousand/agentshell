@@ -302,7 +302,7 @@ The migration leaves unrelated launch jobs untouched. The v0.24-to-v0.25
 migration path is covered with preservation tests for user policy/profile content
 and precise cleanup tests for AgentShell-owned state.
 
-The current candidate is `0.25.1+codex.20260715070420`. Git import, the private
+The current candidate is `0.25.2+codex.20260716020127`. Git import, the private
 repository push, local release artifacts, share ZIP integrity/checksum checks,
 and packaged lifecycle smoke are complete.
 

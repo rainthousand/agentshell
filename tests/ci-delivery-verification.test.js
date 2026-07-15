@@ -71,11 +71,15 @@ test("workflows preserve the compatibility matrix and audit artifacts before pub
   assert.match(ci, /os: \[ubuntu-latest, macos-latest\]/u);
   assert.match(ci, /node: \[20, 22\]/u);
   assert.match(ci, /npm run security:scan/u);
+  assert.match(ci, /Prepare test-only standalone launcher[\s\S]*node scripts\/prepare-test-standalone\.js[\s\S]*npm test/u);
+  assert.match(ci, /AGENTSHELL_TEST_STANDALONE_LAUNCHER: "1"/u);
   assert.match(ci, /package and run lifecycle smoke/u);
   assert.match(ci, /ci-verify-release-artifacts\.js/u);
   assert.match(ci, /actions\/upload-artifact@v4/u);
   assert.match(release, /node-version: 20\.20\.2/u);
   assert.match(release, /bun-version: 1\.2\.20/u);
+  assert.match(release, /Prepare test-only standalone launcher[\s\S]*node scripts\/prepare-test-standalone\.js[\s\S]*npm test/u);
+  assert.match(release, /AGENTSHELL_TEST_STANDALONE_LAUNCHER: "1"/u);
   assert.match(release, /gh release create/u);
   assert.match(release, /artifacts\/release\/agentshell-darwin-arm64/u);
   assert.match(release, /artifacts\/release\/agentshell-darwin-arm64\.sha256/u);

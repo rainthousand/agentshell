@@ -4,6 +4,11 @@ All notable changes to AgentShell are documented here.
 
 ## Unreleased
 
+## 0.25.2 - 2026-07-16
+
+- Publish the standalone macOS executable as a verified GitHub Release Asset instead of tracking the 85 MB build output in Git.
+- Make clean-clone CI use an explicit test-only launcher while delivery and release jobs continue to build and verify the real Node SEA executable.
+
 ## 0.25.1 - 2026-07-15
 
 - Move the native Dashboard into an installer-managed, crash-recovering menu-bar service.

@@ -6,8 +6,11 @@ import os from "node:os";
 import path from "node:path";
 
 const script = "scripts/package-lifecycle-smoke.js";
+const standaloneAvailable = fs.existsSync(path.resolve("bin", "agentshell-darwin-arm64"));
 
-test("delivery package completes isolated install, doctor, update, and uninstall through its prebuilt CLI", () => {
+test("delivery package completes isolated install, doctor, update, and uninstall through its prebuilt CLI", {
+  skip: !standaloneAvailable
+}, () => {
   const result = spawnSync(process.execPath, [script, "--package-dir", process.cwd()], {
     cwd: process.cwd(),
     encoding: "utf8",
@@ -18,7 +21,7 @@ test("delivery package completes isolated install, doctor, update, and uninstall
   const output = JSON.parse(result.stdout);
   assert.equal(output.ok, true);
   assert.equal(output.protocolVersion, "agentshell.package-lifecycle-smoke.v1");
-  assert.equal(output.packageVersion, "0.25.1");
+  assert.equal(output.packageVersion, "0.25.2");
   assert.deepEqual(output.steps.map(({ action }) => action), ["install", "doctor", "update", "uninstall"]);
   assert.equal(output.steps.every(({ ok }) => ok), true);
   assert.equal(output.steps.find(({ action }) => action === "doctor").checks.codex, true);
@@ -27,7 +30,9 @@ test("delivery package completes isolated install, doctor, update, and uninstall
   assert.equal(output.externalCommands.some((command) => command.startsWith("launchctl ")), false);
 });
 
-test("package lifecycle dry run invokes the packaged CLI without writing installation state", () => {
+test("package lifecycle dry run invokes the packaged CLI without writing installation state", {
+  skip: !standaloneAvailable
+}, () => {
   const result = spawnSync(process.execPath, [script, `--package-dir=${process.cwd()}`, "--dry-run"], {
     cwd: process.cwd(),
     encoding: "utf8",

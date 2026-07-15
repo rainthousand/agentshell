@@ -1,6 +1,6 @@
 {
   "name": "agentshell",
-  "version": "0.25.1+codex.20260715070420",
+  "version": "0.25.2+codex.20260716020127",
   "description": "A structured local CLI and Codex skill for AI coding agents.",
   "author": {
     "name": "Alvin"

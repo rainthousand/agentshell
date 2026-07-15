@@ -1,6 +1,6 @@
 {
   "name": "agentshell",
-  "version": "0.25.1",
+  "version": "0.25.2",
   "description": "A structured local CLI for AI coding agents.",
   "type": "module",
   "bin": {

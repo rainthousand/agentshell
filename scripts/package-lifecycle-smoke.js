@@ -31,7 +31,9 @@ export function runPackageLifecycleSmoke(options = {}) {
     HOME: home,
     USERPROFILE: home,
     SHELL: "/bin/zsh",
-    PATH: fakeBin,
+    PATH: process.env.AGENTSHELL_TEST_STANDALONE_LAUNCHER === "1"
+      ? `${fakeBin}${path.delimiter}${path.dirname(process.execPath)}`
+      : fakeBin,
     AGENTSHELL_SMOKE_COMMAND_LOG: commandLog
   };
   const steps = [];

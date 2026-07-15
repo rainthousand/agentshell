@@ -10,7 +10,7 @@ This guide gets a local user from zero to a useful AgentShell run in about 5-10 
 
 AgentShell runs locally. The core CLI does not need a service or API key.
 
-The current candidate is `0.25.1+codex.20260715070420`. Its local share ZIP and
+The current candidate is `0.25.2+codex.20260716020127`. Its local share ZIP and
 packaged install/update/doctor/uninstall flow have been verified. The GitHub
 Release is not published yet, so current Beta handoff uses the verified share
 package rather than a public Release download.

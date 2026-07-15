@@ -27,9 +27,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      - name: Prepare test-only standalone launcher
+        run: node scripts/prepare-test-standalone.js
       - name: Test runtime compatibility
         env:
-          AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1"
+          AGENTSHELL_TEST_STANDALONE_LAUNCHER: "1"
         run: npm test
 
   quality-gates:
@@ -79,13 +81,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20.20.2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.20
       - name: Verify delivery architecture
         run: test "$(uname -m)" = "arm64"
-      - name: Build native menu-bar application once
-        run: npm run dashboard:build-app
       - name: Build package and run lifecycle smoke
-        env:
-          AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1"
         run: npm run release:artifacts
       - name: Verify checksums, report, size, and path hygiene
         run: node tests/ci-verify-release-artifacts.js --dir artifacts/release

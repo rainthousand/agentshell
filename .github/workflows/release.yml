@@ -25,9 +25,11 @@ jobs:
           bun-version: 1.2.20
       - name: Verify release architecture
         run: test "$(uname -m)" = "arm64"
+      - name: Prepare test-only standalone launcher
+        run: node scripts/prepare-test-standalone.js
       - name: Test
         env:
-          AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1"
+          AGENTSHELL_TEST_STANDALONE_LAUNCHER: "1"
         run: npm test
       - name: Scan source for secrets and local paths
         run: npm run security:scan

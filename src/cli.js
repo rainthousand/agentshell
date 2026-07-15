@@ -42,7 +42,7 @@ async function main() {
       ok: true,
       protocolVersion: "agentshell.version.v1",
       name: "agentshell",
-      version: "0.25.1"
+      version: "0.25.2"
     });
     return;
   }
@@ -50,7 +50,7 @@ async function main() {
     printJson({
       ok: true,
       name: "agentshell",
-      version: "0.25.1",
+      version: "0.25.2",
       commands: [
         "agentshell --version",
         "agentshell manual [--full|--topic <repair|plugin|benchmark|profile|onboarding|log-triage|reference>]",

@@ -2,7 +2,7 @@
 
 ## Current Candidate
 
-- Version: `0.25.1+codex.20260715070420`.
+- Version: `0.25.2+codex.20260716020127`.
 - Git import: complete.
 - Private GitHub repository push: complete.
 - Local standalone, release report, share ZIP, checksum/archive verification,
@@ -13,7 +13,7 @@
 
 ### P0: Publish And Verify The GitHub Release
 
-- Publish the v0.25.1 GitHub Release with the approved artifacts and checksums.
+- Publish the v0.25.2 GitHub Release with the approved artifacts and checksums.
 - Download every published asset into a clean location.
 - Verify downloaded checksums, ZIP integrity, size budgets, and manifest data.
 - Run the packaged lifecycle smoke against the downloaded delivery package.
@@ -31,7 +31,7 @@ This work changes remote state and should run only when explicitly requested.
   outcomes without treating AgentShell telemetry as full Codex accounting.
 
 There is no minimum-user release gate. This evidence is useful for post-release
-learning and broader claims, but it does not block v0.25.1 or v1.0.
+learning and broader claims, but it does not block v0.25.2 or v1.0.
 
 ## Release Maintenance
 
@@ -49,7 +49,7 @@ learning and broader claims, but it does not block v0.25.1 or v1.0.
 - Cloud telemetry, hosted execution, and account-dependent services.
 - New broad automatic-repair categories without real failure evidence.
 
-These items do not block v0.25.1 or v1.0 of the macOS local CLI/plugin product.
+These items do not block v0.25.2 or v1.0 of the macOS local CLI/plugin product.
 
 ## Completed Product Foundation
 
