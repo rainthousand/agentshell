@@ -313,8 +313,8 @@ Later plugin distribution can add:
 - optional MCP server, kept lower priority than the local CLI/plugin flow until
   the primary contracts stabilize
 
-The GitHub v0.25 Release has not yet been published. After publication, its
-downloaded assets still need clean-location checksum, archive, and install smoke
-verification. External-user trial exports remain an optional post-release
+GitHub Release `v0.25.3` is published with the standalone binary, plugin ZIP,
+checksums, and release report. Clean-location downloads passed checksum and
+standalone version smoke verification. External-user trial exports remain an optional post-release
 learning channel rather than a release gate. MCP and native Windows/Linux
 Dashboard work stay deferred while the macOS local CLI/plugin path is validated.

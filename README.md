@@ -269,8 +269,9 @@ v0.25 and the v1.0 bar. MCP remains deferred and non-blocking for this phase.
 The current candidate is `0.25.3+codex.20260716020843`. The source has been
 imported into Git and pushed to its private GitHub repository. Local release
 artifacts, the share ZIP, checksum verification, archive integrity, and the
-isolated-HOME packaged lifecycle smoke are complete. Publishing the GitHub
-Release and verifying its downloaded assets remain open. Three fresh verified
+isolated-HOME packaged lifecycle smoke are complete. GitHub Release `v0.25.3`
+is published, and its downloaded binary, ZIP, checksums, and audit report have
+been verified. Three fresh verified
 tasks from external users are no longer a release requirement. External trial
 exports remain available as an optional post-release learning channel.
 

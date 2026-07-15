@@ -11,9 +11,9 @@ This guide gets a local user from zero to a useful AgentShell run in about 5-10 
 AgentShell runs locally. The core CLI does not need a service or API key.
 
 The current candidate is `0.25.3+codex.20260716020843`. Its local share ZIP and
-packaged install/update/doctor/uninstall flow have been verified. The GitHub
-Release is not published yet, so current Beta handoff uses the verified share
-package rather than a public Release download.
+packaged install/update/doctor/uninstall flow have been verified. GitHub Release
+`v0.25.3` contains the standalone binary, plugin ZIP, checksums, and audit report;
+clean downloaded copies passed checksum and standalone version verification.
 
 ## Easiest Codex Install
 

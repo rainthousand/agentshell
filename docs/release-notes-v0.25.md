@@ -7,8 +7,10 @@ v0.25 freezes the first complete local CLI and Codex plugin product surface. It 
 This document describes candidate `0.25.3+codex.20260716020843`. Git import and
 the push to the private GitHub repository are complete. Local release artifacts,
 the share ZIP, checksum/archive verification, and packaged lifecycle smoke are
-complete. Publishing the GitHub Release and verifying the assets downloaded
-from it remain open. External-user trials are optional post-release evidence and
+complete. GitHub Release `v0.25.3` is published, and clean downloads of the
+standalone binary and plugin ZIP passed their published checksums. The downloaded
+binary reports version `0.25.3`; the audit report confirms the strict pinned
+toolchain and size budgets. External-user trials are optional post-release evidence and
 do not block v0.25.3 or v1.0.
 
 ## Product Surface

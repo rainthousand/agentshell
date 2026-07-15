@@ -63,8 +63,9 @@ During the v0.25 freeze, avoid expanding the automatic repair surface unless the
 The current candidate is `0.25.3+codex.20260716020843`. Git import and the
 private-repository push are complete. Local release artifacts, share ZIP
 creation, checksum/archive verification, and packaged lifecycle smoke are also
-complete. The remaining release-engineering gate is publication of the GitHub
-Release followed by verification of the assets downloaded from that Release.
+complete. GitHub Release `v0.25.3` is published, and clean downloaded copies of
+the standalone binary and plugin ZIP passed their published checksums. No
+blocking release-engineering gate remains for this version.
 
 ## v1.0 Feature Freeze
 

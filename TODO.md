@@ -9,17 +9,20 @@
   and packaged install/update/doctor/uninstall smoke: complete.
 - Canonical product path: local CLI + Codex plugin on macOS.
 
-## Active Release Work
+## Completed Release Work
 
-### P0: Publish And Verify The GitHub Release
+### GitHub Release Assets
 
-- Publish the v0.25.3 GitHub Release with the approved artifacts and checksums.
-- Download every published asset into a clean location.
-- Verify downloaded checksums, ZIP integrity, size budgets, and manifest data.
-- Run the packaged lifecycle smoke against the downloaded delivery package.
-- Record the final Release URL and downloaded-asset verification report.
+- Published `v0.25.3` with the standalone binary, plugin ZIP, both checksums,
+  and the release audit report.
+- Downloaded the published binary and ZIP into clean temporary locations and
+  verified both checksums.
+- Verified the downloaded standalone reports version `0.25.3` after applying
+  its executable bit, and confirmed strict toolchain and size-budget evidence
+  in the downloaded release report.
+- Release: `https://github.com/rainthousand/agentshell/releases/tag/v0.25.3`.
 
-This work changes remote state and should run only when explicitly requested.
+No blocking release-engineering task remains for v0.25.3.
 
 ### Post-release: Optional External Evidence
 
