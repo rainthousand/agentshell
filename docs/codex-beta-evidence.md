@@ -71,8 +71,8 @@ demo before external collection:
 The generated reports are
 `artifacts/codex-plugin-p0-internal-smoke.json` and
 `artifacts/codex-plugin-p0-internal-smoke.md`. This is an internal integration
-check, not one of the three external-user runs required for P0 completion. It also
-does not support a positive token-savings claim by itself because the full compact
+check, not external-user evidence. It also does not support a positive
+token-savings claim by itself because the full compact
 workflow output was larger than the raw verification output for this tiny fixture.
 
 ## Evaluator Flow
@@ -88,6 +88,7 @@ npm run codex:plugin:collect -- \
   --markdown artifacts/codex-beta/report.md
 ```
 
-P0 is complete when at least three fresh Codex tasks from external users have
-passing final verification, no placeholder data, and reviewable exported evidence.
-Token and speed claims must state the measurement boundary above.
+External collection is optional and has no minimum-user release threshold.
+Accepted evidence should still have passing final verification, no placeholder
+data, and a reviewable export. Token and speed claims must state the measurement
+boundary above.

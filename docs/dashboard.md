@@ -17,6 +17,12 @@ under `~/.agentshell/dashboard-snapshots`. The managed LaunchAgent merges those
 snapshots instead of traversing registered project directories. This keeps the
 menu-bar refresh independent of Terminal/Codex file permissions and allows the
 last verified aggregate to remain visible when a project is moved or offline.
+Snapshots become stale after 24 hours but remain available for up to 90 days so
+temporarily offline projects do not disappear. Storage is capped at 1024 workspace
+snapshots. Invalid snapshots are isolated locally, and abandoned temporary files
+and old quarantined entries are cleaned conservatively. The managed health endpoint
+reports only aggregate discovered, refreshed, stale, and ignored counts; it never
+returns snapshot names or workspace paths.
 
 ```bash
 agentshell dashboard --status

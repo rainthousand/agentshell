@@ -10,6 +10,11 @@ This guide gets a local user from zero to a useful AgentShell run in about 5-10 
 
 AgentShell runs locally. The core CLI does not need a service or API key.
 
+The current candidate is `0.25.1+codex.20260715070420`. Its local share ZIP and
+packaged install/update/doctor/uninstall flow have been verified. The GitHub
+Release is not published yet, so current Beta handoff uses the verified share
+package rather than a public Release download.
+
 ## Easiest Codex Install
 
 If you received an AgentShell share package:
@@ -65,6 +70,9 @@ npm run share:package -- --zip
 
 The generated package includes a short `START-HERE.md` and excludes local state
 such as `.git`, `.agentshell`, `artifacts`, and `node_modules`.
+
+The source repository has already been imported and pushed privately; creating
+this ZIP does not require publishing or changing the remote repository.
 
 ## Path A: Try The Local CLI
 

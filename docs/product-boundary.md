@@ -17,6 +17,7 @@ AgentShell supports:
 - Codex plugin install, local plugin validation, share-package handoff, and self-diagnosis.
 - Benchmark, performance, real-project candidate, and Codex plugin evidence reports.
 - Schema/manual contracts for shell-callable adapters that wrap the same CLI behavior.
+- A managed native macOS menu-bar Dashboard backed by local, path-free workspace snapshots.
 
 ## Out Of Scope
 
@@ -30,6 +31,7 @@ AgentShell does not currently support:
 - Large refactors, multi-file architectural rewrites, or ambiguous repairs.
 - Automatic fixes for unsupported failure shapes, even when diagnosis can summarize them.
 - MCP server productization. MCP remains low-priority until the local CLI/plugin path is stable with external users.
+- Native Windows and Linux Dashboard applications. Those platforms may use the browser surface until post-v1.0 work is prioritized.
 
 ## Fallback To Shell
 
@@ -58,16 +60,27 @@ v0.25 should freeze the externally visible product shape around:
 
 During the v0.25 freeze, avoid expanding the automatic repair surface unless the new strategy is conservative, covered by fixtures, exposed in docs, and does not change the core protocol contract. Prefer documentation, evidence, installer hardening, and clearer fallback guidance over new feature categories.
 
+The current candidate is `0.25.1+codex.20260715070420`. Git import and the
+private-repository push are complete. Local release artifacts, share ZIP
+creation, checksum/archive verification, and packaged lifecycle smoke are also
+complete. The remaining release-engineering gate is publication of the GitHub
+Release followed by verification of the assets downloaded from that Release.
+
 ## v1.0 Feature Freeze
 
-v1.0 should freeze only after the v0.25 surface has proven stable with external users. Before v1.0, require:
+Before v1.0, require:
 
-- At least three completed external-user Codex plugin runs.
-- Real-project evidence beyond checked-in fixtures.
 - Product readiness passing with no blocking failures.
+- The release CI matrix and downloadable-asset verification passing.
 - Clear documented fallback behavior in README and product docs.
 - Stable command-scoped protocol versions or documented migrations for any breaking response changes.
 - A supported install/update story for the share package and Codex plugin cache.
 - No MCP dependency for the core local plugin workflow.
+
+External-user runs are encouraged as post-release learning evidence, but there
+is no minimum-user gate. Claims based only on local fixtures or AgentShell
+telemetry must keep their measurement boundary explicit. MCP productization and
+native Windows/Linux surfaces remain deferred and do not block v1.0 of the
+macOS local CLI/plugin product.
 
 Post-v1.0 expansion should keep the same center of gravity: the CLI remains the canonical runtime, the Codex plugin and adapters remain thin guidance layers, and MCP remains a later compatibility adapter rather than a second product surface.

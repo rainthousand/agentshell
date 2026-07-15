@@ -290,7 +290,7 @@
   <main class="page">
     <section class="hero">
       <div class="panel hero-main">
-        <div class="eyebrow">AgentShell · PM Brief · 2026-07-14</div>
+        <div class="eyebrow">AgentShell · PM Brief · 2026-07-15</div>
         <h1>面向 AI Agent 的本地结构化命令行</h1>
         <p class="lead">
           AgentShell 的当前定位是 Codex/Claude Code/Cursor 等 coding agent 的本地插件与 CLI 辅助层：
@@ -300,7 +300,7 @@
       <aside class="panel hero-side">
         <div class="status-row">
           <span class="label">当前插件版本</span>
-          <span class="value">0.25.0+codex.20260714042001</span>
+          <span class="value">0.25.1+codex.20260715070420</span>
         </div>
         <div class="status-row">
           <span class="label">插件安装态验证</span>
@@ -319,6 +319,35 @@
           <span class="value">17/17 repair classes</span>
         </div>
       </aside>
+    </section>
+
+    <section class="panel section">
+      <h2>本机 Dashboard 快照</h2>
+      <div class="grid cols-4">
+        <article class="metric">
+          <span class="pill">覆盖范围</span>
+          <div class="big">30</div>
+          <p class="caption">本机已注册并汇总的 workspace 数量。</p>
+        </article>
+        <article class="metric">
+          <span class="pill">Verified tokens saved</span>
+          <div class="big">351,219</div>
+          <p class="caption">AgentShell 可验证、可归因的本地累计 token 节省估算。</p>
+        </article>
+        <article class="metric">
+          <span class="pill">Verified time saved</span>
+          <div class="big">12.371s</div>
+          <p class="caption">具有可比较基线的本地操作所验证的累计时间节省。</p>
+        </article>
+        <article class="metric">
+          <span class="pill">Exact attribution</span>
+          <div class="big">83%</div>
+          <p class="caption">当前快照中能精确关联到受管操作的指标覆盖率。</p>
+        </article>
+      </div>
+      <div class="note">
+        以上是 2026-07-15 这台开发机上的本地快照，不是跨用户平均值、SLA 或完整 Codex 会话 token 账单。Dashboard 只统计 AgentShell 能验证并归因的本地活动。
+      </div>
     </section>
 
     <section class="grid cols-4">
@@ -365,7 +394,7 @@
         </div>
         <div class="feature">
           <h3>4. MCP 暂缓，CLI/插件优先</h3>
-          <p>MCP 被保留为低优先级 TODO。当前验证重点是本地 CLI + Codex plugin 是否已经能带来速度和 token 收益。</p>
+          <p>MCP 与 Windows/Linux 原生状态栏被保留为后续项目。当前产品目标是把 macOS 本地 CLI + Codex plugin 的发行和外部证据闭环做扎实。</p>
         </div>
       </div>
     </section>
@@ -513,7 +542,7 @@
         </div>
         <div class="feature">
           <h3>产品路线应继续插件优先</h3>
-          <p>Codex 插件路径已经可验证、可发布、可自检。MCP 可以保留，但当前更高优先级是 adapter trial collector 和真实项目评估扩展。</p>
+          <p>Codex 插件路径已经可验证、可打包、可自检。当前本地候选为 0.25.1；下一步是发布 GitHub Release 并校验下载资产。外部用户证据改为发布后的可选学习通道，不再阻塞 V1.0。MCP 暂不进入主线。</p>
         </div>
       </div>
     </section>
@@ -522,7 +551,7 @@
       <h2>注意事项</h2>
       <div class="note">
         Token 是基于 <code>ceil(chars / 4)</code> 的估算，不是模型 tokenizer 的精确值；duration 是本机命令耗时，不能直接承诺为跨机器 SLA。
-        真实项目 smoke 主要证明低成本 pass-through，不等同于真实 bug repair 泛化已完全解决。当前最强 repair 证据仍来自 17 类 checked-in repair fixtures。
+        Dashboard 的 351,219 tokens、12.371s 和 83% exact attribution 是本机快照；真实项目 smoke 主要证明低成本 pass-through，不等同于真实 bug repair 泛化已完全解决。当前最强 repair 证据仍来自 17 类 checked-in repair fixtures。
       </div>
       <div class="source-list">
         <div>数据来源：<code>README.md</code>, <code>docs/real-project-evidence.md</code>, <code>docs/performance-analysis.md</code></div>

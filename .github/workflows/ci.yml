@@ -8,34 +8,97 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  compatibility:
+    name: Node ${{ matrix.node }} / ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         node: [20, 22]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - name: Test
+      - name: Test runtime compatibility
         env:
           AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1"
         run: npm test
-      - if: runner.os == 'macOS'
-        run: npm run dashboard:build-app
 
-  product-gates:
+  quality-gates:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm run security:scan
-      - run: npm run plugin:validate:source
-      - run: npm run product:readiness -- --heavy --dry-run --compact
-      - run: npm run release:gate
+          node-version: 20.20.2
+      - name: Scan source for secrets and local paths
+        run: npm run security:scan
+      - name: Validate every published JSON schema
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from "node:child_process";
+          const list = spawnSync(process.execPath, ["src/cli.js", "schema", "list"], { encoding: "utf8" });
+          if (list.status !== 0) throw new Error(list.stderr || list.stdout);
+          const payload = JSON.parse(list.stdout);
+          if (payload.ok !== true || payload.protocolVersion !== "agentshell.schema-list.v1") {
+            throw new Error("Schema registry did not return its stable protocol.");
+          }
+          for (const { name } of payload.schemas) {
+            const result = spawnSync(process.execPath, ["src/cli.js", "schema", "get", name], { encoding: "utf8" });
+            if (result.status !== 0) throw new Error(`${name}: ${result.stderr || result.stdout}`);
+            const schema = JSON.parse(result.stdout);
+            if (schema.protocolVersion !== "agentshell.schema-get.v1" || !schema.$schema) {
+              throw new Error(`${name}: invalid schema response`);
+            }
+          }
+          console.log(`Validated ${payload.schemas.length} schemas.`);
+          NODE
+      - name: Validate Codex plugin source
+        run: npm run plugin:validate:source
+      - name: Run product readiness gates
+        run: npm run product:readiness -- --heavy --dry-run --compact
+      - name: Validate release metadata
+        run: npm run release:gate
+
+  delivery-smoke:
+    name: macOS delivery package
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.2
+      - name: Verify delivery architecture
+        run: test "$(uname -m)" = "arm64"
+      - name: Build native menu-bar application once
+        run: npm run dashboard:build-app
+      - name: Build package and run lifecycle smoke
+        env:
+          AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1"
+        run: npm run release:artifacts
+      - name: Verify checksums, report, size, and path hygiene
+        run: node tests/ci-verify-release-artifacts.js --dir artifacts/release
+      - name: Smoke-test packaged Codex plugin
+        run: npm run plugin:smoke -- --path artifacts/release/agentshell-codex-plugin
+      - name: Upload audited delivery candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentshell-delivery-${{ github.sha }}
+          path: |
+            artifacts/release/agentshell-codex-plugin.zip
+            artifacts/release/agentshell-codex-plugin.zip.sha256
+            artifacts/release/agentshell-darwin-arm64.sha256
+            artifacts/release/release-report.json
+          if-no-files-found: error
+          retention-days: 7

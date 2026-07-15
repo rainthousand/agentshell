@@ -266,11 +266,13 @@ coverage, Codex plugin trial scoring, and strategy intake. Use
 [Product Boundary](docs/product-boundary.md) as the freeze/scope contract for
 v0.25 and the v1.0 bar. MCP remains deferred and non-blocking for this phase.
 
-The current v0.25 build is a local release candidate, not a completed GitHub
-Release. Its local delivery checks cover Node 20 standalone execution, managed
-PATH setup, legacy Dashboard migration, and an isolated-HOME packaged lifecycle
-smoke. Three fresh verified tasks from external users are still required for the
-v1.0 evidence bar.
+The current candidate is `0.25.1+codex.20260715070420`. The source has been
+imported into Git and pushed to its private GitHub repository. Local release
+artifacts, the share ZIP, checksum verification, archive integrity, and the
+isolated-HOME packaged lifecycle smoke are complete. Publishing the GitHub
+Release and verifying its downloaded assets remain open. Three fresh verified
+tasks from external users are no longer a release requirement. External trial
+exports remain available as an optional post-release learning channel.
 
 ## Share Package
 
@@ -298,6 +300,11 @@ ZIP delivery uses maximum compression and must pass an immediate archive
 integrity check. `npm run release:artifacts` also records checksums, standalone
 builder versions, package compression ratio, and blocking size budgets in
 `artifacts/release/release-report.json`.
+
+The latest local Dashboard snapshot covers 30 registered workspaces and reports
+351,219 verified tokens saved, 12.371 seconds of verified time saved, and 83%
+exact attribution. These are point-in-time measurements from this development
+machine, not a general performance promise or full Codex session accounting.
 
 Key workflow topics:
 

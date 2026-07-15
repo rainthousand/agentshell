@@ -7,8 +7,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   RELEASE_SIZE_BUDGETS,
+  assertStandaloneBuildReport,
   buildReleaseArtifacts,
   evaluateReleaseSizeBudgets,
+  inspectArtifactToolchain,
   runLifecycleGate
 } from "../scripts/release-artifacts.js";
 
@@ -119,14 +121,22 @@ test("release artifacts retain standalone builder metadata and packaging metrics
       outDir,
       platform: "darwin",
       arch: "arm64",
+      nodeVersion: "20.20.2",
       runner(command, args) {
+        if (command === "bun" && args[0] === "--version") return { status: 0, stdout: "1.2.20\n", stderr: "" };
         if (command === "npm" && args.includes("dashboard:build-app")) return success({ ok: true });
         if (command === "npm" && args.includes("build:standalone")) {
           return success({
             ok: true,
             protocolVersion: "agentshell.standalone-build.v1",
             status: "built",
-            builder: { bundler: "bun", bunVersion: "1.2.3", runtime: "node-sea", nodeVersion: "22.0.0" }
+            sha256: crypto.createHash("sha256").update(binary).digest("hex"),
+            builder: { bundler: "bun", bunVersion: "1.2.20", runtime: "node-sea", nodeVersion: "20.20.2" },
+            toolchain: {
+              actual: { nodeVersion: "20.20.2", bunVersion: "1.2.20" },
+              enforcement: "strict",
+              ok: true
+            }
           }, "\n> build:standalone\n");
         }
         if (command === "node" && args[0] === "scripts/share-package.js") {
@@ -152,10 +162,13 @@ test("release artifacts retain standalone builder metadata and packaging metrics
     assert.equal(report.standalone.buildReport.protocolVersion, "agentshell.standalone-build.v1");
     assert.deepEqual(report.standalone.builder, {
       bundler: "bun",
-      bunVersion: "1.2.3",
+      bunVersion: "1.2.20",
       runtime: "node-sea",
-      nodeVersion: "22.0.0"
+      nodeVersion: "20.20.2"
     });
+    assert.equal(report.toolchain.ok, true);
+    assert.equal(report.toolchain.enforcement, "strict");
+    assert.equal(report.standalone.sourceSha256, report.standalone.sha256);
     assert.equal(report.standalone.bytes, 20);
     assert.equal(report.zipBytes, 8);
     assert.equal(report.packageBytes, 20);
@@ -166,6 +179,56 @@ test("release artifacts retain standalone builder metadata and packaging metrics
   } finally {
     fs.rmSync(projectRoot, { recursive: true, force: true });
   }
+});
+
+test("release artifacts reject unsupported build hosts before running build commands", () => {
+  const calls = [];
+  assert.throws(() => buildReleaseArtifacts({
+    projectRoot: "/tmp/agentshell-release-toolchain-test",
+    platform: "darwin",
+    arch: "arm64",
+    nodeVersion: "22.0.0",
+    runner(command, args) {
+      calls.push([command, ...args]);
+      if (command === "bun") return { status: 0, stdout: "1.2.20", stderr: "" };
+      return { status: 1, stdout: "", stderr: "unexpected" };
+    }
+  }), /Unsupported release toolchain/);
+  assert.deepEqual(calls, [["bun", "--version"]]);
+});
+
+test("skipped native builds report toolchain status without blocking developer packaging", () => {
+  const report = inspectArtifactToolchain({
+    projectRoot: process.cwd(),
+    runner() { throw new Error("Bun must not be invoked"); },
+    nodeVersion: "22.0.0",
+    enforce: false
+  });
+  assert.equal(report.ok, false);
+  assert.equal(report.status, "incomplete");
+  assert.equal(report.enforcement, "informational");
+});
+
+test("standalone build attestation rejects stale builder metadata", () => {
+  assert.throws(() => assertStandaloneBuildReport({
+    protocolVersion: "agentshell.standalone-build.v1",
+    status: "built",
+    sha256: "a".repeat(64),
+    builder: { nodeVersion: "22.0.0", bunVersion: "1.2.20" },
+    toolchain: {
+      actual: { nodeVersion: "20.20.2", bunVersion: "1.2.20" },
+      enforcement: "strict",
+      ok: true
+    }
+  }), /Unsupported release toolchain/);
+});
+
+test("standalone build attestation requires a strict digest-bearing report", () => {
+  assert.throws(() => assertStandaloneBuildReport({
+    protocolVersion: "agentshell.standalone-build.v1",
+    status: "dry-run",
+    builder: { nodeVersion: "20.20.2", bunVersion: "1.2.20" }
+  }), /not a completed/);
 });
 
 test("release artifact size budgets accept their limits and reject either overage", () => {

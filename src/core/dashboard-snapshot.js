@@ -5,6 +5,10 @@ import path from "node:path";
 
 const SNAPSHOT_VERSION = 1;
 const FRESHNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+const DEFAULT_QUARANTINE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_TEMP_RETENTION_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_MAX_SNAPSHOTS = 1024;
 
 export function writeDashboardSnapshot(root, report, options = {}) {
   if (report?.protocolVersion !== "agentshell.metrics.v2" || report.scope !== "workspace") {
@@ -15,7 +19,7 @@ export function writeDashboardSnapshot(root, report, options = {}) {
   const file = path.join(directory, `${workspaceId(root)}.json`);
   const snapshot = {
     version: SNAPSHOT_VERSION,
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date(options.now ?? Date.now()).toISOString(),
     report: sanitizeReport(report)
   };
   writeJsonAtomic(file, snapshot);
@@ -23,18 +27,56 @@ export function writeDashboardSnapshot(root, report, options = {}) {
 }
 
 export function readGlobalDashboardSnapshot(options = {}) {
+  return readDashboardSnapshotAggregate(options).report;
+}
+
+export function readDashboardSnapshotAggregate(options = {}) {
   const directory = snapshotDirectory(options);
-  let files = [];
-  try { files = fs.readdirSync(directory).filter((file) => file.endsWith(".json")); } catch {}
-  const snapshots = files.flatMap((file) => {
+  const now = options.now ?? Date.now();
+  const policy = snapshotPolicy(options);
+  const diagnostics = emptyDiagnostics(policy);
+  let entries = [];
+  try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch {}
+  cleanupTemporaryFiles(directory, entries, now, policy, diagnostics);
+  cleanupQuarantine(directory, now, policy, diagnostics);
+  const snapshots = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    diagnostics.discovered += 1;
+    const file = path.join(directory, entry.name);
     try {
-      const value = JSON.parse(fs.readFileSync(path.join(directory, file), "utf8"));
-      return value?.version === SNAPSHOT_VERSION && value?.report?.protocolVersion === "agentshell.metrics.v2"
-        ? [value]
-        : [];
-    } catch { return []; }
-  });
-  return mergeSnapshots(snapshots, options.now ?? Date.now());
+      const value = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (!validSnapshot(value)) {
+        quarantineSnapshot(file, directory, now, diagnostics);
+        continue;
+      }
+      const updatedMs = dateValue(value.updatedAt);
+      if (now - updatedMs > policy.retentionMs) {
+        removeFile(file, diagnostics, "retired");
+        diagnostics.ignored += 1;
+        continue;
+      }
+      snapshots.push({ file, value, updatedMs });
+    } catch (error) {
+      if (error?.code !== "ENOENT") quarantineSnapshot(file, directory, now, diagnostics);
+      else diagnostics.ignored += 1;
+    }
+  }
+
+  snapshots.sort((a, b) => b.updatedMs - a.updatedMs);
+  for (const snapshot of snapshots.splice(policy.maxSnapshots)) {
+    removeFile(snapshot.file, diagnostics, "pruned");
+    diagnostics.ignored += 1;
+  }
+  for (const snapshot of snapshots) {
+    if (now - snapshot.updatedMs > policy.freshnessWindowMs) diagnostics.stale += 1;
+    else diagnostics.refreshed += 1;
+  }
+  diagnostics.retained = snapshots.length;
+  return {
+    report: mergeSnapshots(snapshots.map((snapshot) => snapshot.value), now),
+    diagnostics
+  };
 }
 
 export function mergeSnapshots(snapshots, now = Date.now()) {
@@ -213,6 +255,101 @@ function sum(values, key) {
 
 function emptyFreshness() {
   return { status: "empty", latestAt: null, ageMs: null, staleAfterMs: FRESHNESS_WINDOW_MS };
+}
+
+function snapshotPolicy(options) {
+  return {
+    freshnessWindowMs: positiveNumber(options.freshnessWindowMs, FRESHNESS_WINDOW_MS),
+    retentionMs: positiveNumber(options.retentionMs, DEFAULT_RETENTION_MS),
+    quarantineRetentionMs: positiveNumber(options.quarantineRetentionMs, DEFAULT_QUARANTINE_RETENTION_MS),
+    tempRetentionMs: positiveNumber(options.tempRetentionMs, DEFAULT_TEMP_RETENTION_MS),
+    maxSnapshots: positiveInteger(options.maxSnapshots, DEFAULT_MAX_SNAPSHOTS)
+  };
+}
+
+function emptyDiagnostics(policy) {
+  return {
+    discovered: 0,
+    refreshed: 0,
+    stale: 0,
+    ignored: 0,
+    retained: 0,
+    quarantined: 0,
+    retired: 0,
+    pruned: 0,
+    cleanedTemporary: 0,
+    cleanedQuarantine: 0,
+    freshnessWindowMs: policy.freshnessWindowMs,
+    retentionMs: policy.retentionMs,
+    maxSnapshots: policy.maxSnapshots
+  };
+}
+
+function validSnapshot(value) {
+  return value?.version === SNAPSHOT_VERSION
+    && dateValue(value.updatedAt) > 0
+    && value?.report?.protocolVersion === "agentshell.metrics.v2"
+    && value.report.scope === "workspace"
+    && value.report.dashboard
+    && value.report.totals;
+}
+
+function quarantineSnapshot(file, directory, now, diagnostics) {
+  diagnostics.ignored += 1;
+  const quarantine = path.join(directory, ".quarantine");
+  try {
+    fs.mkdirSync(quarantine, { recursive: true, mode: 0o700 });
+    const target = path.join(quarantine, `${path.basename(file)}.${now}.${crypto.randomUUID()}.bad`);
+    fs.renameSync(file, target);
+    diagnostics.quarantined += 1;
+  } catch (error) {
+    if (error?.code !== "ENOENT") return;
+  }
+}
+
+function cleanupTemporaryFiles(directory, entries, now, policy, diagnostics) {
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".tmp")) continue;
+    const file = path.join(directory, entry.name);
+    try {
+      const ageMs = now - fs.statSync(file).mtimeMs;
+      if (ageMs <= policy.tempRetentionMs) continue;
+      fs.unlinkSync(file);
+      diagnostics.cleanedTemporary += 1;
+    } catch {}
+  }
+}
+
+function cleanupQuarantine(directory, now, policy, diagnostics) {
+  const quarantine = path.join(directory, ".quarantine");
+  let entries = [];
+  try { entries = fs.readdirSync(quarantine, { withFileTypes: true }); } catch { return; }
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const file = path.join(quarantine, entry.name);
+    try {
+      if (now - fs.statSync(file).mtimeMs <= policy.quarantineRetentionMs) continue;
+      fs.unlinkSync(file);
+      diagnostics.cleanedQuarantine += 1;
+    } catch {}
+  }
+}
+
+function removeFile(file, diagnostics, key) {
+  try {
+    fs.unlinkSync(file);
+    diagnostics[key] += 1;
+  } catch {}
+}
+
+function positiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function positiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function snapshotDirectory(options) {

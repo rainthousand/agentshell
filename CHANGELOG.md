@@ -4,6 +4,14 @@ All notable changes to AgentShell are documented here.
 
 ## Unreleased
 
+## 0.25.1 - 2026-07-15
+
+- Move the native Dashboard into an installer-managed, crash-recovering menu-bar service.
+- Aggregate verified savings through permission-independent, path-free workspace snapshots.
+- Add bounded snapshot retention, corruption quarantine, lifecycle diagnostics, and migration seeding.
+- Pin and attest the Node 20.20.2/Bun 1.2.20 release toolchain and verify delivery artifacts in CI.
+- Harden install, update, rollback, doctor, packaged lifecycle, checksums, and release size budgets.
+
 ## 0.25.0 - 2026-07-14
 
 - Add a user-level singleton lifecycle for the native Dashboard.

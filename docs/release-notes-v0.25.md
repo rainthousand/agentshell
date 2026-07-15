@@ -4,7 +4,12 @@ v0.25 freezes the first complete local CLI and Codex plugin product surface. It 
 
 ## Candidate Status
 
-This document currently describes the v0.25 local release candidate. The remote GitHub Release and final downloadable-asset verification are not complete. Three fresh verified external-user tasks also remain required for the v1.0 evidence bar.
+This document describes candidate `0.25.1+codex.20260715070420`. Git import and
+the push to the private GitHub repository are complete. Local release artifacts,
+the share ZIP, checksum/archive verification, and packaged lifecycle smoke are
+complete. Publishing the GitHub Release and verifying the assets downloaded
+from it remain open. External-user trials are optional post-release evidence and
+do not block v0.25.1 or v1.0.
 
 ## Product Surface
 
@@ -47,13 +52,24 @@ The supported repair surface includes the `typescript-property-suggestion` strat
 
 The checked-in fixture suite preserves 51/51 successful repair runs and the historical 22,112 versus 4,459 estimated-token comparison. Batch 5 real-project evidence recorded a 96.3% reduction in its scoped fix-first comparison. Batch 7 repeats the fix-first path. All nine fix-first runs passed. These figures are scoped engineering evidence, not full Codex session token accounting.
 
+The latest local Dashboard snapshot covers 30 registered workspaces and reports
+351,219 verified tokens saved, 12.371 seconds of verified time saved, and 83%
+exact attribution. This is a point-in-time local snapshot, not a cross-user
+benchmark or a claim about total Codex model tokens.
+
 ## Release Checklist
 
 1. Run `npm test` on Node 20 and 22 for Ubuntu and macOS.
 2. Run `npm run security:scan` and `npm run product:readiness -- --heavy --dry-run --compact`.
-3. Run `npm run release:gate -- --tag v0.25.0`.
+3. Run `npm run release:gate -- --tag v0.25.1`.
 4. Run `npm run release:artifacts` on macOS arm64 and inspect checksum, archive verification, builder metadata, compression ratio, and size budgets in `release-report.json`.
 5. Run `npm run package:lifecycle:smoke` against the packaged delivery directory.
-6. Complete the remote Release only after its downloadable artifacts pass smoke and checksum verification.
+6. Publish the remote Release, download its assets into a clean location, then
+   repeat archive, checksum, and install smoke verification against those
+   downloaded files.
 
-Three fresh verified external-user tasks remain required before v1.0. MCP is deferred and is not a v0.25 dependency.
+External-user trials remain useful for post-release learning and broader product
+claims, but there is no minimum-user release gate. MCP is deferred and is not a
+v0.25 dependency.
+Native Windows and Linux Dashboard applications are also deferred; the current
+native product target is macOS.

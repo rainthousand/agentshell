@@ -7,8 +7,11 @@ import { spawnSync } from "node:child_process";
 
 import {
   STANDALONE_BUILD_PROTOCOL_VERSION,
+  RELEASE_TOOLCHAIN,
+  assertReleaseToolchain,
   assertSeaBundleCompatibility,
   buildStandalone,
+  evaluateReleaseToolchain,
   parseBuildStandaloneArgs
 } from "../scripts/build-standalone.js";
 
@@ -39,11 +42,45 @@ test("standalone dry run describes the macOS arm64 artifact and smoke checks", (
     assert.equal(result.target, "darwin-arm64");
     assert.equal(result.output, path.join(root, "bin", "agentshell-darwin-arm64"));
     assert.equal(result.runtimeDependency, false);
+    assert.equal(result.toolchain.enforcement, "informational");
+    assert.equal(result.toolchain.actual.bunVersion, null);
     assert.deepEqual(result.signing, { identity: "ad-hoc", status: "planned" });
     assert.equal(result.build.args.includes("--target=node"), true);
     assert.equal(result.build.args.includes("--format=cjs"), true);
     assert.deepEqual(result.build.args.slice(-2), ["--outfile", "<temporary>/agentshell.cjs"]);
     assert.deepEqual(result.smokeChecks.map((check) => check.name), ["version", "schema-list", "plugin-status"]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("release toolchain requires the canonical Node and Bun versions", () => {
+  const compliant = evaluateReleaseToolchain({ nodeVersion: "v20.20.2", bunVersion: "1.2.20\n" });
+  assert.equal(compliant.ok, true);
+  assert.equal(compliant.status, "compliant");
+  assert.deepEqual(compliant.required, RELEASE_TOOLCHAIN);
+  assert.doesNotThrow(() => assertReleaseToolchain(compliant));
+
+  const unsupported = evaluateReleaseToolchain({ nodeVersion: "22.0.0", bunVersion: "1.2.19" });
+  assert.equal(unsupported.ok, false);
+  assert.equal(unsupported.status, "unsupported");
+  assert.throws(() => assertReleaseToolchain(unsupported), /required Node 20\.20\.2, Bun 1\.2\.20/);
+});
+
+test("standalone build rejects unsupported toolchains before writing output", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-toolchain-test-"));
+  try {
+    assert.throws(() => buildStandalone({}, {
+      root,
+      platform: "darwin",
+      arch: "arm64",
+      nodeVersion: "22.0.0",
+      run(command, args) {
+        assert.deepEqual([command, ...args], ["bun", "--version"]);
+        return { status: 0, stdout: "1.2.20\n", stderr: "" };
+      }
+    }), /Unsupported release toolchain/);
+    assert.equal(fs.existsSync(path.join(root, "bin", "agentshell-darwin-arm64")), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

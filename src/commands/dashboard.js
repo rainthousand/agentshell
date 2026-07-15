@@ -7,7 +7,7 @@ import { spawn, spawnSync } from "node:child_process";
 
 import { metrics } from "./metrics.js";
 import { resolvePackageRoot } from "../core/package-root.js";
-import { readGlobalDashboardSnapshot } from "../core/dashboard-snapshot.js";
+import { readDashboardSnapshotAggregate } from "../core/dashboard-snapshot.js";
 
 const PROTOCOL_VERSION = "agentshell.dashboard.v1";
 const DEFAULT_PORT = 4317;
@@ -328,7 +328,17 @@ function createServer(root, options) {
       const url = new URL(request.url || "/", "http://127.0.0.1");
       if (request.method !== "GET") return sendJson(response, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
       if (url.pathname === "/api/health") {
-        return sendJson(response, 200, { ok: true, protocolVersion: PROTOCOL_VERSION, instanceId: options.instanceId });
+        const managedGlobal = options.globalService === true
+          || process.env.AGENTSHELL_DASHBOARD_GLOBAL_SERVICE === "1";
+        const snapshotLifecycle = managedGlobal
+          ? readDashboardSnapshotAggregate({ home: options.home }).diagnostics
+          : null;
+        return sendJson(response, 200, {
+          ok: true,
+          protocolVersion: PROTOCOL_VERSION,
+          instanceId: options.instanceId,
+          ...(snapshotLifecycle ? { snapshotLifecycle } : {})
+        });
       }
       if (url.pathname === "/api/metrics") {
         const scope = url.searchParams.get("scope") || "global";
@@ -337,13 +347,17 @@ function createServer(root, options) {
         }
         const managedGlobal = scope === "global"
           && (options.globalService === true || process.env.AGENTSHELL_DASHBOARD_GLOBAL_SERVICE === "1");
-        const report = managedGlobal
-          ? readGlobalDashboardSnapshot({ home: options.home })
+        const aggregate = managedGlobal
+          ? readDashboardSnapshotAggregate({ home: options.home })
+          : null;
+        const report = aggregate
+          ? aggregate.report
           : await metrics(root, {
             compact: true,
             limit: url.searchParams.get("limit") || 500,
             scope
           });
+        if (aggregate) setSnapshotHeaders(response, aggregate.diagnostics);
         return sendJson(response, 200, {
           ...report,
           dashboard: { ...report.dashboard, scope }
@@ -356,6 +370,13 @@ function createServer(root, options) {
       return sendJson(response, 500, { ok: false, error: "DASHBOARD_ERROR", message: error.message });
     }
   });
+}
+
+function setSnapshotHeaders(response, diagnostics) {
+  response.setHeader("X-AgentShell-Snapshots-Discovered", diagnostics.discovered);
+  response.setHeader("X-AgentShell-Snapshots-Refreshed", diagnostics.refreshed);
+  response.setHeader("X-AgentShell-Snapshots-Stale", diagnostics.stale);
+  response.setHeader("X-AgentShell-Snapshots-Ignored", diagnostics.ignored);
 }
 
 function listen(server, requestedPort) {

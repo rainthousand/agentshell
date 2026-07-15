@@ -302,6 +302,10 @@ The migration leaves unrelated launch jobs untouched. The v0.24-to-v0.25
 migration path is covered with preservation tests for user policy/profile content
 and precise cleanup tests for AgentShell-owned state.
 
+The current candidate is `0.25.1+codex.20260715070420`. Git import, the private
+repository push, local release artifacts, share ZIP integrity/checksum checks,
+and packaged lifecycle smoke are complete.
+
 Later plugin distribution can add:
 
 - personal Codex marketplace entry
@@ -309,6 +313,8 @@ Later plugin distribution can add:
 - optional MCP server, kept lower priority than the local CLI/plugin flow until
   the primary contracts stabilize
 
-The GitHub v0.25 Release is not complete at the time of this local-candidate
-documentation update. Three fresh verified external-user tasks remain open; MCP
-work stays deferred while the local CLI/plugin path is validated.
+The GitHub v0.25 Release has not yet been published. After publication, its
+downloaded assets still need clean-location checksum, archive, and install smoke
+verification. External-user trial exports remain an optional post-release
+learning channel rather than a release gate. MCP and native Windows/Linux
+Dashboard work stay deferred while the macOS local CLI/plugin path is validated.

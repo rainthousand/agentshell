@@ -7,6 +7,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const STANDALONE_BUILD_PROTOCOL_VERSION = "agentshell.standalone-build.v1";
+export const RELEASE_TOOLCHAIN = Object.freeze({
+  nodeVersion: "20.20.2",
+  bunVersion: "1.2.20"
+});
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -37,6 +41,7 @@ export function buildStandalone(options = {}, dependencies = {}) {
   const arch = dependencies.arch || process.arch;
   const packageRoot = path.resolve(dependencies.root || root);
   const run = dependencies.run || defaultRunner;
+  const nodeVersion = normalizeToolVersion(dependencies.nodeVersion || process.versions.node);
   const target = `${platform}-${arch}`;
   const output = path.resolve(packageRoot, options.out || path.join("bin", `agentshell-${target}`));
   const entitlements = path.join(packageRoot, "desktop", "macos", "AgentShellCLI.entitlements");
@@ -67,6 +72,7 @@ export function buildStandalone(options = {}, dependencies = {}) {
       bytes: null,
       sha256: null,
       runtimeDependency: false,
+      toolchain: evaluateReleaseToolchain({ nodeVersion, bunVersion: null }, { enforce: false }),
       build: bundleCommand,
       signing: { identity: "ad-hoc", status: "planned" },
       smokeChecks: plannedSmokeChecks()
@@ -75,6 +81,11 @@ export function buildStandalone(options = {}, dependencies = {}) {
 
   const bunVersion = run("bun", ["--version"], { cwd: packageRoot });
   ensureSucceeded(bunVersion, "Bun is required to build the standalone binary. Install Bun and ensure `bun` is on PATH.");
+  const toolchain = evaluateReleaseToolchain({
+    nodeVersion,
+    bunVersion: normalizeToolVersion(bunVersion.stdout)
+  });
+  assertReleaseToolchain(toolchain);
 
   fs.mkdirSync(path.dirname(output), { recursive: true });
   const buildDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-sea-build-"));
@@ -92,8 +103,9 @@ export function buildStandalone(options = {}, dependencies = {}) {
       useSnapshot: false,
       useCodeCache: false
     }, null, 2)}\n`);
-    ensureSucceeded(run(process.execPath, ["--experimental-sea-config", config], { cwd: packageRoot }), "Node failed to create the SEA preparation blob.");
-    fs.copyFileSync(process.execPath, output);
+    const nodeExecutable = dependencies.nodeExecutable || process.execPath;
+    ensureSucceeded(run(nodeExecutable, ["--experimental-sea-config", config], { cwd: packageRoot }), "Node failed to create the SEA preparation blob.");
+    fs.copyFileSync(nodeExecutable, output);
     fs.chmodSync(output, 0o755);
     const removeSignature = run("codesign", ["--remove-signature", output], { cwd: packageRoot });
     if (removeSignature.status !== 0 && !String(removeSignature.stderr || "").includes("code object is not signed")) {
@@ -135,13 +147,52 @@ export function buildStandalone(options = {}, dependencies = {}) {
     signing: { identity: "ad-hoc", status: "signed", verified: true },
     builder: {
       bundler: "bun",
-      bunVersion: bunVersion.stdout.trim(),
+      bunVersion: toolchain.actual.bunVersion,
       runtime: "node-sea",
-      nodeVersion: process.versions.node,
+      nodeVersion: toolchain.actual.nodeVersion,
       injector: "postject@1.0.0-alpha.6"
     },
+    toolchain,
     smokeChecks
   };
+}
+
+export function evaluateReleaseToolchain(actual = {}, options = {}) {
+  const enforce = options.enforce !== false;
+  const normalized = {
+    nodeVersion: normalizeToolVersion(actual.nodeVersion),
+    bunVersion: normalizeToolVersion(actual.bunVersion)
+  };
+  const checks = {
+    node: normalized.nodeVersion === RELEASE_TOOLCHAIN.nodeVersion,
+    bun: normalized.bunVersion === RELEASE_TOOLCHAIN.bunVersion
+  };
+  const complete = Boolean(normalized.nodeVersion && normalized.bunVersion);
+  const ok = complete && checks.node && checks.bun;
+  return {
+    required: { ...RELEASE_TOOLCHAIN },
+    actual: normalized,
+    checks,
+    complete,
+    ok,
+    status: !complete ? "incomplete" : ok ? "compliant" : "unsupported",
+    enforcement: enforce ? "strict" : "informational"
+  };
+}
+
+export function assertReleaseToolchain(report) {
+  if (report?.ok === true) return report;
+  const actualNode = report?.actual?.nodeVersion || "missing";
+  const actualBun = report?.actual?.bunVersion || "missing";
+  throw new Error(
+    `Unsupported release toolchain: Node ${actualNode}, Bun ${actualBun}; ` +
+    `required Node ${RELEASE_TOOLCHAIN.nodeVersion}, Bun ${RELEASE_TOOLCHAIN.bunVersion}.`
+  );
+}
+
+function normalizeToolVersion(value) {
+  const text = String(value || "").trim();
+  return text.startsWith("v") ? text.slice(1) : text || null;
 }
 
 export function assertSeaBundleCompatibility(bundle, options = {}) {

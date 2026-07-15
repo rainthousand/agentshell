@@ -14,7 +14,7 @@ The compiled AgentShell executable does not require Node.js, npm, or Bun at runt
 
 ## Maintainer build
 
-Maintainers need Node.js, Bun for bundling, `codesign`, and network access to the pinned `postject` injector. The builder uses Node SEA rather than a Bun-native executable so the resulting Mach-O can be signed and executed reliably on current macOS. From the repository root:
+Maintainers need the pinned release toolchain: Node.js `20.20.2`, Bun `1.2.20`, `codesign`, and network access to the pinned `postject` injector. Real standalone and native release builds fail before producing artifacts when either runtime version differs. The builder uses Node SEA rather than a Bun-native executable so the resulting Mach-O can be signed and executed reliably on current macOS. From the repository root:
 
 ```bash
 npm run build:standalone
@@ -33,9 +33,9 @@ npm run build:standalone -- --out artifacts/standalone/agentshell
 npm run build:standalone -- --dry-run
 ```
 
-After bundling, SEA injection, and ad-hoc signing, the builder runs the binary from a temporary non-source directory and checks `--version`, `schema list`, and `plugin status --compact`. It emits `agentshell.standalone-build.v1` JSON containing the target, artifact size, SHA-256 digest, smoke results, builder versions, and `runtimeDependency: false`.
+After bundling, SEA injection, and ad-hoc signing, the builder runs the binary from a temporary non-source directory and checks `--version`, `schema list`, and `plugin status --compact`. It emits `agentshell.standalone-build.v1` JSON containing the target, artifact size, SHA-256 digest, smoke results, builder versions, a strict toolchain attestation, and `runtimeDependency: false`. Release packaging verifies that attestation and checks that its binary SHA-256 matches the build report.
 
-Set `AGENTSHELL_TEST_STANDALONE=1` to include the real signed SEA build in the test suite. Ordinary tests use the dry-run path so repository validation remains deterministic when build tools are unavailable.
+Set `AGENTSHELL_TEST_STANDALONE=1` to include the real signed SEA build in the test suite. Ordinary tests use the dry-run path so repository validation remains deterministic when build tools are unavailable. `--dry-run` and `AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD=1` report the detected toolchain as informational and do not require Bun; they cannot be mistaken for a native release build because the report marks enforcement explicitly.
 
 ## Scope
 
