@@ -12,6 +12,8 @@ An end user needs:
 
 The compiled AgentShell executable does not require Node.js, npm, or Bun at runtime. The plugin installer can place it on `PATH`; users should not need a JavaScript development environment to run AgentShell commands.
 
+Tagged releases publish the executable, its SHA-256 checksum, the Codex plugin ZIP, the ZIP checksum, and the release audit report as GitHub Release Assets. The compiled executable is intentionally not tracked in Git; source checkouts build it locally or download it from the matching release.
+
 ## Maintainer build
 
 Maintainers need the pinned release toolchain: Node.js `20.20.2`, Bun `1.2.20`, `codesign`, and network access to the pinned `postject` injector. Real standalone and native release builds fail before producing artifacts when either runtime version differs. The builder uses Node SEA rather than a Bun-native executable so the resulting Mach-O can be signed and executed reliably on current macOS. From the repository root:
@@ -25,6 +27,8 @@ The default artifact is:
 ```text
 bin/agentshell-darwin-arm64
 ```
+
+This path is ignored by Git. The tag-triggered Release workflow rebuilds it with the pinned toolchain, verifies its signature, checksum, smoke checks, and package lifecycle, then uploads the audited result to the GitHub Release.
 
 Choose another output path or inspect the build without compiling:
 

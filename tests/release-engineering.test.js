@@ -78,7 +78,9 @@ test("release gate rejects --tag without a value", () => {
   assert.equal(JSON.parse(result.stdout).checks.tagMatchesPackage, false);
 });
 
-test("release artifacts include a verifiable SHA256 checksum", () => {
+test("release artifacts include a verifiable SHA256 checksum", {
+  skip: !fs.existsSync(path.resolve("bin", "agentshell-darwin-arm64"))
+}, () => {
   const report = run("scripts/release-artifacts.js", {
     AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1"
   });

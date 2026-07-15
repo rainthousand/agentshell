@@ -301,6 +301,11 @@ integrity check. `npm run release:artifacts` also records checksums, standalone
 builder versions, package compression ratio, and blocking size budgets in
 `artifacts/release/release-report.json`.
 
+Standalone executables are build outputs rather than repository source. Git
+ignores `bin/agentshell-darwin-arm64`; tagged releases rebuild and audit it with
+the pinned toolchain, then publish the executable, checksums, plugin ZIP, and
+release report as GitHub Release Assets.
+
 The latest local Dashboard snapshot covers 30 registered workspaces and reports
 351,219 verified tokens saved, 12.371 seconds of verified time saved, and 83%
 exact attribution. These are point-in-time measurements from this development

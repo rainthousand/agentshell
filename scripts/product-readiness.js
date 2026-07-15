@@ -55,7 +55,6 @@ const REQUIRED_FILES = [
   "desktop/macos/dist/AgentShell Dashboard.app/Contents/MacOS/AgentShellDashboard",
   "scripts/build-dashboard-app.js",
   "scripts/build-standalone.js",
-  "bin/agentshell-darwin-arm64",
   "scripts/plugin-lifecycle.js",
   "scripts/security-scan.js",
   "scripts/release-gate.js",

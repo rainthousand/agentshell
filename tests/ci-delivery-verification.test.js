@@ -67,6 +67,7 @@ test("CI path hygiene detects macOS, Linux, Windows, and GitHub runner paths", (
 test("workflows preserve the compatibility matrix and audit artifacts before publishing", () => {
   const ci = fs.readFileSync(".github/workflows/ci.yml", "utf8");
   const release = fs.readFileSync(".github/workflows/release.yml", "utf8");
+  const gitignore = fs.readFileSync(".gitignore", "utf8");
   assert.match(ci, /os: \[ubuntu-latest, macos-latest\]/u);
   assert.match(ci, /node: \[20, 22\]/u);
   assert.match(ci, /npm run security:scan/u);
@@ -75,6 +76,12 @@ test("workflows preserve the compatibility matrix and audit artifacts before pub
   assert.match(ci, /actions\/upload-artifact@v4/u);
   assert.match(release, /node-version: 20\.20\.2/u);
   assert.match(release, /bun-version: 1\.2\.20/u);
+  assert.match(release, /gh release create/u);
+  assert.match(release, /artifacts\/release\/agentshell-darwin-arm64/u);
+  assert.match(release, /artifacts\/release\/agentshell-darwin-arm64\.sha256/u);
+  assert.match(release, /artifacts\/release\/agentshell-codex-plugin\.zip/u);
+  assert.match(release, /artifacts\/release\/agentshell-codex-plugin\.zip\.sha256/u);
+  assert.match(gitignore, /^bin\/agentshell-darwin-arm64$/mu);
   assert.ok(release.indexOf("ci-verify-release-artifacts.js") < release.indexOf("gh release create"));
   assert.ok(release.indexOf("actions/upload-artifact@v4") < release.indexOf("gh release create"));
 });
