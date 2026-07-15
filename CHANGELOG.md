@@ -4,6 +4,10 @@ All notable changes to AgentShell are documented here.
 
 ## Unreleased
 
+## 0.25.3 - 2026-07-16
+
+- Remove a redundant schema subprocess assertion from the run-status integration test; the same schema contract remains covered by the CLI schema smoke suite.
+
 ## 0.25.2 - 2026-07-16
 
 - Publish the standalone macOS executable as a verified GitHub Release Asset instead of tracking the 85 MB build output in Git.

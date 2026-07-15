@@ -60,7 +60,7 @@ v0.25 should freeze the externally visible product shape around:
 
 During the v0.25 freeze, avoid expanding the automatic repair surface unless the new strategy is conservative, covered by fixtures, exposed in docs, and does not change the core protocol contract. Prefer documentation, evidence, installer hardening, and clearer fallback guidance over new feature categories.
 
-The current candidate is `0.25.2+codex.20260716020127`. Git import and the
+The current candidate is `0.25.3+codex.20260716020843`. Git import and the
 private-repository push are complete. Local release artifacts, share ZIP
 creation, checksum/archive verification, and packaged lifecycle smoke are also
 complete. The remaining release-engineering gate is publication of the GitHub

@@ -116,12 +116,6 @@ test("run status tracks diagnose, change fill apply, and verify", () => {
   assert.equal(metricsOutput.dashboard.latestTask.status, "passed");
   assert.equal(metricsOutput.measurement.scope, "agentshell-local-tooling");
 
-  const schema = run(dir, ["schema", "get", "run-clear"]);
-  assert.equal(schema.status, 0);
-  const schemaOutput = JSON.parse(schema.stdout);
-  assert.equal(schemaOutput.protocolVersion, "agentshell.schema-get.v1");
-  assert.equal(schemaOutput.title, "AgentShell Run Clear Response");
-
   const clear = run(dir, ["run", "clear"]);
   assert.equal(clear.status, 0);
   const clearOutput = JSON.parse(clear.stdout);

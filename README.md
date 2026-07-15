@@ -266,7 +266,7 @@ coverage, Codex plugin trial scoring, and strategy intake. Use
 [Product Boundary](docs/product-boundary.md) as the freeze/scope contract for
 v0.25 and the v1.0 bar. MCP remains deferred and non-blocking for this phase.
 
-The current candidate is `0.25.2+codex.20260716020127`. The source has been
+The current candidate is `0.25.3+codex.20260716020843`. The source has been
 imported into Git and pushed to its private GitHub repository. Local release
 artifacts, the share ZIP, checksum verification, archive integrity, and the
 isolated-HOME packaged lifecycle smoke are complete. Publishing the GitHub

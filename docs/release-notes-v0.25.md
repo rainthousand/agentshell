@@ -4,12 +4,12 @@ v0.25 freezes the first complete local CLI and Codex plugin product surface. It 
 
 ## Candidate Status
 
-This document describes candidate `0.25.2+codex.20260716020127`. Git import and
+This document describes candidate `0.25.3+codex.20260716020843`. Git import and
 the push to the private GitHub repository are complete. Local release artifacts,
 the share ZIP, checksum/archive verification, and packaged lifecycle smoke are
 complete. Publishing the GitHub Release and verifying the assets downloaded
 from it remain open. External-user trials are optional post-release evidence and
-do not block v0.25.2 or v1.0.
+do not block v0.25.3 or v1.0.
 
 ## Product Surface
 
@@ -61,7 +61,7 @@ benchmark or a claim about total Codex model tokens.
 
 1. Run `npm test` on Node 20 and 22 for Ubuntu and macOS.
 2. Run `npm run security:scan` and `npm run product:readiness -- --heavy --dry-run --compact`.
-3. Run `npm run release:gate -- --tag v0.25.2`.
+3. Run `npm run release:gate -- --tag v0.25.3`.
 4. Run `npm run release:artifacts` on macOS arm64 and inspect checksum, archive verification, builder metadata, compression ratio, and size budgets in `release-report.json`.
 5. Run `npm run package:lifecycle:smoke` against the packaged delivery directory.
 6. Publish the remote Release, download its assets into a clean location, then

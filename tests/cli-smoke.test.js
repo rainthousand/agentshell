@@ -37,7 +37,7 @@ test("version returns a machine-readable product version", () => {
   assert.equal(result.status, 0);
   const output = JSON.parse(result.stdout);
   assert.equal(output.protocolVersion, "agentshell.version.v1");
-  assert.equal(output.version, "0.25.2");
+  assert.equal(output.version, "0.25.3");
 });
 
 test("dashboard accepts only one explicit surface", () => {
@@ -153,7 +153,7 @@ test("node src/cli.js manual returns compact routing by default", () => {
   assert.equal(output.protocolVersion, "agentshell.manual.v1");
   assert.equal(output.compact, true);
   assert.equal(output.name, "AgentShell");
-  assert.equal(output.version, "0.25.2");
+  assert.equal(output.version, "0.25.3");
   assert.equal(output.firstPass.command, "agentshell start --compact");
   assert.ok(output.primaryCommands.some((entry) => entry.command === "agentshell fix test --fast --compact"));
   assert.ok(output.topics.some((entry) => entry.command === "agentshell manual --topic repair"));

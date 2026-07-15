@@ -21,7 +21,7 @@ test("delivery package completes isolated install, doctor, update, and uninstall
   const output = JSON.parse(result.stdout);
   assert.equal(output.ok, true);
   assert.equal(output.protocolVersion, "agentshell.package-lifecycle-smoke.v1");
-  assert.equal(output.packageVersion, "0.25.2");
+  assert.equal(output.packageVersion, "0.25.3");
   assert.deepEqual(output.steps.map(({ action }) => action), ["install", "doctor", "update", "uninstall"]);
   assert.equal(output.steps.every(({ ok }) => ok), true);
   assert.equal(output.steps.find(({ action }) => action === "doctor").checks.codex, true);
