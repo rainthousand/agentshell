@@ -25,6 +25,7 @@ test("product readiness heavy dry run includes release candidate checks", () => 
   assert.equal(report.ok, true);
   assert.equal(report.mode, "heavy-dry-run");
   assert.ok(report.checks.some((check) => check.id === "benchmark-suite-ci" && check.details.dryRun === true));
+  assert.ok(report.checks.some((check) => check.id === "release-artifacts" && check.details.command === "npm run release:artifacts"));
   assert.ok(report.checks.some((check) => check.id === "codex-plugin-trial"));
   assert.ok(report.checks.some((check) => check.id === "strategy-intake"));
 });

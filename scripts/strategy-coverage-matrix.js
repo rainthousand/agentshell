@@ -2,7 +2,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const root = path.resolve(import.meta.dirname, "..");
 const PROTOCOL_VERSION = "agentshell.strategy-coverage-matrix.v1";
 const UNKNOWN_STRATEGY = "unknown";
 
@@ -35,7 +34,7 @@ const BENCHMARK_ROOTS = ["examples/benchmark-cases"];
 const REAL_PROJECT_MANIFEST = "examples/real-projects.json";
 const REAL_PROJECT_ROOTS = ["examples/real-projects"];
 
-export function buildStrategyCoverageMatrix(projectRoot = root) {
+export function buildStrategyCoverageMatrix(projectRoot = process.cwd()) {
   const strategies = readStrategies(projectRoot);
   const unitTestFiles = listFiles(projectRoot, UNIT_TEST_ROOTS)
     .filter((file) => path.basename(file) !== "strategy-coverage-matrix.test.js");

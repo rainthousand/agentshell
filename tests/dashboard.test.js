@@ -18,6 +18,12 @@ test("metrics v2 separates measured, estimated, and unavailable values", async (
   assert.ok(report.measurement.unavailable.includes("codexModelTokens"));
   assert.equal(report.measurement.attribution.exactEvents, 1);
   assert.equal(report.measurement.attribution.legacyEvents, 0);
+  assert.equal(report.measurement.freshness.status, "fresh");
+  assert.equal(report.measurement.coverage.observedToolCalls, 1);
+  assert.equal(report.measurement.coverage.managedRuns, 1);
+  assert.equal(report.measurement.coverage.exactAttributionPercent, 100);
+  assert.equal(report.measurement.coverage.verifiedTokenSavingsAvailable, true);
+  assert.equal(report.measurement.coverage.verifiedTimeSavingsAvailable, false);
   assert.equal(report.dashboard.workspace.name, "dashboard-fixture");
   assert.equal(report.dashboard.health, "ready");
   assert.equal(report.dashboard.totals.tasks, 1);
@@ -30,7 +36,10 @@ test("metrics v2 separates measured, estimated, and unavailable values", async (
   assert.equal(report.dashboard.totals.estimatedContextAvoidedTokens, 900);
   assert.equal(report.dashboard.totals.contextAvoidedPercent, 90);
   assert.equal(report.dashboard.totals.executionMs, 350);
+  assert.equal(report.dashboard.totals.estimatedTimeSavedMs, null);
   assert.equal(report.dashboard.latestTask.verificationOk, true);
+  assert.equal(report.dashboard.latestTask.stale, false);
+  assert.equal(report.dashboard.latestTask.lifecycle, "complete");
 });
 
 test("metrics reset preserves history while starting a fresh measurement window", async () => {
@@ -71,6 +80,32 @@ test("time saved counts verified cache hits, not ordinary runtime variance", asy
   fs.writeFileSync(historyFile, `${[JSON.stringify(first), ...rest].join("\n")}\n`);
   const report = await metrics(root, { compact: true });
   assert.equal(report.dashboard.totals.estimatedTimeSavedMs, 350);
+  assert.equal(report.dashboard.coverage.verifiedTimeSavingsAvailable, true);
+});
+
+test("stale unfinished runs remain visible without counting as evaluated failures", async () => {
+  const root = fixtureWorkspace();
+  const state = path.join(root, ".agentshell");
+  const staleAt = new Date(Date.now() - (25 * 60 * 60 * 1000)).toISOString();
+  const run = JSON.parse(fs.readFileSync(path.join(state, "active-run.json"), "utf8"));
+  run.status = "in_progress";
+  run.updatedAt = staleAt;
+  run.nodes = run.nodes.slice(0, 2);
+  fs.writeFileSync(path.join(state, "active-run.json"), JSON.stringify(run));
+  fs.writeFileSync(path.join(state, "runs.jsonl"), `${JSON.stringify(run)}\n`);
+  for (const file of ["events.jsonl", "history.jsonl"]) {
+    const entry = JSON.parse(fs.readFileSync(path.join(state, file), "utf8"));
+    entry.createdAt = staleAt;
+    fs.writeFileSync(path.join(state, file), `${JSON.stringify(entry)}\n`);
+  }
+
+  const report = await metrics(root, { compact: true });
+  assert.equal(report.dashboard.freshness.status, "stale");
+  assert.equal(report.dashboard.coverage.activeManagedRuns, 0);
+  assert.equal(report.dashboard.coverage.staleManagedRuns, 1);
+  assert.equal(report.dashboard.totals.successRate, null);
+  assert.equal(report.dashboard.latestTask.stale, true);
+  assert.equal(report.dashboard.latestTask.lifecycle, "stale");
 });
 
 test("dashboard serves local read-only UI and metrics with security headers", async () => {
@@ -90,8 +125,8 @@ test("dashboard serves local read-only UI and metrics with security headers", as
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
     assert.match(html, /AgentShell Dashboard/);
-    assert.match(html, /Verified savings/);
-    assert.match(html, /Time saved/);
+    assert.match(html, /Verified tokens saved/);
+    assert.match(html, /Verified time saved/);
 
     const api = await fetch(new URL("/api/metrics", session.report.url));
     const data = await api.json();
@@ -99,6 +134,12 @@ test("dashboard serves local read-only UI and metrics with security headers", as
     assert.equal(data.protocolVersion, "agentshell.metrics.v2");
     assert.equal(data.dashboard.scope, "global");
     assert.ok(data.dashboard.totals);
+
+    const health = await fetch(new URL("/api/health", session.report.url));
+    const healthData = await health.json();
+    assert.equal(healthData.protocolVersion, "agentshell.dashboard.v1");
+    assert.equal(typeof healthData.instanceId, "string");
+    assert.ok(healthData.instanceId.length > 10);
 
     const projectApi = await fetch(new URL("/api/metrics?scope=workspace", session.report.url));
     const projectData = await projectApi.json();
@@ -135,11 +176,57 @@ test("dashboard reuses one healthy user-level server", async () => {
     const status = await dashboardStatus({ runtimeDir });
     assert.equal(status.running, true);
     assert.equal(status.state.port, first.report.port);
+    const lock = JSON.parse(fs.readFileSync(path.join(runtimeDir, "dashboard.lock"), "utf8"));
+    assert.equal(lock.pid, process.pid);
+    assert.equal(lock.instanceId, status.state.instanceId);
   } finally {
     await first.close();
   }
   assert.equal(fs.existsSync(path.join(runtimeDir, "dashboard.lock")), false);
   assert.equal(fs.existsSync(path.join(runtimeDir, "dashboard.json")), false);
+});
+
+test("managed global Dashboard is reused from a different project root", async () => {
+  const firstRoot = fixtureWorkspace();
+  const secondRoot = fixtureWorkspace();
+  const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-dashboard-global-runtime-"));
+  const first = await startDashboard(firstRoot, {
+    port: 0,
+    open: false,
+    runtimeDir,
+    monitorParent: false,
+    globalService: true
+  });
+  try {
+    const second = await startDashboard(secondRoot, {
+      port: 0,
+      open: false,
+      runtimeDir,
+      monitorParent: false
+    });
+    assert.equal(second.report.reused, true);
+    assert.equal(second.report.pid, first.report.pid);
+    assert.equal(second.report.url, first.report.url);
+  } finally {
+    await first.close();
+  }
+});
+
+test("dashboard replaces a dead singleton state when its lock identity matches", async () => {
+  const root = fixtureWorkspace();
+  const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-dashboard-dead-runtime-"));
+  const dead = { pid: 999999, instanceId: "dead-instance", root, version: "old", url: "http://127.0.0.1:1/" };
+  fs.mkdirSync(runtimeDir, { recursive: true });
+  fs.writeFileSync(path.join(runtimeDir, "dashboard.json"), JSON.stringify(dead));
+  fs.writeFileSync(path.join(runtimeDir, "dashboard.lock"), JSON.stringify({ pid: dead.pid, instanceId: dead.instanceId }));
+
+  const session = await startDashboard(root, { port: 0, open: false, runtimeDir, monitorParent: false });
+  try {
+    assert.equal(session.report.reused, false);
+    assert.equal(session.report.pid, process.pid);
+  } finally {
+    await session.close();
+  }
 });
 
 function fixtureWorkspace() {

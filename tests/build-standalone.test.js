@@ -7,9 +7,27 @@ import { spawnSync } from "node:child_process";
 
 import {
   STANDALONE_BUILD_PROTOCOL_VERSION,
+  assertSeaBundleCompatibility,
   buildStandalone,
   parseBuildStandaloneArgs
 } from "../scripts/build-standalone.js";
+
+test("standalone bundle compatibility rejects Node 20 CJS hazards", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-bundle-check-"));
+  const bundle = path.join(root, "agentshell.cjs");
+  try {
+    fs.writeFileSync(bundle, "const here = import.meta.dirname;\n");
+    assert.throws(() => assertSeaBundleCompatibility(bundle, { packageRoot: root }), /import\.meta syntax/);
+
+    fs.writeFileSync(bundle, `const root = ${JSON.stringify(root)};\n`);
+    assert.throws(() => assertSeaBundleCompatibility(bundle, { packageRoot: root }), /build machine package path/);
+
+    fs.writeFileSync(bundle, "module.exports = { ok: true };\n");
+    assert.doesNotThrow(() => assertSeaBundleCompatibility(bundle, { packageRoot: root }));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("standalone dry run describes the macOS arm64 artifact and smoke checks", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-build-test-"));

@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { setupCodex } from "../src/commands/setup-codex.js";
+import { registerWorkspace } from "../src/core/workspace-registry.js";
 
 test("setupCodex installs plugin, policy, and native CLI without node or npm", async () => {
   const fixture = makeFixture();
@@ -32,8 +33,31 @@ test("setupCodex installs plugin, policy, and native CLI without node or npm", a
   const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
   assert.equal(record.path, installed);
   assert.equal(record.sha256, hash(installed));
+  assert.equal(record.pathProfile.path, path.join(fixture.home, ".zprofile"));
+  assert.equal(result.commandPath.status, "profile-updated");
+  assert.equal(result.commandPath.fallbackCommand, installed);
+  assert.equal(result.plugin.legacyDashboardMigration.reason, "isolated-home");
   assert.equal(fs.statSync(recordPath).mode & 0o777, 0o600);
   assert.equal(fs.statSync(path.dirname(recordPath)).mode & 0o777, 0o700);
+});
+
+test("setupCodex seeds dashboard snapshots from accessible registered workspaces", async () => {
+  const fixture = makeFixture();
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-setup-snapshot-"));
+  fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "setup-snapshot" }));
+  registerWorkspace(project, { homeDir: fixture.home });
+
+  const result = await setupCodex("install", { ...fixture, runCommand: successfulRunner([]) });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.dashboardSnapshots, {
+    ok: true,
+    status: "refreshed",
+    refreshed: 1,
+    skipped: 0
+  });
+  const snapshots = path.join(fixture.home, ".agentshell", "dashboard-snapshots");
+  assert.equal(fs.readdirSync(snapshots).filter((file) => file.endsWith(".json")).length, 1);
 });
 
 test("setupCodex dry run makes no changes or subprocess calls", async () => {
@@ -49,6 +73,7 @@ test("setupCodex dry run makes no changes or subprocess calls", async () => {
   assert.equal(fs.existsSync(path.join(fixture.home, ".local", "bin", "agentshell")), false);
   assert.equal(fs.existsSync(path.join(fixture.home, ".codex", "AGENTS.md")), false);
   assert.equal(fs.existsSync(path.join(fixture.home, "plugins")), false);
+  assert.equal(fs.existsSync(path.join(fixture.home, ".zprofile")), false);
 });
 
 test("setupCodex rejects a package without a matching prebuilt CLI", async () => {
@@ -88,6 +113,7 @@ test("setupCodex uninstall removes only a CLI matching its managed hash", async 
   assert.equal(removed.nativeCli.status, "removed");
   assert.equal(fs.existsSync(installed), false);
   assert.equal(fs.existsSync(path.join(fixture.home, "plugins", "agentshell")), false);
+  assert.equal(fs.existsSync(path.join(fixture.home, ".zprofile")), false);
 
   assert.equal((await setupCodex("install", { ...fixture, runCommand: runner })).ok, true);
   fs.writeFileSync(installed, "user replacement", { mode: 0o755 });
@@ -105,6 +131,7 @@ test("setupCodex doctor reports plugin, policy, native CLI, and Codex checks", a
   assert.equal(result.checks.plugin, true);
   assert.equal(result.checks.policy, true);
   assert.equal(result.checks.nativeCli, true);
+  assert.equal(result.checks.commandPath, true);
   assert.equal(result.checks.codex, true);
 
   result = await setupCodex("doctor", { ...fixture, runCommand: async () => ({ ok: false, status: 127 }) });
@@ -112,6 +139,177 @@ test("setupCodex doctor reports plugin, policy, native CLI, and Codex checks", a
   assert.equal(result.checks.codex, false);
   assert.equal("stdout" in result.codex, false);
   assert.equal("stderr" in result.codex, false);
+});
+
+test("setupCodex keeps PATH profile changes idempotent and preserves user content on uninstall", async () => {
+  const fixture = makeFixture();
+  const profile = path.join(fixture.home, ".zprofile");
+  fs.mkdirSync(fixture.home, { recursive: true });
+  fs.writeFileSync(profile, "export EDITOR=vim");
+  const runner = successfulRunner([]);
+
+  assert.equal((await setupCodex("install", { ...fixture, runCommand: runner })).commandPath.status, "profile-updated");
+  assert.equal((await setupCodex("update", { ...fixture, runCommand: runner })).commandPath.status, "profile-configured");
+  const configured = fs.readFileSync(profile, "utf8");
+  assert.equal(configured.match(/>>> AgentShell managed PATH >>>/g)?.length, 1);
+
+  const removed = await setupCodex("uninstall", { ...fixture, runCommand: runner });
+  assert.equal(removed.commandPath.status, "removed");
+  assert.equal(fs.readFileSync(profile, "utf8"), "export EDITOR=vim");
+});
+
+test("setupCodex preserves a PATH block modified by the user", async () => {
+  const fixture = makeFixture();
+  const runner = successfulRunner([]);
+  await setupCodex("install", { ...fixture, runCommand: runner });
+  const profile = path.join(fixture.home, ".zprofile");
+  fs.writeFileSync(profile, fs.readFileSync(profile, "utf8").replace("$HOME/.local/bin", "$HOME/bin"));
+
+  const result = await setupCodex("uninstall", { ...fixture, runCommand: runner });
+
+  assert.equal(result.commandPath.status, "preserved-modified");
+  assert.match(fs.readFileSync(profile, "utf8"), /\$HOME\/bin/);
+});
+
+test("setupCodex reports PATH visibility without changing a profile", async () => {
+  const fixture = makeFixture();
+  const bin = path.join(fixture.home, ".local", "bin");
+
+  const result = await setupCodex("install", {
+    ...fixture,
+    env: { SHELL: "/bin/zsh", PATH: `/usr/bin${path.delimiter}${bin}` },
+    runCommand: successfulRunner([])
+  });
+
+  assert.equal(result.commandPath.status, "visible");
+  assert.equal(result.commandPath.visible, true);
+  assert.equal(fs.existsSync(path.join(fixture.home, ".zprofile")), false);
+});
+
+test("setupCodex gives unsupported shells an absolute fallback command", async () => {
+  const fixture = makeFixture();
+
+  const result = await setupCodex("install", {
+    ...fixture,
+    env: { SHELL: "/usr/local/bin/fish", PATH: "/usr/bin" },
+    runCommand: successfulRunner([])
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.commandPath.ok, false);
+  assert.equal(result.commandPath.status, "fallback-required");
+  assert.equal(result.commandPath.fallbackCommand, path.join(fixture.home, ".local", "bin", "agentshell"));
+  assert.equal(fs.existsSync(path.join(fixture.home, ".zprofile")), false);
+});
+
+test("setupCodex recognizes an existing unmanaged AgentShell PATH block without claiming ownership", async () => {
+  const fixture = makeFixture();
+  const profile = path.join(fixture.home, ".zprofile");
+  fs.mkdirSync(fixture.home, { recursive: true });
+  fs.writeFileSync(profile, [
+    "# >>> AgentShell managed PATH >>>",
+    'case ":$PATH:" in',
+    '  *":$HOME/.local/bin:"*) ;;',
+    '  *) export PATH="$HOME/.local/bin:$PATH" ;;',
+    "esac",
+    "# <<< AgentShell managed PATH <<<",
+    ""
+  ].join("\n"));
+
+  const result = await setupCodex("install", { ...fixture, runCommand: successfulRunner([]) });
+  assert.equal(result.commandPath.status, "profile-configured-unmanaged");
+  const record = JSON.parse(fs.readFileSync(path.join(fixture.home, ".agentshell", "standalone-install.json"), "utf8"));
+  assert.equal("pathProfile" in record, false);
+
+  const removed = await setupCodex("uninstall", { ...fixture, runCommand: successfulRunner([]) });
+  assert.equal(removed.commandPath.status, "not-managed");
+  assert.match(fs.readFileSync(profile, "utf8"), /AgentShell managed PATH/);
+});
+
+test("setupCodex manages the macOS Dashboard service across install, doctor, update, and uninstall", async () => {
+  const fixture = makeFixture();
+  const calls = [];
+  const options = {
+    ...fixture,
+    uid: 501,
+    allowUserServiceManagement: true,
+    runCommand: successfulRunner(calls)
+  };
+
+  const installed = await setupCodex("install", options);
+  const plist = path.join(fixture.home, "Library", "LaunchAgents", "com.agentshell.dashboard.plist");
+  assert.equal(installed.ok, true);
+  assert.equal(installed.dashboardService.status, "running");
+  assert.equal(fs.existsSync(plist), true);
+  assert.deepEqual(launchctlCalls(calls), [
+    ["bootout", "gui/501/com.agentshell.dashboard"],
+    ["bootstrap", "gui/501", plist],
+    ["print", "gui/501/com.agentshell.dashboard"]
+  ]);
+  const record = JSON.parse(fs.readFileSync(path.join(fixture.home, ".agentshell", "standalone-install.json"), "utf8"));
+  assert.equal(record.dashboardService.path, plist);
+
+  calls.length = 0;
+  const healthy = await setupCodex("doctor", options);
+  assert.equal(healthy.ok, true);
+  assert.equal(healthy.checks.dashboardService, true);
+  assert.deepEqual(launchctlCalls(calls), [["print", "gui/501/com.agentshell.dashboard"]]);
+
+  calls.length = 0;
+  const updated = await setupCodex("update", options);
+  assert.equal(updated.dashboardService.status, "running");
+  assert.deepEqual(launchctlCalls(calls), [
+    ["bootout", "gui/501/com.agentshell.dashboard"],
+    ["bootstrap", "gui/501", plist],
+    ["print", "gui/501/com.agentshell.dashboard"]
+  ]);
+
+  calls.length = 0;
+  const removed = await setupCodex("uninstall", options);
+  assert.equal(removed.dashboardService.status, "removed");
+  assert.equal(fs.existsSync(plist), false);
+  assert.deepEqual(launchctlCalls(calls), [["bootout", "gui/501/com.agentshell.dashboard"]]);
+});
+
+test("setupCodex reports and rolls back a Dashboard service bootstrap failure", async () => {
+  const fixture = makeFixture();
+  const result = await setupCodex("install", {
+    ...fixture,
+    uid: 501,
+    allowUserServiceManagement: true,
+    runCommand: async (command, args) => ({
+      ok: !(command === "launchctl" && args[0] === "bootstrap"),
+      status: command === "launchctl" && args[0] === "bootstrap" ? 5 : 0
+    })
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "DASHBOARD_SERVICE_FAILED");
+  assert.equal(result.dashboardService.status, "bootstrap-failed");
+  assert.equal(fs.existsSync(path.join(fixture.home, ".local", "bin", "agentshell")), false);
+  assert.equal(fs.existsSync(path.join(fixture.home, ".agentshell", "standalone-install.json")), false);
+});
+
+test("setupCodex preserves installation state when Dashboard service bootout fails", async () => {
+  const fixture = makeFixture();
+  const base = { ...fixture, uid: 501, allowUserServiceManagement: true };
+  assert.equal((await setupCodex("install", { ...base, runCommand: successfulRunner([]) })).ok, true);
+  const installedCli = path.join(fixture.home, ".local", "bin", "agentshell");
+  const record = path.join(fixture.home, ".agentshell", "standalone-install.json");
+
+  const result = await setupCodex("uninstall", {
+    ...base,
+    runCommand: async (command, args) => ({
+      ok: command !== "launchctl" || args[0] === "print",
+      status: command === "launchctl" && args[0] !== "print" ? 5 : 0
+    })
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "DASHBOARD_SERVICE_STOP_FAILED");
+  assert.equal(fs.existsSync(installedCli), true);
+  assert.equal(fs.existsSync(record), true);
+  assert.equal(fs.existsSync(path.join(fixture.home, "plugins", "agentshell")), true);
 });
 
 test("setupCodex returns a compact error for unsupported actions", async () => {
@@ -131,7 +329,7 @@ function makeFixture() {
   fs.writeFileSync(path.join(source, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "agentshell", version: "1.0.0" }));
   fs.writeFileSync(path.join(source, "bin", "agentshell"), "#!/bin/sh\n", { mode: 0o755 });
   fs.writeFileSync(path.join(source, "bin", `agentshell-${platform}-${arch}`), "native-cli", { mode: 0o755 });
-  return { home, source, platform, arch };
+  return { home, source, platform, arch, env: { SHELL: "/bin/zsh", PATH: "/usr/bin" } };
 }
 
 function successfulRunner(calls) {
@@ -139,6 +337,10 @@ function successfulRunner(calls) {
     calls.push({ command, args, options });
     return { ok: true, status: 0, stdout: "sensitive output must not leak" };
   };
+}
+
+function launchctlCalls(calls) {
+  return calls.filter(({ command }) => command === "launchctl").map(({ args }) => args);
 }
 
 function hash(file) {

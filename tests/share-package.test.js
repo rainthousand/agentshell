@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { buildSharePackage } from "../scripts/share-package.js";
+import { buildSharePackage, writeZip } from "../scripts/share-package.js";
 
 test("share package builds a real-user handoff directory without runtime state", () => {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-share-package-"));
@@ -57,6 +57,7 @@ test("share package builds a real-user handoff directory without runtime state",
   assert.match(startHere, /Double-click `install\.command`/);
   assert.match(startHere, /check-install\.command/);
   assert.match(startHere, /agentshell trial export --verify --rating 5/);
+  assert.match(startHere, /managed macOS menu-bar Dashboard/);
   assert.match(startHere, /not a public plugin release/i);
 
   const binMode = fs.statSync(path.join(packageDir, "bin", "agentshell")).mode;
@@ -117,4 +118,18 @@ test("share package rejects unsafe package names", () => {
     () => buildSharePackage(process.cwd(), { outDir: os.tmpdir(), name: "../agentshell" }),
     /--name may only contain/
   );
+});
+
+test("share package ZIP uses maximum compression and passes an integrity check", () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-share-zip-"));
+  const packageName = "fixture-package";
+  fs.mkdirSync(path.join(outDir, packageName));
+  fs.writeFileSync(path.join(outDir, packageName, "payload.txt"), "repeatable payload\n".repeat(100));
+
+  const report = writeZip(outDir, packageName, path.join(outDir, `${packageName}.zip`));
+  assert.equal(report.ok, true, report.stderr || report.verification.stderr);
+  assert.equal(report.compressionLevel, 9);
+  assert.equal(report.verification.ok, true);
+  assert.ok(report.bytes > 0);
+  assert.match(report.command, /^zip -9qr /);
 });

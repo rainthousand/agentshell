@@ -2,8 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import {
+  RELEASE_SIZE_BUDGETS,
+  buildReleaseArtifacts,
+  evaluateReleaseSizeBudgets,
+  runLifecycleGate
+} from "../scripts/release-artifacts.js";
 
 test("security and release gates pass for the source tree", () => {
   const security = run("scripts/security-scan.js");
@@ -85,6 +92,119 @@ test("release artifacts include a verifiable SHA256 checksum", () => {
   assert.match(fs.readFileSync(`${standalone}.sha256`, "utf8"), new RegExp(`^${standaloneActual}`));
   assert.notEqual(fs.statSync(standalone).mode & 0o111, 0);
   assert.equal(fs.existsSync(path.join(path.dirname(zip), "release-report.json")), true);
+  assert.equal(report.lifecycle.protocolVersion, "agentshell.package-lifecycle-smoke.v1");
+  assert.equal(report.lifecycle.packageDir, path.join(path.dirname(zip), "agentshell-codex-plugin"));
+  assert.equal(report.lifecycle.summary.finalState, "uninstalled");
+  assert.equal(report.lifecycle.summary.passed, 4);
+  assert.equal(report.zipBytes, fs.statSync(zip).size);
+  assert.equal(report.standalone.bytes, fs.statSync(standalone).size);
+  assert.ok(report.packageBytes >= report.standalone.bytes);
+  assert.equal(report.compressionRatio, report.zipBytes / report.packageBytes);
+  assert.equal(report.zipToStandaloneRatio, report.zipBytes / report.standalone.bytes);
+  assert.equal(report.compression.level, 9);
+  assert.equal(report.compression.archiveVerified, true);
+  assert.equal(report.sizeBudgets.ok, true);
+});
+
+test("release artifacts retain standalone builder metadata and packaging metrics", () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-release-report-"));
+  const outDir = path.join(projectRoot, "release");
+  const binary = Buffer.alloc(20, 1);
+  fs.mkdirSync(path.join(projectRoot, "bin"), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, "bin", "agentshell-darwin-arm64"), binary);
+
+  try {
+    const report = buildReleaseArtifacts({
+      projectRoot,
+      outDir,
+      platform: "darwin",
+      arch: "arm64",
+      runner(command, args) {
+        if (command === "npm" && args.includes("dashboard:build-app")) return success({ ok: true });
+        if (command === "npm" && args.includes("build:standalone")) {
+          return success({
+            ok: true,
+            protocolVersion: "agentshell.standalone-build.v1",
+            status: "built",
+            builder: { bundler: "bun", bunVersion: "1.2.3", runtime: "node-sea", nodeVersion: "22.0.0" }
+          }, "\n> build:standalone\n");
+        }
+        if (command === "node" && args[0] === "scripts/share-package.js") {
+          const deliveryDir = path.join(outDir, "agentshell-codex-plugin");
+          fs.mkdirSync(deliveryDir, { recursive: true });
+          fs.writeFileSync(path.join(deliveryDir, "payload"), binary);
+          fs.writeFileSync(path.join(outDir, "agentshell-codex-plugin.zip"), Buffer.alloc(8, 2));
+          return success({ ok: true, zip: { compressionLevel: 9, verification: { ok: true } } });
+        }
+        if (command === "npm" && args.includes("package:lifecycle:smoke")) {
+          return success({
+            ok: true,
+            protocolVersion: "agentshell.package-lifecycle-smoke.v1",
+            packageVersion: "0.0.0",
+            packageDir: path.join(outDir, "agentshell-codex-plugin"),
+            summary: { passed: 4, finalState: "uninstalled" }
+          });
+        }
+        return { status: 1, stdout: "", stderr: `unexpected command: ${command} ${args.join(" ")}` };
+      }
+    });
+
+    assert.equal(report.standalone.buildReport.protocolVersion, "agentshell.standalone-build.v1");
+    assert.deepEqual(report.standalone.builder, {
+      bundler: "bun",
+      bunVersion: "1.2.3",
+      runtime: "node-sea",
+      nodeVersion: "22.0.0"
+    });
+    assert.equal(report.standalone.bytes, 20);
+    assert.equal(report.zipBytes, 8);
+    assert.equal(report.packageBytes, 20);
+    assert.equal(report.compressionRatio, 0.4);
+    assert.equal(report.zipToStandaloneRatio, 0.4);
+    assert.equal(report.compression.level, 9);
+    assert.equal(report.compression.archiveVerified, true);
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("release artifact size budgets accept their limits and reject either overage", () => {
+  const atLimit = evaluateReleaseSizeBudgets(RELEASE_SIZE_BUDGETS);
+  assert.equal(atLimit.ok, true);
+  assert.equal(atLimit.standalone.limitBytes, 100 * 1024 * 1024);
+  assert.equal(atLimit.zip.limitBytes, 40 * 1024 * 1024);
+
+  const standaloneOver = evaluateReleaseSizeBudgets({
+    standaloneBytes: RELEASE_SIZE_BUDGETS.standaloneBytes + 1,
+    zipBytes: RELEASE_SIZE_BUDGETS.zipBytes
+  });
+  const zipOver = evaluateReleaseSizeBudgets({
+    standaloneBytes: RELEASE_SIZE_BUDGETS.standaloneBytes,
+    zipBytes: RELEASE_SIZE_BUDGETS.zipBytes + 1
+  });
+  assert.equal(standaloneOver.ok, false);
+  assert.equal(standaloneOver.standalone.ok, false);
+  assert.equal(zipOver.ok, false);
+  assert.equal(zipOver.zip.ok, false);
+});
+
+test("release artifacts block when packaged lifecycle smoke fails", () => {
+  const deliveryDir = path.join(process.cwd(), "artifacts", "release", "agentshell-codex-plugin");
+  assert.throws(() => runLifecycleGate(deliveryDir, {
+    runner(command, args) {
+      assert.equal(command, "npm");
+      assert.deepEqual(args, ["run", "package:lifecycle:smoke", "--", "--package-dir", deliveryDir]);
+      return { status: 1, stdout: '{"ok":false}', stderr: "lifecycle failed" };
+    }
+  }), /lifecycle failed/);
+});
+
+test("release artifacts block malformed lifecycle output", () => {
+  assert.throws(() => runLifecycleGate("/tmp/delivery", {
+    runner() {
+      return { status: 0, stdout: "not json", stderr: "" };
+    }
+  }), /Packaged install lifecycle smoke failed/);
 });
 
 function run(script, env = {}) {
@@ -113,4 +233,8 @@ function spawnReleaseGate(args = [], env = {}) {
     encoding: "utf8",
     env: { ...cleanEnv, ...env }
   });
+}
+
+function success(report, prefix = "") {
+  return { status: 0, stdout: `${prefix}${JSON.stringify(report, null, 2)}\n`, stderr: "" };
 }

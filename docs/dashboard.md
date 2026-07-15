@@ -8,6 +8,15 @@ agentshell dashboard
 
 AgentShell maintains one user-level Dashboard process. Repeated launches reuse a
 healthy matching instance; a stale version or different workspace is replaced.
+The macOS Codex installer registers `com.agentshell.dashboard` as a user
+LaunchAgent and starts it immediately. It starts again at login, restarts after
+an abnormal exit, and stays stopped after a normal `dashboard --stop`.
+
+Project-context AgentShell commands atomically publish path-free metric snapshots
+under `~/.agentshell/dashboard-snapshots`. The managed LaunchAgent merges those
+snapshots instead of traversing registered project directories. This keeps the
+menu-bar refresh independent of Terminal/Codex file permissions and allows the
+last verified aggregate to remain visible when a project is moved or offline.
 
 ```bash
 agentshell dashboard --status
@@ -16,7 +25,7 @@ agentshell dashboard --stop
 
 On macOS the command opens a native AppKit menu-bar utility by default. The status
 item shows compact verified savings such as `AS 79K`; clicking it reveals the full
-`Verified savings` and `Time saved` values across all registered workspaces. The
+`Verified tokens saved` and `Verified time saved` values across all registered workspaces. The
 popover labels this scope as `All workspaces` without exposing project paths. It
 does not appear in the Dock or open a window at launch. Use `--window` when the
 optional detailed panel is useful.
@@ -28,9 +37,12 @@ native default, `--browser` for the browser surface, `--no-open` for a headless
 workflow, or `--port 0` in automation.
 Non-macOS systems currently fall back to the browser surface.
 
-For a menu-bar process launched independently of a terminal, use
-`nohup agentshell dashboard --menubar --daemon >/dev/null 2>&1 &`. The `--daemon`
-flag keeps the singleton server alive after its launching shell exits.
+Source-checkout development can still launch an independent process with
+`nohup agentshell dashboard --menubar --daemon >/dev/null 2>&1 &`. Installed
+users do not need this command. `setup codex doctor` verifies the managed plist
+and loaded service; uninstall stops it and removes the plist only if its recorded
+hash still matches. Launch diagnostics stay local in
+`~/.agentshell/dashboard-launch.log` and `dashboard-error.log`.
 
 The read-only metrics endpoint defaults to the global aggregate. Call it with an
 explicit workspace scope when a project-only view is needed:
@@ -59,8 +71,15 @@ Estimated values use the documented four-characters-per-token proxy:
 - verified savings versus raw verification output.
 
 The Dashboard does not claim access to Codex model tokens, Codex thinking time,
-or commands executed outside AgentShell. Estimated time saved stays unavailable
-until a matched workflow baseline exists.
+or commands executed outside AgentShell. Verified time saved stays unavailable
+until an actual cache hit can be compared with its measured uncached baseline.
+
+`tasks` counts managed AgentShell repair runs; `toolCalls` counts observed
+AgentShell CLI events. They intentionally answer different questions, so a small
+task count can coexist with many tool calls. The metrics payload includes a
+24-hour freshness state, stale managed-run count, and exact attribution coverage.
+Old unfinished runs remain in history but are labeled `stale` and do not reduce
+the completed-run success rate.
 
 ## Privacy
 

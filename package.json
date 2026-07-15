@@ -29,6 +29,7 @@
     "product:readiness": "node scripts/product-readiness.js",
     "product:readiness:heavy": "node scripts/product-readiness.js --heavy",
     "share:package": "node scripts/share-package.js",
+    "package:lifecycle:smoke": "node scripts/package-lifecycle-smoke.js",
     "adapter:generate": "node scripts/adapter-generate.js",
     "adapter:trial": "node scripts/adapter-trial.js",
     "adapter:trial:collect": "node scripts/adapter-trial-collect.js",

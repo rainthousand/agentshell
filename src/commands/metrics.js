@@ -6,6 +6,7 @@ import { readRegisteredWorkspaces } from "../core/workspace-registry.js";
 import { runStatus, summarizeRun } from "./run-status.js";
 
 const PROTOCOL_VERSION = "agentshell.metrics.v2";
+const FRESHNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function metrics(root, options = {}) {
   const scope = parseScope(options.scope);
@@ -67,7 +68,9 @@ export async function metrics(root, options = {}) {
         exactEvents: attribution.exactEvents,
         legacyEvents: attribution.legacyEvents,
         method: attribution.legacyEvents > 0 ? "operation-id-with-legacy-fallback" : "operation-id"
-      }
+      },
+      freshness: dashboard.freshness,
+      coverage: dashboard.coverage
     },
     dashboard,
     privacy: {
@@ -124,7 +127,8 @@ function dashboardSummary(root, datasets, toolCallCount, scope) {
   const summaries = runEntries.map((entry) => entry.summary);
   const events = datasets.flatMap((dataset) => dataset.events);
   const operations = datasets.flatMap((dataset) => dataset.operations);
-  const passed = summaries.filter((run) => run.status === "passed").length;
+  const evaluated = summaries.filter((run) => run.status === "passed" || run.status === "failing");
+  const passed = evaluated.filter((run) => run.status === "passed").length;
   const commandCount = sum(summaries.map((run) => run.commandCount));
   const executionMs = sum(summaries.map((run) => run.durationMs));
   const workflowElapsedMs = sum(runs.map(elapsedMsForRun));
@@ -144,6 +148,8 @@ function dashboardSummary(root, datasets, toolCallCount, scope) {
     ? null
     : attribution.percentSaved;
   const latest = summaries.at(-1) || null;
+  const freshness = freshnessFor(events, operations, runs);
+  const coverage = coverageFor(summaries, runs, toolCallCount, attribution, estimatedTimeSavedMs);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -151,13 +157,15 @@ function dashboardSummary(root, datasets, toolCallCount, scope) {
       name: scope === "global" ? "All workspaces" : workspaceName(root)
     },
     health: healthFor(latest, runs.at(-1)),
+    freshness,
+    coverage,
     totals: {
       tasks: summaries.length,
       managedRuns: summaries.length,
       operations: operations.length,
       toolCalls: toolCallCount,
       passed,
-      successRate: summaries.length > 0 ? Math.round((passed / summaries.length) * 100) : null,
+      successRate: evaluated.length > 0 ? Math.round((passed / evaluated.length) * 100) : null,
       commandCount,
       averageCommandsPerTask: summaries.length > 0 ? roundOne(commandCount / summaries.length) : null,
       agentShellOutputTokens,
@@ -232,6 +240,7 @@ function latestRunSummary(datasets) {
 function timeSavedFromCacheHits(operations) {
   const baselines = new Map();
   let saved = 0;
+  let verifiedHits = 0;
   for (const operation of operations) {
     if (operation.type !== "verify" || !operation.cacheKey) continue;
     if (!operation.cacheHit && Number.isFinite(operation.durationMs)) {
@@ -241,9 +250,10 @@ function timeSavedFromCacheHits(operations) {
     const baseline = baselines.get(operation.cacheKey);
     if (operation.cacheHit && Number.isFinite(baseline)) {
       saved += Math.max(0, baseline - (operation.durationMs || 0));
+      verifiedHits += 1;
     }
   }
-  return baselines.size > 0 ? saved : null;
+  return verifiedHits > 0 ? saved : null;
 }
 
 function attributedVerification(events, operations) {
@@ -329,6 +339,7 @@ function uniqueRuns(root) {
 }
 
 function taskForDashboard(summary, run) {
+  const stale = staleRun(summary, run);
   return {
     id: summary.runId,
     status: summary.status,
@@ -338,19 +349,67 @@ function taskForDashboard(summary, run) {
     workflowElapsedMs: elapsedMsForRun(run),
     finishedAt: run?.updatedAt || null,
     changedFileCount: summary.latestChange?.changedFiles?.length || 0,
-    verificationOk: summary.latestVerify?.ok === true
+    verificationOk: summary.latestVerify?.ok === true,
+    stale,
+    lifecycle: stale ? "stale" : summary.status === "in_progress" ? "active" : "complete"
   };
 }
 
 function taskForTrend(summary, run) {
+  const stale = staleRun(summary, run);
   return {
     id: summary.runId,
     status: summary.status,
     estimatedTokens: summary.estimatedTokens,
     executionMs: summary.durationMs,
     workflowElapsedMs: elapsedMsForRun(run),
-    finishedAt: run?.updatedAt || null
+    finishedAt: run?.updatedAt || null,
+    stale,
+    lifecycle: stale ? "stale" : summary.status === "in_progress" ? "active" : "complete"
   };
+}
+
+function freshnessFor(events, operations, runs) {
+  const latestMs = Math.max(0, ...events.map((event) => dateValue(event.createdAt)),
+    ...operations.map((operation) => dateValue(operation.createdAt)),
+    ...runs.map((run) => dateValue(run.updatedAt)));
+  if (latestMs === 0) {
+    return { status: "empty", latestAt: null, ageMs: null, staleAfterMs: FRESHNESS_WINDOW_MS };
+  }
+  const ageMs = Math.max(0, Date.now() - latestMs);
+  return {
+    status: ageMs > FRESHNESS_WINDOW_MS ? "stale" : "fresh",
+    latestAt: new Date(latestMs).toISOString(),
+    ageMs,
+    staleAfterMs: FRESHNESS_WINDOW_MS
+  };
+}
+
+function coverageFor(summaries, runs, toolCalls, attribution, estimatedTimeSavedMs) {
+  const attributableEvents = attribution.exactEvents + attribution.legacyEvents;
+  const staleManagedRuns = summaries.filter((summary, index) => staleRun(summary, runs[index])).length;
+  const activeManagedRuns = summaries.filter((summary, index) => (
+    summary.status === "in_progress" && !staleRun(summary, runs[index])
+  )).length;
+  return {
+    observedToolCalls: toolCalls,
+    managedRuns: summaries.length,
+    evaluatedManagedRuns: summaries.filter((summary) => ["passed", "failing"].includes(summary.status)).length,
+    activeManagedRuns,
+    staleManagedRuns,
+    attributableEvents,
+    exactAttributedEvents: attribution.exactEvents,
+    exactAttributionPercent: attributableEvents > 0
+      ? Math.round((attribution.exactEvents / attributableEvents) * 100)
+      : null,
+    verifiedTokenSavingsAvailable: attribution.rawTokens > 0,
+    verifiedTimeSavingsAvailable: estimatedTimeSavedMs !== null
+  };
+}
+
+function staleRun(summary, run) {
+  return summary?.status !== "passed"
+    && Date.now() - dateValue(run?.updatedAt) > FRESHNESS_WINDOW_MS;
 }
 
 function elapsedMsForRun(run) {

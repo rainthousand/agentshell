@@ -84,6 +84,7 @@ export function buildStandalone(options = {}, dependencies = {}) {
     const config = path.join(buildDir, "sea-config.json");
     const bundleArgs = bundleCommand.args.map((arg) => arg === "<temporary>/agentshell.cjs" ? bundle : arg);
     ensureSucceeded(run(bundleCommand.command, bundleArgs, { cwd: packageRoot }), "Bun failed to bundle AgentShell for Node SEA.");
+    assertSeaBundleCompatibility(bundle, { packageRoot });
     fs.writeFileSync(config, `${JSON.stringify({
       main: bundle,
       output: blob,
@@ -141,6 +142,17 @@ export function buildStandalone(options = {}, dependencies = {}) {
     },
     smokeChecks
   };
+}
+
+export function assertSeaBundleCompatibility(bundle, options = {}) {
+  const source = fs.readFileSync(bundle, "utf8");
+  if (/import\.meta(?:\.|\[)/u.test(source)) {
+    throw new Error("Bundled AgentShell still contains import.meta syntax, which Node 20 SEA cannot execute as CommonJS.");
+  }
+  const packageRoot = options.packageRoot && path.resolve(options.packageRoot);
+  if (packageRoot && source.includes(packageRoot)) {
+    throw new Error("Bundled AgentShell contains the build machine package path. Runtime package discovery must remain relocatable.");
+  }
 }
 
 function runSmokeChecks(binary, packageRoot, cwd, run) {

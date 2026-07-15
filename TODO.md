@@ -2,7 +2,7 @@
 
 ## Current Release State
 
-- Current installed Codex personal plugin: v0.24; run `node src/cli.js plugin status --compact` for the current local cachebuster version.
+- Current installed Codex personal plugin: v0.25 local candidate; run `node src/cli.js plugin status --compact` for the current local cachebuster version. The GitHub Release is not complete yet.
 - Main fast path: `agentshell fix test --fast --compact`; `agentshell fix test --compact` remains the compatible default.
 - Current supported automatic fix strategies:
   - `missing-object-property`
@@ -30,7 +30,15 @@ P0 external evidence is active. The automatic redacted exporter and evaluator pa
 
 P1 non-developer support tooling is implemented: `install.command` now preserves failures in `agentshell-install.log` without closing before the user can read them, and `check-install.command` creates a Desktop `agentshell-install-check.json` health report. Real-user installation attempts are still required to close P1 evidence.
 
-The local value Dashboard batch is implemented around `agentshell.metrics.v2` and `agentshell dashboard`: measured execution and elapsed time are separated from estimated context avoided, unavailable Codex accounting remains explicit, and the read-only UI binds only to `127.0.0.1`. The macOS native AppKit floating shell is built and CLI integration is active; external-user validation and a later Windows desktop shell remain follow-up evidence/work.
+The v0.25 local candidate now covers Node 20 standalone compatibility, managed `~/.local/bin` PATH setup, migration of legacy Dashboard launch jobs that reference a source checkout, v0.24-to-v0.25 preservation/cleanup tests, and an isolated-HOME packaged install/update/doctor/uninstall smoke. The remote GitHub Release and its downloadable-asset verification remain unfinished.
+
+The local candidate release package now uses maximum ZIP compression with an immediate integrity test, records Node/Bun builder metadata and real package compression ratio, and blocks standalone artifacts above 100 MiB or ZIPs above 40 MiB. The current 85.3 MiB SEA binary is intentionally not stripped until SEA segment, signing, and runtime safety can be proven on a disposable copy.
+
+The macOS menu-bar Dashboard is now part of the managed install lifecycle through `com.agentshell.dashboard`: install/update start the user LaunchAgent, doctor checks its recorded plist and loaded state, abnormal exits restart, normal stops remain stopped, and uninstall preserves any user-modified plist instead of deleting it.
+
+The managed Dashboard no longer traverses registered source directories from launchd. Project-context commands atomically publish path-free snapshots under `~/.agentshell/dashboard-snapshots`; install/update seeds every accessible registered workspace, and the menu-bar service merges only those snapshots. The local migration refreshed 28 workspaces and preserved verified token/time evidence without requiring Full Disk Access.
+
+The local value Dashboard batch is implemented around `agentshell.metrics.v2` and `agentshell dashboard`: measured execution and elapsed time are separated from estimated context avoided, unavailable Codex accounting remains explicit, and the read-only UI binds only to `127.0.0.1`. Freshness, stale managed runs, and attribution coverage now make the evidence boundary auditable; verified time remains unavailable until a real cache hit has a measured baseline. The macOS native AppKit menu-bar shell is built and CLI integration is active; external-user validation and a later Windows desktop shell remain follow-up evidence/work.
 
 Completed batches were intentionally split by write scope so sub-agents could work in parallel.
 

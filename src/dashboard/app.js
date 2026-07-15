@@ -1,4 +1,5 @@
 const elements = {
+  shell: document.querySelector(".shell"),
   tokens: document.querySelector("#tokens-saved"),
   timeSaved: document.querySelector("#time-saved")
 };
@@ -17,8 +18,16 @@ async function refresh() {
 function render(report) {
   const dashboard = report.dashboard;
   const totals = dashboard.totals;
-  elements.tokens.textContent = totals.estimatedContextAvoidedTokens === null ? "--" : formatInteger(totals.estimatedContextAvoidedTokens);
-  elements.timeSaved.textContent = totals.estimatedTimeSavedMs === null ? "--" : formatDuration(totals.estimatedTimeSavedMs);
+  const coverage = dashboard.coverage || {};
+  const tokensAvailable = coverage.verifiedTokenSavingsAvailable ?? totals.estimatedContextAvoidedTokens !== null;
+  const timeAvailable = coverage.verifiedTimeSavingsAvailable ?? totals.estimatedTimeSavedMs !== null;
+  elements.tokens.textContent = tokensAvailable ? formatInteger(totals.estimatedContextAvoidedTokens) : "--";
+  elements.timeSaved.textContent = timeAvailable ? formatDuration(totals.estimatedTimeSavedMs) : "--";
+  const freshness = dashboard.freshness?.status || "unknown";
+  const attribution = coverage.exactAttributionPercent == null ? "unavailable" : `${coverage.exactAttributionPercent}% exact`;
+  const detail = `AgentShell local tooling. Data: ${freshness}; attribution: ${attribution}. Codex model tokens are unavailable.`;
+  elements.shell.title = detail;
+  elements.shell.setAttribute("aria-label", `AgentShell verified savings. ${detail}`);
 }
 
 function formatInteger(value) {

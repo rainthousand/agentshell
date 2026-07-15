@@ -44,6 +44,7 @@ const REQUIRED_FILES = [
   "scripts/performance-summary.js",
   "src/core/workspace-registry.js",
   "src/core/package-root.js",
+  "src/core/dashboard-service.js",
   "src/commands/setup-codex.js",
   "src/commands/dashboard.js",
   "src/dashboard/index.html",
@@ -59,6 +60,7 @@ const REQUIRED_FILES = [
   "scripts/security-scan.js",
   "scripts/release-gate.js",
   "scripts/release-artifacts.js",
+  "scripts/package-lifecycle-smoke.js",
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",
   "CHANGELOG.md",
@@ -103,6 +105,7 @@ const REQUIRED_PACKAGE_SCRIPTS = [
   "security:scan",
   "release:gate",
   "release:artifacts",
+  "package:lifecycle:smoke",
   "adapter:trial",
   "adapter:trial:collect",
   "adapter:trial:suite",
@@ -126,6 +129,7 @@ const REQUIRED_PACKAGE_SCRIPTS = [
 ];
 
 const HEAVY_COMMANDS = [
+  { id: "release-artifacts", name: "Release package lifecycle", command: ["npm", "run", "release:artifacts"] },
   { id: "plugin-activation-smoke", name: "Plugin activation smoke", command: ["npm", "run", "plugin:activation-smoke"] },
   { id: "benchmark-suite-ci", name: "Benchmark suite CI thresholds", command: ["npm", "run", "benchmark:suite:ci"] },
   { id: "benchmark-cache", name: "Cache benchmark", command: ["npm", "run", "benchmark:cache"] },

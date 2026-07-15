@@ -34,6 +34,10 @@ test("global metrics aggregate registered workspaces without leaking their paths
   assert.equal(report.savings.charsSavedVsRawVerify, 5400);
   assert.equal(report.savings.percentSavedVsRawVerify, 90);
   assert.equal(report.measurement.attribution.exactEvents, 2);
+  assert.equal(report.measurement.freshness.status, "fresh");
+  assert.equal(report.measurement.coverage.observedToolCalls, 2);
+  assert.equal(report.measurement.coverage.managedRuns, 2);
+  assert.equal(report.measurement.coverage.exactAttributionPercent, 100);
   assert.equal(report.dashboard.workspace.name, "All workspaces");
   assert.equal(report.dashboard.totals.tasks, 2);
   assert.equal(report.dashboard.totals.operations, 2);

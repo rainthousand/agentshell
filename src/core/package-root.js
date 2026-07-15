@@ -13,7 +13,7 @@ export function resolvePackageRoot(options = {}) {
     throw new Error(`Invalid AgentShell package root: ${path.resolve(explicit)}`);
   }
 
-  const sourceRoot = path.resolve(options.sourceRoot || path.join(import.meta.dirname, "..", ".."));
+  const sourceRoot = path.resolve(options.sourceRoot || process.cwd());
   const executablePath = path.resolve(options.executablePath || process.execPath);
   const executableDir = path.dirname(executablePath);
   const directCandidates = [

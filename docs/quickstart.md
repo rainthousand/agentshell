@@ -25,7 +25,9 @@ If you received an AgentShell share package:
 4. Verify by asking Codex to use AgentShell, or run `agentshell start --compact` in Terminal.
 
 Success means the installer finished without a blocking error and says no manual
-Codex configuration is needed. Existing global instructions are preserved.
+Codex configuration is needed. Existing global instructions are preserved. On
+macOS the AgentShell savings item also appears in the menu bar automatically;
+there is no separate Dashboard startup step.
 
 To preview the same steps without changing anything, run:
 

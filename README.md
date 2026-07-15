@@ -54,7 +54,12 @@ For a non-developer Codex user with a share package:
 4. Verify by asking Codex to use AgentShell, or run `agentshell start --compact`.
 
 After a successful install, no manual Codex configuration or instruction
-copy/paste is needed. Existing global instructions are preserved.
+copy/paste is needed. Existing global instructions are preserved. On macOS the
+installer also creates and starts an AgentShell-owned menu-bar LaunchAgent;
+updates replace it atomically, `doctor:codex` checks it, and uninstall removes it
+only while its recorded configuration is unchanged. AgentShell commands publish
+path-free snapshots to `~/.agentshell/dashboard-snapshots`, so the LaunchAgent
+does not need permission to open each source project while refreshing metrics.
 
 To preview the exact install sequence without changing files, links, or Codex
 settings:
@@ -105,8 +110,10 @@ agentshell fix test --safe --compact
 agentshell fix test --fast --compact
 ```
 
-If `agentshell` is not on `PATH`, use `node src/cli.js <command>` from this
-checkout or `bin/agentshell <command>` from a source/plugin-cache checkout.
+The v0.25 managed installer adds `~/.local/bin` to supported shell profiles when
+needed. Until a new shell is opened, or when working without the installer, use
+`node src/cli.js <command>` from this checkout or `bin/agentshell <command>` from
+a source/plugin-cache checkout.
 
 ## Before / After
 
@@ -259,6 +266,12 @@ coverage, Codex plugin trial scoring, and strategy intake. Use
 [Product Boundary](docs/product-boundary.md) as the freeze/scope contract for
 v0.25 and the v1.0 bar. MCP remains deferred and non-blocking for this phase.
 
+The current v0.25 build is a local release candidate, not a completed GitHub
+Release. Its local delivery checks cover Node 20 standalone execution, managed
+PATH setup, legacy Dashboard migration, and an isolated-HOME packaged lifecycle
+smoke. Three fresh verified tasks from external users are still required for the
+v1.0 evidence bar.
+
 ## Share Package
 
 For a real-user handoff without publishing a plugin, create a local share
@@ -277,6 +290,14 @@ The package includes the source, plugin metadata, `install.command`,
 installer keeps `agentshell-install.log` when support is needed; the check command
 writes `agentshell-install-check.json` to the Desktop for a review-before-sharing
 health report.
+
+Before handing off a candidate, run `npm run package:lifecycle:smoke` against the
+generated delivery directory. It exercises packaged install, update, doctor, and
+uninstall in an isolated HOME without changing the developer's Codex state.
+ZIP delivery uses maximum compression and must pass an immediate archive
+integrity check. `npm run release:artifacts` also records checksums, standalone
+builder versions, package compression ratio, and blocking size budgets in
+`artifacts/release/release-report.json`.
 
 Key workflow topics:
 

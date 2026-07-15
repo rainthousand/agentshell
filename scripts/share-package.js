@@ -233,20 +233,34 @@ function walk(current, dirent, visit) {
   }
 }
 
-function writeZip(outDir, packageName, zipPath) {
+export function writeZip(outDir, packageName, zipPath) {
   fs.rmSync(zipPath, { force: true });
-  const result = spawnSync("zip", ["-qr", zipPath, packageName], {
+  const result = spawnSync("zip", ["-9qr", zipPath, packageName], {
     cwd: outDir,
     encoding: "utf8"
   });
+  const verification = result.status === 0
+    ? spawnSync("zip", ["-T", zipPath], { cwd: outDir, encoding: "utf8" })
+    : null;
+  const ok = result.status === 0 && verification?.status === 0;
   return {
-    ok: result.status === 0,
+    ok,
     path: zipPath,
-    command: `zip -qr ${path.basename(zipPath)} ${packageName}`,
+    bytes: ok ? fs.statSync(zipPath).size : null,
+    compressionLevel: 9,
+    command: `zip -9qr ${path.basename(zipPath)} ${packageName}`,
     status: result.status,
     stdout: trim(result.stdout),
     stderr: trim(result.stderr),
-    error: result.error?.message
+    error: result.error?.message,
+    verification: {
+      command: `zip -T ${path.basename(zipPath)}`,
+      ok: verification?.status === 0,
+      status: verification?.status ?? null,
+      stdout: trim(verification?.stdout),
+      stderr: trim(verification?.stderr),
+      error: verification?.error?.message
+    }
   };
 }
 
@@ -285,7 +299,7 @@ bin/agentshell-darwin-arm64 setup codex doctor --source "$PWD"
 bin/agentshell-darwin-arm64 setup codex uninstall --source "$PWD"
 \`\`\`
 
-When the installer succeeds, open a new Codex task. The installer places the native \`agentshell\` command in \`~/.local/bin\`, installs the local Codex plugin copy, writes AgentShell guidance into \`~/.codex/AGENTS.md\`, and runs smoke checks. End users do not need Node.js or npm.
+When the installer succeeds, open a new Codex task and a new Terminal window. The installer places the native \`agentshell\` command in \`~/.local/bin\`, safely adds that directory to supported shell profiles when needed, installs the local Codex plugin copy, writes AgentShell guidance into \`~/.codex/AGENTS.md\`, starts the managed macOS menu-bar Dashboard, and runs smoke checks. End users do not need Node.js or npm.
 
 After Codex completes and verifies a real task, ask it:
 
@@ -326,7 +340,7 @@ STATUS=\${PIPESTATUS[0]}
 echo
 if [ "$STATUS" -eq 0 ]; then
   echo "AgentShell is installed and configured for Codex."
-  echo "Quit and reopen Codex, then start a new task."
+  echo "Quit and reopen Codex, then start a new task. Open a new Terminal before typing agentshell."
 else
   echo "AgentShell installation did not finish."
   echo "Keep this folder and send agentshell-install.log when asking for help."

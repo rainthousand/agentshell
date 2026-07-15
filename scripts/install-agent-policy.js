@@ -2,7 +2,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const START = "<!-- agentshell-policy:start -->";
 const END = "<!-- agentshell-policy:end -->";
@@ -36,7 +35,7 @@ const POLICY = [
   END
 ].join("\n");
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (path.basename(process.argv[1] || "") === "install-agent-policy.js") {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));

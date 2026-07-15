@@ -65,7 +65,7 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem.button else { return }
         button.title = "AS --"
-        button.toolTip = "AgentShell Verified savings"
+        button.toolTip = "AgentShell verified savings"
         button.target = self
         button.action = #selector(togglePopover)
     }
@@ -79,8 +79,8 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         savingsValue = label("--", size: 22, weight: .semibold, color: .labelColor)
         timeValue = label("--", size: 22, weight: .semibold, color: .labelColor)
 
-        let savings = metric(title: "Verified savings", value: savingsValue)
-        let time = metric(title: "Time saved", value: timeValue)
+        let savings = metric(title: "Verified tokens saved", value: savingsValue)
+        let time = metric(title: "Verified time saved", value: timeValue)
         let metrics = NSStackView(views: [savings, time])
         metrics.orientation = .horizontal
         metrics.distribution = .fillEqually
@@ -194,14 +194,30 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
             }
             let tokens = totals["estimatedContextAvoidedTokens"] as? NSNumber
             let time = totals["estimatedTimeSavedMs"] as? NSNumber
+            let coverage = dashboard["coverage"] as? [String: Any]
+            let freshness = dashboard["freshness"] as? [String: Any]
+            let tokensAvailable = coverage?["verifiedTokenSavingsAvailable"] as? Bool ?? (tokens != nil)
+            let timeAvailable = coverage?["verifiedTimeSavingsAvailable"] as? Bool ?? (time != nil)
+            let freshnessStatus = freshness?["status"] as? String ?? "unknown"
+            let exactAttribution = coverage?["exactAttributionPercent"] as? NSNumber
             let scope = dashboard["scope"] as? String
-            DispatchQueue.main.async { self.render(tokens: tokens, time: time, scope: scope) }
+            DispatchQueue.main.async {
+                self.render(
+                    tokens: tokensAvailable ? tokens : nil,
+                    time: timeAvailable ? time : nil,
+                    scope: scope,
+                    freshness: freshnessStatus,
+                    exactAttribution: exactAttribution
+                )
+            }
         }
         requestTask?.resume()
     }
 
-    private func render(tokens: NSNumber?, time: NSNumber?, scope: String?) {
+    private func render(tokens: NSNumber?, time: NSNumber?, scope: String?, freshness: String, exactAttribution: NSNumber?) {
         scopeValue.stringValue = scope == "workspace" ? "Project" : "All workspaces"
+        let attribution = exactAttribution.map { "\($0.intValue)% exact attribution" } ?? "attribution unavailable"
+        statusItem.button?.toolTip = "AgentShell local tooling; data \(freshness); \(attribution); Codex model tokens unavailable"
         if let tokens {
             statusItem.button?.title = "AS \(compactNumber(tokens.intValue))"
             savingsValue.stringValue = "\(formattedNumber(tokens.intValue)) tokens"
@@ -214,6 +230,7 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func renderOffline() {
         statusItem.button?.title = "AS --"
+        statusItem.button?.toolTip = "AgentShell metrics unavailable"
         scopeValue.stringValue = "All workspaces"
         savingsValue.stringValue = "--"
         timeValue.stringValue = "--"

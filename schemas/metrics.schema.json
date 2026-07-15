@@ -9,7 +9,7 @@
     "protocolVersion": { "const": "agentshell.metrics.v2" },
     "compact": { "type": "boolean" },
     "scope": { "enum": ["workspace", "global"] },
-    "workspaceCount": { "type": "integer", "minimum": 1 },
+    "workspaceCount": { "type": "integer", "minimum": 0 },
     "window": { "$ref": "#/$defs/window" },
     "totals": { "$ref": "#/$defs/totals" },
     "savings": { "oneOf": [{ "$ref": "#/$defs/savings" }, { "type": "null" }] },
@@ -35,7 +35,7 @@
   "$defs": {
     "measurement": {
       "type": "object",
-      "required": ["scope", "measured", "estimated", "unavailable", "attribution"],
+      "required": ["scope", "measured", "estimated", "unavailable", "attribution", "freshness", "coverage"],
       "properties": {
         "scope": { "const": "agentshell-local-tooling" },
         "measured": { "type": "array", "items": { "type": "string" } },
@@ -50,7 +50,9 @@
             "method": { "enum": ["operation-id", "operation-id-with-legacy-fallback"] }
           },
           "additionalProperties": false
-        }
+        },
+        "freshness": { "$ref": "#/$defs/freshness" },
+        "coverage": { "$ref": "#/$defs/coverage" }
       },
       "additionalProperties": false
     },
@@ -68,7 +70,7 @@
     },
     "dashboard": {
       "type": "object",
-      "required": ["generatedAt", "workspace", "health", "totals", "latestTask", "trend"],
+      "required": ["generatedAt", "workspace", "health", "freshness", "coverage", "totals", "latestTask", "trend"],
       "properties": {
         "generatedAt": { "type": "string" },
         "workspace": {
@@ -78,6 +80,8 @@
           "additionalProperties": false
         },
         "health": { "enum": ["ready", "attention", "idle"] },
+        "freshness": { "$ref": "#/$defs/freshness" },
+        "coverage": { "$ref": "#/$defs/coverage" },
         "totals": { "$ref": "#/$defs/dashboardTotals" },
         "latestTask": { "oneOf": [{ "$ref": "#/$defs/dashboardTask" }, { "type": "null" }] },
         "trend": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/trendTask" } }
@@ -115,7 +119,9 @@
           "properties": {
             "commandCount": { "type": "integer", "minimum": 0 },
             "changedFileCount": { "type": "integer", "minimum": 0 },
-            "verificationOk": { "type": "boolean" }
+            "verificationOk": { "type": "boolean" },
+            "stale": { "type": "boolean" },
+            "lifecycle": { "enum": ["active", "stale", "complete"] }
           }
         }
       ]
@@ -129,8 +135,38 @@
         "estimatedTokens": { "type": "integer", "minimum": 0 },
         "executionMs": { "type": "number", "minimum": 0 },
         "workflowElapsedMs": { "type": "number", "minimum": 0 },
-        "finishedAt": { "type": ["string", "null"] }
+        "finishedAt": { "type": ["string", "null"] },
+        "stale": { "type": "boolean" },
+        "lifecycle": { "enum": ["active", "stale", "complete"] }
       }
+    },
+    "freshness": {
+      "type": "object",
+      "required": ["status", "latestAt", "ageMs", "staleAfterMs"],
+      "properties": {
+        "status": { "enum": ["fresh", "stale", "empty"] },
+        "latestAt": { "type": ["string", "null"] },
+        "ageMs": { "type": ["number", "null"], "minimum": 0 },
+        "staleAfterMs": { "type": "number", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["observedToolCalls", "managedRuns", "evaluatedManagedRuns", "activeManagedRuns", "staleManagedRuns", "attributableEvents", "exactAttributedEvents", "exactAttributionPercent", "verifiedTokenSavingsAvailable", "verifiedTimeSavingsAvailable"],
+      "properties": {
+        "observedToolCalls": { "type": "integer", "minimum": 0 },
+        "managedRuns": { "type": "integer", "minimum": 0 },
+        "evaluatedManagedRuns": { "type": "integer", "minimum": 0 },
+        "activeManagedRuns": { "type": "integer", "minimum": 0 },
+        "staleManagedRuns": { "type": "integer", "minimum": 0 },
+        "attributableEvents": { "type": "integer", "minimum": 0 },
+        "exactAttributedEvents": { "type": "integer", "minimum": 0 },
+        "exactAttributionPercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "verifiedTokenSavingsAvailable": { "type": "boolean" },
+        "verifiedTimeSavingsAvailable": { "type": "boolean" }
+      },
+      "additionalProperties": false
     },
     "window": {
       "type": "object",

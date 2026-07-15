@@ -3,4 +3,5 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+process.env.AGENTSHELL_PACKAGE_ROOT ||= path.resolve(here, "..");
 await import(path.join(here, "..", "src", "cli.js"));

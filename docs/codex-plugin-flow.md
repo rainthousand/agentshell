@@ -216,7 +216,9 @@ For a non-developer Codex user with a share package:
 4. Verify by asking Codex to use AgentShell, or run `agentshell start --compact`.
 
 After a successful install, no manual Codex configuration or instruction
-copy/paste is needed. Existing global instructions are preserved.
+copy/paste is needed. Existing global instructions are preserved. The macOS
+installer manages the menu-bar Dashboard as a user LaunchAgent, including
+update restart, doctor inspection, and ownership-checked uninstall.
 
 For a no-change preview, run:
 
@@ -240,6 +242,21 @@ npm run share:package -- --zip
 The share package includes `START-HERE.md`, `install.command`, the plugin
 payload, docs, schemas, and demo fixtures. It excludes runtime and repository
 state such as `.git`, `.agentshell`, `artifacts`, and `node_modules`.
+
+The v0.25 managed installer copies the standalone CLI to `~/.local/bin` and adds
+an idempotent AgentShell PATH block to supported shell profiles when required.
+An update preserves user-authored profile and AGENTS content; uninstall removes
+the PATH block only when it still matches the AgentShell-owned content.
+
+Before an external handoff, verify the generated delivery directory with:
+
+```bash
+npm run package:lifecycle:smoke
+```
+
+The smoke uses an isolated HOME and fake host commands to exercise packaged
+install, update, doctor, and uninstall without changing the developer's Codex or
+launchd state. The standalone build is also checked for Node 20 compatibility.
 
 For manual local development, `npm link` is the simplest way to put `agentshell` on PATH.
 
@@ -279,9 +296,19 @@ roll back after a later validation failure. Uninstall removes only AgentShell's
 marketplace entry, plugin directory, cache directory, Dashboard process, and
 managed AGENTS policy block. The source checkout is left untouched.
 
+Install, update, and uninstall also migrate legacy AgentShell Dashboard launch
+jobs whose executable or working directory points into an old source checkout.
+The migration leaves unrelated launch jobs untouched. The v0.24-to-v0.25
+migration path is covered with preservation tests for user policy/profile content
+and precise cleanup tests for AgentShell-owned state.
+
 Later plugin distribution can add:
 
 - personal Codex marketplace entry
 - packaged release artifact
 - optional MCP server, kept lower priority than the local CLI/plugin flow until
   the primary contracts stabilize
+
+The GitHub v0.25 Release is not complete at the time of this local-candidate
+documentation update. Three fresh verified external-user tasks remain open; MCP
+work stays deferred while the local CLI/plugin path is validated.

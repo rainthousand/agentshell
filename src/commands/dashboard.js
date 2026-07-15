@@ -2,10 +2,12 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 
 import { metrics } from "./metrics.js";
 import { resolvePackageRoot } from "../core/package-root.js";
+import { readGlobalDashboardSnapshot } from "../core/dashboard-snapshot.js";
 
 const PROTOCOL_VERSION = "agentshell.dashboard.v1";
 const DEFAULT_PORT = 4317;
@@ -17,6 +19,8 @@ const ASSETS = new Map([
 ]);
 
 export async function startDashboard(root, options = {}) {
+  const instanceId = options.instanceId || crypto.randomUUID();
+  options = { ...options, instanceId };
   const singleton = options.singleton !== false;
   const runtime = runtimePaths(options);
   if (singleton) {
@@ -39,8 +43,10 @@ export async function startDashboard(root, options = {}) {
   const url = `http://127.0.0.1:${address.port}/`;
   const metadata = {
     pid: process.pid,
+    instanceId,
     root: path.resolve(root),
     version: pluginVersion(options),
+    globalService: options.globalService === true || process.env.AGENTSHELL_DASHBOARD_GLOBAL_SERVICE === "1",
     port: address.port,
     url,
     startedAt: new Date().toISOString()
@@ -53,7 +59,8 @@ export async function startDashboard(root, options = {}) {
     closed = true;
     await closeServer(server);
     if (singleton) releaseRuntime(runtime, process.pid);
-    if (isNativeSurface(launch.surface)) stopNativeWindows();
+    if (launch.stop) launch.stop();
+    else if (isNativeSurface(launch.surface)) stopNativeWindows();
   };
   if (singleton && options.monitorParent !== false) monitorParent(close);
 
@@ -63,7 +70,7 @@ export async function startDashboard(root, options = {}) {
 export async function dashboardStatus(options = {}) {
   const runtime = runtimePaths(options);
   const state = readJson(runtime.state);
-  const healthy = Boolean(state && isProcessAlive(state.pid) && await healthReady(state.url));
+  const healthy = Boolean(state && isProcessAlive(state.pid) && await healthReady(state.url, state.instanceId));
   return {
     ok: true,
     protocolVersion: "agentshell.dashboard-control.v1",
@@ -75,17 +82,29 @@ export async function dashboardStatus(options = {}) {
 export async function stopDashboard(options = {}) {
   const runtime = runtimePaths(options);
   const state = readJson(runtime.state);
+  let stopped = true;
+  let reason = null;
   if (state?.pid && state.pid !== process.pid && isProcessAlive(state.pid)) {
-    try { process.kill(state.pid, "SIGTERM"); } catch {}
-    await waitForExit(state.pid, 1500);
+    if (!await healthReady(state.url, state.instanceId)) {
+      stopped = false;
+      reason = "instance-unverified";
+    } else {
+      try { process.kill(state.pid, "SIGTERM"); } catch {}
+      await waitForExit(state.pid, 1500);
+      stopped = !isProcessAlive(state.pid);
+      if (!stopped) reason = "process-did-not-exit";
+    }
   }
-  releaseRuntime(runtime, state?.pid);
-  stopNativeWindows();
+  if (stopped) {
+    releaseRuntime(runtime, state?.pid);
+    stopNativeWindows();
+  }
   return {
-    ok: true,
+    ok: stopped,
     protocolVersion: "agentshell.dashboard-control.v1",
-    stopped: Boolean(state),
-    previousPid: state?.pid || null
+    stopped: Boolean(state) && stopped,
+    previousPid: state?.pid || null,
+    ...(reason ? { reason } : {})
   };
 }
 
@@ -122,6 +141,9 @@ function launchSurface(url, options) {
   const app = dashboardApp(options);
   if (["menubar", "window"].includes(preferred) && process.platform === "darwin" && fs.existsSync(app)) {
     stopNativeWindows();
+    if (process.env.AGENTSHELL_DASHBOARD_GLOBAL_SERVICE === "1") {
+      return launchManagedNativeApp(app, url, preferred === "window");
+    }
     const appArgs = [app, "--args", "--url", url];
     if (preferred === "window") appArgs.push("--show-window");
     const result = spawnSync("open", appArgs, {
@@ -133,6 +155,31 @@ function launchSurface(url, options) {
     opened: openUrl(url),
     surface: ["menubar", "window"].includes(preferred) ? "browser-fallback" : "browser"
   };
+}
+
+function launchManagedNativeApp(app, url, showWindow) {
+  const executable = path.join(app, "Contents", "MacOS", "AgentShellDashboard");
+  const args = ["--url", url, ...(showWindow ? ["--show-window"] : [])];
+  let stopping = false;
+  try {
+    const child = spawn(executable, args, { stdio: "ignore" });
+    child.once("error", () => {
+      if (!stopping) process.exit(1);
+    });
+    child.once("exit", (code, signal) => {
+      if (!stopping && (signal || code !== 0)) process.exit(1);
+    });
+    return {
+      opened: true,
+      surface: showWindow ? "desktop-window" : "menu-bar",
+      stop() {
+        stopping = true;
+        if (!child.killed) child.kill("SIGTERM");
+      }
+    };
+  } catch {
+    return { opened: false, surface: "browser-fallback" };
+  }
 }
 
 function isNativeSurface(surface) {
@@ -151,8 +198,8 @@ function runtimePaths(options) {
 
 async function reusableDashboard(root, runtime, options) {
   const state = readJson(runtime.state);
-  if (!state || state.root !== path.resolve(root) || state.version !== pluginVersion(options)) return null;
-  if (!isProcessAlive(state.pid) || !await healthReady(state.url)) return null;
+  if (!state || (!state.globalService && state.root !== path.resolve(root)) || state.version !== pluginVersion(options)) return null;
+  if (!isProcessAlive(state.pid) || !await healthReady(state.url, state.instanceId)) return null;
   return state;
 }
 
@@ -162,15 +209,29 @@ async function claimDashboard(root, runtime, options) {
     if (reusable) return reusable;
 
     const state = readJson(runtime.state);
-    if (state?.pid && state.pid !== process.pid && isProcessAlive(state.pid)) {
-      try { process.kill(state.pid, "SIGTERM"); } catch {}
-      await waitForExit(state.pid, 1500);
+    if (state?.pid && !isProcessAlive(state.pid)) {
+      const owner = readJson(runtime.lock);
       fs.rmSync(runtime.state, { force: true });
-      fs.rmSync(runtime.lock, { force: true });
+      if ((owner?.pid === state.pid && owner?.instanceId === state.instanceId) || lockIsStale(runtime.lock)) {
+        fs.rmSync(runtime.lock, { force: true });
+      }
+    }
+    if (state?.pid && state.pid !== process.pid && isProcessAlive(state.pid)) {
+      const owner = readJson(runtime.lock);
+      const owned = owner?.pid === state.pid && owner?.instanceId === state.instanceId;
+      if (owned) {
+        try { process.kill(state.pid, "SIGTERM"); } catch {}
+        await waitForExit(state.pid, 1500);
+        if (isProcessAlive(state.pid)) {
+          throw new Error("Existing AgentShell Dashboard did not stop; refusing to start a competing singleton");
+        }
+      }
+      fs.rmSync(runtime.state, { force: true });
+      if (owned || lockIsStale(runtime.lock)) fs.rmSync(runtime.lock, { force: true });
     }
 
     try {
-      acquireLock(runtime.lock);
+      acquireLock(runtime.lock, { pid: process.pid, instanceId: options.instanceId });
       return null;
     } catch (error) {
       if (error.code !== "EEXIST") throw error;
@@ -181,9 +242,9 @@ async function claimDashboard(root, runtime, options) {
   throw new Error("Dashboard singleton lock could not be acquired");
 }
 
-function acquireLock(file) {
+function acquireLock(file, owner) {
   const descriptor = fs.openSync(file, "wx", 0o600);
-  fs.writeFileSync(descriptor, `${process.pid}\n`);
+  fs.writeFileSync(descriptor, `${JSON.stringify(owner)}\n`);
   fs.closeSync(descriptor);
 }
 
@@ -223,11 +284,12 @@ function isProcessAlive(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
-async function healthReady(url) {
-  if (typeof url !== "string") return false;
+async function healthReady(url, instanceId) {
+  if (typeof url !== "string" || typeof instanceId !== "string") return false;
   try {
     const response = await fetch(new URL("/api/health", url), { signal: AbortSignal.timeout(500) });
-    return response.ok;
+    const payload = await response.json();
+    return response.ok && payload.instanceId === instanceId;
   } catch { return false; }
 }
 
@@ -266,18 +328,22 @@ function createServer(root, options) {
       const url = new URL(request.url || "/", "http://127.0.0.1");
       if (request.method !== "GET") return sendJson(response, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
       if (url.pathname === "/api/health") {
-        return sendJson(response, 200, { ok: true, protocolVersion: PROTOCOL_VERSION });
+        return sendJson(response, 200, { ok: true, protocolVersion: PROTOCOL_VERSION, instanceId: options.instanceId });
       }
       if (url.pathname === "/api/metrics") {
         const scope = url.searchParams.get("scope") || "global";
         if (!["global", "workspace"].includes(scope)) {
           return sendJson(response, 400, { ok: false, error: "INVALID_SCOPE", allowed: ["global", "workspace"] });
         }
-        const report = await metrics(root, {
-          compact: true,
-          limit: url.searchParams.get("limit") || 500,
-          scope
-        });
+        const managedGlobal = scope === "global"
+          && (options.globalService === true || process.env.AGENTSHELL_DASHBOARD_GLOBAL_SERVICE === "1");
+        const report = managedGlobal
+          ? readGlobalDashboardSnapshot({ home: options.home })
+          : await metrics(root, {
+            compact: true,
+            limit: url.searchParams.get("limit") || 500,
+            scope
+          });
         return sendJson(response, 200, {
           ...report,
           dashboard: { ...report.dashboard, scope }

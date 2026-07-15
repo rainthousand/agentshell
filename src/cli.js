@@ -29,10 +29,12 @@ import { fail, printJson } from "./core/output.js";
 import { appendEvent, appendRunCommandStats } from "./core/store.js";
 import { registerWorkspace } from "./core/workspace-registry.js";
 import { resolvePackageRoot } from "./core/package-root.js";
+import { writeDashboardSnapshot } from "./core/dashboard-snapshot.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
 const commandStartedAt = process.hrtime.bigint();
+let dashboardSnapshotRoot = null;
 
 async function main() {
   if (command === "--version" || command === "-v" || command === "version") {
@@ -60,7 +62,7 @@ async function main() {
         "agentshell trial status [--project <path>]",
         "agentshell trial export [--verify] [--project <path>] [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]",
         "agentshell dashboard [--port N] [--menubar|--window|--browser] [--daemon] [--no-open|--status|--stop]",
-        "agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--dry-run]",
+        "agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--home <path>] [--dry-run]",
         "agentshell understand [--compact]",
         "agentshell find <query>",
         "agentshell read <file> --lines A:B",
@@ -91,21 +93,26 @@ async function main() {
 
   if (command === "setup") {
     if (args[1] !== "codex") {
-      printJson(fail("INVALID_ARGUMENT", "Usage: agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--dry-run]"));
+      printJson(fail("INVALID_ARGUMENT", "Usage: agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--home <path>] [--dry-run]"));
       process.exitCode = 2;
       return;
     }
     const action = args[2] && !args[2].startsWith("--") ? args[2] : "install";
     const sourceFlag = args.indexOf("--source");
+    const homeFlag = args.indexOf("--home");
     let source;
+    let home;
     try {
+      if (sourceFlag >= 0 && (!args[sourceFlag + 1] || args[sourceFlag + 1].startsWith("--"))) throw new Error("--source requires a path");
+      if (homeFlag >= 0 && (!args[homeFlag + 1] || args[homeFlag + 1].startsWith("--"))) throw new Error("--home requires a path");
       source = sourceFlag >= 0 ? path.resolve(args[sourceFlag + 1]) : resolvePackageRoot();
+      home = homeFlag >= 0 ? path.resolve(args[homeFlag + 1]) : undefined;
     } catch (error) {
       printJson(fail("PACKAGE_ROOT_NOT_FOUND", error.message));
       process.exitCode = 1;
       return;
     }
-    const result = await setupCodex(action, { source, dryRun: args.includes("--dry-run") });
+    const result = await setupCodex(action, { source, home, dryRun: args.includes("--dry-run") });
     printJson(result);
     process.exitCode = result.ok ? 0 : 1;
     return;
@@ -430,6 +437,14 @@ async function main() {
 main().catch((error) => {
   emit(fail("UNEXPECTED_ERROR", error.message));
   process.exitCode = 1;
+}).finally(async () => {
+  if (!dashboardSnapshotRoot) return;
+  try {
+    const report = await metrics(dashboardSnapshotRoot, { compact: true, scope: "workspace" });
+    writeDashboardSnapshot(dashboardSnapshotRoot, report);
+  } catch {
+    // Dashboard telemetry must never change command behavior.
+  }
 });
 
 function emit(result) {
@@ -447,7 +462,10 @@ function emit(result) {
     const operationIds = operationIdsFor(result);
     if (operationIds.length > 0) event.operationIds = operationIds;
     appendEvent(process.cwd(), event);
-    if (shouldRegisterWorkspace(process.cwd())) registerWorkspace(process.cwd());
+    if (shouldRegisterWorkspace(process.cwd())) {
+      registerWorkspace(process.cwd());
+      dashboardSnapshotRoot = process.cwd();
+    }
     if (result.runId && command !== "run") {
       appendRunCommandStats(process.cwd(), result.runId, event);
     }
