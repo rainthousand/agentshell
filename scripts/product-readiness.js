@@ -64,6 +64,8 @@ const REQUIRED_FILES = [
   "scripts/prepare-test-standalone.js",
   "scripts/plugin-lifecycle.js",
   "scripts/security-scan.js",
+  "scripts/product-readiness.js",
+  "scripts/product-readiness-cli.js",
   "scripts/release-gate.js",
   "scripts/release-artifacts.js",
   "scripts/package-lifecycle-smoke.js",
@@ -471,7 +473,7 @@ function readText(projectRoot, relativePath) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
 }
 
-function renderMarkdown(report) {
+export function renderProductReadinessMarkdown(report) {
   const lines = [
     `# AgentShell Product Readiness`,
     "",
@@ -498,22 +500,22 @@ function parseArgs(argv) {
   };
 }
 
-const options = parseArgs(process.argv.slice(2));
-
-const mainFile = process.argv[1] ? path.resolve(process.argv[1]) : null;
-
-if (mainFile && path.basename(mainFile) === "product-readiness.js") {
+export function runProductReadinessCli(argv = process.argv.slice(2), io = {}) {
+  const options = parseArgs(argv);
+  const write = io.write || ((value) => process.stdout.write(value));
   if (options.help) {
-    console.log(JSON.stringify({
+    write(`${JSON.stringify({
       ok: true,
-      usage: "node scripts/product-readiness.js [--markdown] [--heavy] [--dry-run]"
-    }, null, 2));
-    process.exit(0);
+      usage: "node scripts/product-readiness-cli.js [--markdown] [--heavy] [--dry-run]"
+    }, null, 2)}\n`);
+    return 0;
   }
 
   const report = buildProductReadinessReport(root, options);
-  console.log(options.markdown ? renderMarkdown(report) : JSON.stringify(report, null, 2));
-  process.exit(report.ok ? 0 : 1);
+  write(options.markdown
+    ? renderProductReadinessMarkdown(report)
+    : `${JSON.stringify(report, null, 2)}\n`);
+  return report.ok ? 0 : 1;
 }
 
 function trim(text = "") {

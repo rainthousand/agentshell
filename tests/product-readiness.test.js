@@ -31,11 +31,11 @@ test("product readiness heavy dry run includes release candidate checks", () => 
 });
 
 test("product readiness CLI prints parseable JSON and markdown", () => {
-  const json = spawnSync("node", ["scripts/product-readiness.js"], {
+  const json = spawnSync("node", ["scripts/product-readiness-cli.js"], {
     cwd: process.cwd(),
     encoding: "utf8"
   });
-  const markdown = spawnSync("node", ["scripts/product-readiness.js", "--markdown"], {
+  const markdown = spawnSync("node", ["scripts/product-readiness-cli.js", "--markdown"], {
     cwd: process.cwd(),
     encoding: "utf8"
   });
