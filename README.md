@@ -57,7 +57,7 @@ Download the current public release:
 The matching checksum and release audit report are on the
 [V1.0 release page](https://github.com/rainthousand/agentshell/releases/tag/v1.0.0).
 
-Additional checked-in evidence: on the repair fixture suite,
+Additional checked-in evidence: on the checked-in repair fixture suite,
 `real-project-eval --mode fix-first --runs 3` passed **51/51** repeated repair
 runs with **262** estimated output tokens per repair run on average. Compared with
 running one full raw/split/fix matrix across the same checked-in fixtures, the
