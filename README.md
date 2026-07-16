@@ -50,6 +50,22 @@ need Node.js 20+ and the pinned release toolchain.
 
 Full guide: [docs/quickstart.md](docs/quickstart.md).
 
+### Install from the GitHub marketplace
+
+Codex users can install AgentShell directly from this public repository:
+
+```bash
+codex plugin marketplace add rainthousand/agentshell --ref main
+codex plugin add agentshell@agentshell
+```
+
+Quit and reopen Codex, then start a new task. To refresh the repository-backed
+marketplace later, run `codex plugin marketplace upgrade agentshell` before
+reinstalling or updating the plugin.
+
+The downloadable ZIP remains available for users who prefer the native
+double-click installer and managed menu-bar Dashboard.
+
 For a non-developer Codex user with a share package:
 
 1. Unzip it, if needed, and open the `agentshell-codex-plugin` folder.

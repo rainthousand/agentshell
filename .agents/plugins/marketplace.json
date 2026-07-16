@@ -1,0 +1,21 @@
+{
+  "name": "agentshell",
+  "interface": {
+    "displayName": "AgentShell"
+  },
+  "plugins": [
+    {
+      "name": "agentshell",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/rainthousand/agentshell.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -21,6 +21,21 @@ clean downloaded copies passed checksum and standalone version verification.
 
 ## Easiest Codex Install
 
+### GitHub marketplace
+
+Install the plugin directly from the public AgentShell repository:
+
+```bash
+codex plugin marketplace add rainthousand/agentshell --ref main
+codex plugin add agentshell@agentshell
+```
+
+Quit and reopen Codex, then start a new Codex task. Refresh the Git-backed
+marketplace with `codex plugin marketplace upgrade agentshell` when a new
+AgentShell version is available.
+
+### Downloaded package
+
 Download
 [`agentshell-codex-plugin.zip`](https://github.com/rainthousand/agentshell/releases/download/v1.0.0/agentshell-codex-plugin.zip)
 from the V1.0 release, or use a share package supplied by the publisher:
