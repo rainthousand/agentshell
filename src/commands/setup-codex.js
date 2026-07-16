@@ -13,6 +13,13 @@ import {
 } from "../core/dashboard-service.js";
 import { readRegisteredWorkspaces } from "../core/workspace-registry.js";
 import { writeDashboardSnapshot } from "../core/dashboard-snapshot.js";
+import {
+  acquireReleasePackage,
+  DEFAULT_RELEASE_CHANNEL,
+  DEFAULT_RELEASE_REPOSITORY,
+  normalizeReleaseChannel,
+  ReleaseChannelError
+} from "../core/release-channel.js";
 import { metrics } from "./metrics.js";
 
 export const SETUP_CODEX_PROTOCOL_VERSION = "agentshell.setup-codex.v1";
@@ -35,22 +42,73 @@ export async function setupCodex(action, options = {}) {
     });
   }
 
-  const paths = setupPaths(options);
-  const context = { ...options, paths };
+  let channel;
+  const requestedChannel = options.channel !== undefined
+    ? options.channel
+    : DEFAULT_RELEASE_CHANNEL;
   try {
+    channel = normalizeReleaseChannel(requestedChannel);
+  } catch (error) {
+    return report(false, action, { ...options, channel: requestedChannel }, {
+      release: {
+        ok: false,
+        status: "invalid-channel",
+        channel: requestedChannel || null,
+        source: "none",
+        checksumVerified: false,
+        dataUploaded: false
+      },
+      error: releaseError(error)
+    });
+  }
+
+  let prepared = null;
+  try {
+    const sourceMode = resolveSourceMode(action, options);
+    let source = options.source || process.cwd();
+    let release = sourceMode === "local"
+      ? localReleaseStatus(source, channel)
+      : plannedReleaseStatus(channel, options.repository);
+
+    if ((action === "install" || action === "update") && sourceMode === "remote" && !options.dryRun) {
+      const acquire = options.acquireRelease || acquireReleasePackage;
+      prepared = await acquire({
+        channel,
+        repository: options.repository || DEFAULT_RELEASE_REPOSITORY,
+        fetchImpl: options.fetchImpl,
+        githubToken: options.githubToken,
+        apiBase: options.apiBase,
+        temporaryDirectory: options.temporaryDirectory,
+        extractArchive: options.extractArchive,
+        runCommand: options.releaseRunCommand
+      });
+      source = prepared.source;
+      release = prepared.status;
+    }
+
+    const paths = setupPaths({ ...options, source });
+    const context = { ...options, source, sourceMode, channel, release, paths };
     if (action === "doctor") return await diagnose(context);
     if (action === "uninstall") return await remove(context);
     return await install(action, context);
   } catch (error) {
-    return report(false, action, options, {
-      error: { code: "SETUP_FAILED", message: error instanceof Error ? error.message : String(error) }
-    });
+    const details = {
+      error: error instanceof ReleaseChannelError
+        ? releaseError(error)
+        : { code: "SETUP_FAILED", message: error instanceof Error ? error.message : String(error) }
+    };
+    if (error instanceof ReleaseChannelError) {
+      details.release = { ...plannedReleaseStatus(channel, options.repository), ok: false, status: "failed" };
+    }
+    return report(false, action, { ...options, channel }, details);
+  } finally {
+    prepared?.cleanup?.();
   }
 }
 
 async function install(action, context) {
   const { paths, dryRun = false } = context;
-  if (!isFile(paths.sourceCli)) {
+  if (!dryRun && !isFile(paths.sourceCli)) {
     return report(false, action, context, {
       error: {
         code: "NATIVE_CLI_MISSING",
@@ -93,13 +151,16 @@ async function install(action, context) {
 
   const codex = await execute(context, "codex", ["plugin", "add", "agentshell@personal"]);
   if (!codex.ok) {
+    const rolledBack = rollbackPlugin({ home: paths.home, source: paths.source });
     return report(false, action, context, {
-      plugin: compactLifecycle(lifecycle),
+      plugin: compactLifecycle(rolledBack),
       codex,
+      rollback: { ok: Boolean(rolledBack.ok), status: rolledBack.rolledBack ? "restored" : "not-available" },
       error: { code: "CODEX_PLUGIN_ADD_FAILED", message: "Codex could not activate the AgentShell plugin." }
     });
   }
 
+  const previousPolicy = snapshotFile(paths.policy);
   const policy = installAgentPolicy(paths.policy);
   const previous = snapshotManagedCli(paths);
   const previousRecord = readRecord(paths.record);
@@ -110,12 +171,15 @@ async function install(action, context) {
     const validation = await execute(context, paths.installedCli, ["--version"]);
     if (!validation.ok) {
       restoreManagedCli(paths, previous);
+      restoreFileSnapshot(paths.policy, previousPolicy);
+      const rolledBack = rollbackPlugin({ home: paths.home, source: paths.source });
       return report(false, action, context, {
-        plugin: compactLifecycle(lifecycle),
+        plugin: compactLifecycle(rolledBack),
         codex,
         policy: compactPolicy(policy),
         nativeCli: { ok: false, status: "validation-failed", path: paths.installedCli },
         validation,
+        rollback: { ok: Boolean(rolledBack.ok), status: rolledBack.rolledBack ? "restored" : "not-available" },
         error: { code: "NATIVE_CLI_INVALID", message: "Installed AgentShell CLI failed its version check." }
       });
     }
@@ -129,6 +193,7 @@ async function install(action, context) {
     if (!dashboardService.ok) {
       rollbackCommandPath(commandPath);
       restoreManagedCli(paths, previous);
+      restoreFileSnapshot(paths.policy, previousPolicy);
       const rolledBack = rollbackPlugin({ home: paths.home, source: paths.source });
       return report(false, action, context, {
         plugin: compactLifecycle(rolledBack),
@@ -138,6 +203,7 @@ async function install(action, context) {
         commandPath: compactCommandPath(commandPath),
         dashboardService: compactDashboardService(dashboardService),
         validation,
+        rollback: { ok: Boolean(rolledBack.ok), status: rolledBack.rolledBack ? "restored" : "not-available" },
         error: { code: "DASHBOARD_SERVICE_FAILED", message: "The managed macOS Dashboard service could not be installed safely." }
       });
     }
@@ -147,7 +213,9 @@ async function install(action, context) {
       path: paths.installedCli,
       sha256: hash,
       ...(commandPath.record ? { pathProfile: commandPath.record } : {}),
-      ...(dashboardService.record ? { dashboardService: dashboardService.record } : {})
+      ...(dashboardService.record ? { dashboardService: dashboardService.record } : {}),
+      channel: context.channel,
+      release: context.release
     });
     return report(true, action, context, {
       plugin: compactLifecycle(lifecycle),
@@ -165,6 +233,8 @@ async function install(action, context) {
     }
     rollbackCommandPath(commandPath);
     restoreManagedCli(paths, previous);
+    restoreFileSnapshot(paths.policy, previousPolicy);
+    rollbackPlugin({ home: paths.home, source: paths.source });
     throw error;
   }
 }
@@ -256,7 +326,9 @@ async function diagnose(context) {
     },
     commandPath: compactCommandPath(commandPath),
     dashboardService: compactDashboardService(dashboardService),
-    codex
+    codex,
+    release: record?.release || context.release,
+    channel: record?.channel || context.channel
   });
 }
 
@@ -458,6 +530,20 @@ function snapshotManagedCli(paths) {
   return { content: fs.readFileSync(paths.installedCli), mode: fs.statSync(paths.installedCli).mode };
 }
 
+function snapshotFile(file) {
+  if (!isFile(file)) return null;
+  return { content: fs.readFileSync(file), mode: fs.statSync(file).mode };
+}
+
+function restoreFileSnapshot(file, snapshot) {
+  if (!snapshot) {
+    fs.rmSync(file, { force: true });
+    return;
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, snapshot.content, { mode: snapshot.mode });
+}
+
 function restoreManagedCli(paths, snapshot) {
   if (!snapshot) {
     fs.rmSync(paths.installedCli, { force: true });
@@ -556,6 +642,47 @@ function report(ok, action, options, details) {
     protocolVersion: SETUP_CODEX_PROTOCOL_VERSION,
     action,
     dryRun: Boolean(options.dryRun),
+    channel: Object.hasOwn(options, "channel") ? options.channel : DEFAULT_RELEASE_CHANNEL,
+    release: details.release || options.release || localReleaseStatus(options.source || process.cwd(), options.channel),
+    privacy: { dataUploaded: false, telemetry: "disabled" },
     ...details
+  };
+}
+
+function resolveSourceMode(action, options) {
+  if (action !== "install" && action !== "update") return "installed";
+  if (options.sourceMode === "local" || options.sourceMode === "remote") return options.sourceMode;
+  return options.source ? "local" : "remote";
+}
+
+function localReleaseStatus(source, channel = DEFAULT_RELEASE_CHANNEL) {
+  return {
+    ok: true,
+    status: "local-source",
+    channel: channel || DEFAULT_RELEASE_CHANNEL,
+    source: "local",
+    path: path.resolve(source || process.cwd()),
+    checksumVerified: false,
+    dataUploaded: false
+  };
+}
+
+function plannedReleaseStatus(channel, repository = DEFAULT_RELEASE_REPOSITORY) {
+  return {
+    ok: true,
+    status: "would-resolve",
+    channel,
+    source: "github-release",
+    repository: repository || DEFAULT_RELEASE_REPOSITORY,
+    checksumVerified: false,
+    dataUploaded: false
+  };
+}
+
+function releaseError(error) {
+  return {
+    code: error?.code || "SETUP_FAILED",
+    message: error instanceof Error ? error.message : String(error),
+    ...(error?.details && Object.keys(error.details).length > 0 ? { details: error.details } : {})
   };
 }

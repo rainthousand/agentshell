@@ -60,7 +60,8 @@ test("share package builds a real-user handoff directory without runtime state",
   assert.match(startHere, /check-install\.command/);
   assert.match(startHere, /agentshell trial export --verify --rating 5/);
   assert.match(startHere, /managed macOS menu-bar Dashboard/);
-  assert.match(startHere, /not a public plugin release/i);
+  assert.match(startHere, /AgentShell Core package/i);
+  assert.match(startHere, /SHA-256 checksum/i);
 
   const binMode = fs.statSync(path.join(packageDir, "bin", "agentshell")).mode;
   assert.notEqual(binMode & 0o111, 0, "bin/agentshell should remain executable");

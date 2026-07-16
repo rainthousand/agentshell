@@ -21,11 +21,45 @@ test("help returns command list as JSON", () => {
   assert.ok(output.commands.includes("agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]"));
   assert.ok(output.commands.includes("agentshell trial status [--project <path>]"));
   assert.ok(output.commands.includes("agentshell trial export [--verify] [--project <path>] [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]"));
+  assert.ok(output.commands.includes("agentshell support export --out <bundle.json|bundle.zip> [--format json|zip] [--dry-run]"));
   assert.ok(output.commands.includes("agentshell dashboard [--port N] [--menubar|--window|--browser] [--daemon] [--no-open|--status|--stop]"));
   assert.ok(output.commands.includes("agentshell manual [--full|--topic <repair|plugin|benchmark|profile|onboarding|log-triage|reference>]"));
   assert.ok(output.commands.includes("agentshell start [--compact] [--profile]"));
   assert.ok(output.commands.includes("agentshell entry [--compact] [--profile]"));
   assert.ok(output.commands.includes("agentshell fix test [--fast|--safe|--dry-run] [--compact] [--profile]"));
+});
+
+test("support export dry-run is available from the product CLI", () => {
+  const result = spawnSync("node", ["src/cli.js", "support", "export", "--dry-run"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.ok, true);
+  assert.equal(output.protocolVersion, "agentshell.support-bundle.v1");
+  assert.equal(output.privacy.userPathsIncluded, false);
+  assert.equal(output.artifact.written, false);
+});
+
+test("setup codex exposes explicit stable and beta release channels", () => {
+  const beta = spawnSync("node", ["src/cli.js", "setup", "codex", "update", "--channel", "beta", "--dry-run"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  assert.equal(beta.status, 0, beta.stderr);
+  const output = JSON.parse(beta.stdout);
+  assert.equal(output.ok, true);
+  assert.equal(output.channel, "beta");
+  assert.equal(output.release.status, "would-resolve");
+
+  const conflict = spawnSync("node", ["src/cli.js", "setup", "codex", "update", "--channel", "stable", "--source", ".", "--dry-run"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  assert.equal(conflict.status, 2);
+  assert.equal(JSON.parse(conflict.stdout).error.code, "INVALID_ARGUMENT");
 });
 
 test("version returns a machine-readable product version", () => {
@@ -37,7 +71,7 @@ test("version returns a machine-readable product version", () => {
   assert.equal(result.status, 0);
   const output = JSON.parse(result.stdout);
   assert.equal(output.protocolVersion, "agentshell.version.v1");
-  assert.equal(output.version, "0.25.3");
+  assert.equal(output.version, "1.0.0");
 });
 
 test("dashboard accepts only one explicit surface", () => {
@@ -153,7 +187,7 @@ test("node src/cli.js manual returns compact routing by default", () => {
   assert.equal(output.protocolVersion, "agentshell.manual.v1");
   assert.equal(output.compact, true);
   assert.equal(output.name, "AgentShell");
-  assert.equal(output.version, "0.25.3");
+  assert.equal(output.version, "1.0.0");
   assert.equal(output.firstPass.command, "agentshell start --compact");
   assert.ok(output.primaryCommands.some((entry) => entry.command === "agentshell fix test --fast --compact"));
   assert.ok(output.topics.some((entry) => entry.command === "agentshell manual --topic repair"));

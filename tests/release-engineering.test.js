@@ -272,6 +272,15 @@ test("release artifacts block malformed lifecycle output", () => {
   }), /Packaged install lifecycle smoke failed/);
 });
 
+test("core release workflow publishes audited assets without Apple credentials or installer packages", () => {
+  const release = fs.readFileSync(".github/workflows/release.yml", "utf8");
+  assert.doesNotMatch(release, /APPLE_DEVELOPER_ID|APPLE_NOTARY|notarize-release|stapler|\.pkg/u);
+  assert.match(release, /agentshell-codex-plugin\.zip\.sha256/u);
+  assert.match(release, /agentshell-darwin-arm64\.sha256/u);
+  assert.match(release, /release-report\.json/u);
+  assert.ok(release.indexOf("Verify release payload") < release.indexOf("gh release create"));
+});
+
 function run(script, env = {}) {
   const result = spawnSync("node", [script], {
     cwd: process.cwd(),

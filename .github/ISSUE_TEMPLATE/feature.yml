@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a focused improvement to the stable product
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the agent workflow cost or reliability problem, not only a preferred implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and expected impact
+      description: Include redacted token, command-count, speed, or failure evidence when available.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Product surface
+      options:
+        - Compact inspection
+        - Diagnose or repair
+        - Verification
+        - Install or update
+        - Metrics or Dashboard
+        - Codex plugin guidance
+    validations:
+      required: true

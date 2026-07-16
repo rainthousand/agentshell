@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { setupCodex } from "../src/commands/setup-codex.js";
+import { acquireReleasePackage, ReleaseChannelError } from "../src/core/release-channel.js";
 import { registerWorkspace } from "../src/core/workspace-registry.js";
 
 test("setupCodex installs plugin, policy, and native CLI without node or npm", async () => {
@@ -33,6 +34,9 @@ test("setupCodex installs plugin, policy, and native CLI without node or npm", a
   const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
   assert.equal(record.path, installed);
   assert.equal(record.sha256, hash(installed));
+  assert.equal(record.channel, "stable");
+  assert.equal(record.release.status, "local-source");
+  assert.equal(result.privacy.dataUploaded, false);
   assert.equal(record.pathProfile.path, path.join(fixture.home, ".zprofile"));
   assert.equal(result.commandPath.status, "profile-updated");
   assert.equal(result.commandPath.fallbackCommand, installed);
@@ -99,7 +103,92 @@ test("setupCodex restores an existing CLI when version validation fails", async 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "NATIVE_CLI_INVALID");
   assert.equal(fs.readFileSync(installed, "utf8"), "existing-cli");
+  assert.equal(fs.existsSync(path.join(fixture.home, "plugins", "agentshell")), false);
+  assert.equal(fs.existsSync(path.join(fixture.home, ".codex", "AGENTS.md")), false);
   assert.equal(fs.existsSync(path.join(fixture.home, ".agentshell", "standalone-install.json")), false);
+});
+
+test("setupCodex installs a verified stable release and records its channel", async () => {
+  const fixture = makeFixture();
+  let cleaned = false;
+  const result = await setupCodex("update", {
+    ...fixture,
+    sourceMode: "remote",
+    channel: "stable",
+    acquireRelease: async () => ({
+      source: fixture.source,
+      cleanup: () => { cleaned = true; },
+      status: {
+        ok: true,
+        status: "verified",
+        channel: "stable",
+        source: "github-release",
+        repository: "rainthousand/agentshell",
+        tag: "v1.0.0",
+        version: "1.0.0",
+        checksumVerified: true,
+        sha256: "a".repeat(64),
+        dataUploaded: false
+      }
+    }),
+    runCommand: successfulRunner([])
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.release.checksumVerified, true);
+  assert.equal(result.channel, "stable");
+  assert.equal(cleaned, true);
+  const record = JSON.parse(fs.readFileSync(path.join(fixture.home, ".agentshell", "standalone-install.json"), "utf8"));
+  assert.equal(record.release.version, "1.0.0");
+  assert.equal(record.channel, "stable");
+});
+
+test("release channel verifies checksums before exposing a package", async () => {
+  const archive = Buffer.from("verified archive bytes");
+  const checksum = crypto.createHash("sha256").update(archive).digest("hex");
+  const fetchImpl = releaseFetch({ archive, checksum });
+  const acquired = await acquireReleasePackage({
+    channel: "stable",
+    fetchImpl,
+    extractArchive: async (_file, destination) => createExtractedPackage(destination, "1.0.0")
+  });
+
+  assert.equal(acquired.status.version, "1.0.0");
+  assert.equal(acquired.status.checksumVerified, true);
+  assert.equal(acquired.status.dataUploaded, false);
+  assert.equal(fs.existsSync(acquired.source), true);
+  const temporaryRoot = path.dirname(path.dirname(acquired.source));
+  acquired.cleanup();
+  assert.equal(fs.existsSync(temporaryRoot), false);
+});
+
+test("release channel rejects a checksum mismatch before extraction", async () => {
+  let extracted = false;
+  await assert.rejects(
+    acquireReleasePackage({
+      channel: "stable",
+      fetchImpl: releaseFetch({ archive: Buffer.from("tampered"), checksum: "0".repeat(64) }),
+      extractArchive: async () => { extracted = true; }
+    }),
+    (error) => error instanceof ReleaseChannelError && error.code === "RELEASE_CHECKSUM_MISMATCH"
+  );
+  assert.equal(extracted, false);
+});
+
+test("release channel rejects symbolic links in an extracted package", async () => {
+  const archive = Buffer.from("archive with symbolic link");
+  const checksum = crypto.createHash("sha256").update(archive).digest("hex");
+  await assert.rejects(
+    acquireReleasePackage({
+      channel: "stable",
+      fetchImpl: releaseFetch({ archive, checksum }),
+      extractArchive: async (_file, destination) => {
+        createExtractedPackage(destination, "1.0.0");
+        fs.symlinkSync("/tmp", path.join(destination, "agentshell-codex-plugin", "unsafe-link"));
+      }
+    }),
+    (error) => error instanceof ReleaseChannelError && error.code === "RELEASE_ARCHIVE_UNSAFE"
+  );
 });
 
 test("setupCodex uninstall removes only a CLI matching its managed hash", async () => {
@@ -345,4 +434,49 @@ function launchctlCalls(calls) {
 
 function hash(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+function releaseFetch({ archive, checksum }) {
+  return async (url, request) => {
+    assert.equal(request.method, "GET");
+    if (url.endsWith("/releases/latest")) {
+      return jsonResponse({
+        tag_name: "v1.0.0",
+        draft: false,
+        prerelease: false,
+        assets: [
+          { name: "agentshell-codex-plugin.zip", url: "https://api.example/assets/plugin" },
+          { name: "agentshell-codex-plugin.zip.sha256", url: "https://api.example/assets/checksum" }
+        ]
+      });
+    }
+    if (url.endsWith("/checksum")) return textResponse(`${checksum}  agentshell-codex-plugin.zip\n`);
+    if (url.endsWith("/plugin")) return bytesResponse(archive);
+    throw new Error(`unexpected URL: ${url}`);
+  };
+}
+
+function createExtractedPackage(destination, version) {
+  const source = path.join(destination, "agentshell-codex-plugin");
+  fs.mkdirSync(path.join(source, ".codex-plugin"), { recursive: true });
+  fs.mkdirSync(path.join(source, "bin"), { recursive: true });
+  fs.writeFileSync(path.join(source, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "agentshell", version }));
+  fs.writeFileSync(path.join(source, "bin", "agentshell-darwin-arm64"), "native", { mode: 0o755 });
+}
+
+function jsonResponse(value) {
+  return { ok: true, status: 200, headers: new Map(), json: async () => value };
+}
+
+function textResponse(value) {
+  return { ok: true, status: 200, headers: new Map(), text: async () => value };
+}
+
+function bytesResponse(value) {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Map([["content-length", String(value.length)]]),
+    arrayBuffer: async () => value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
+  };
 }

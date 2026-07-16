@@ -14,7 +14,7 @@ function compactManual() {
     protocolVersion: PROTOCOL_VERSION,
     compact: true,
     name: "AgentShell",
-    version: "0.25.3",
+    version: "1.0.0",
     purpose: "Structured local execution for AI coding agents with compact JSON output, task-level run status, hash-checked edits, and undo.",
     firstPass: {
       command: "agentshell start --compact",
@@ -195,7 +195,7 @@ function topicManual(topic) {
     protocolVersion: PROTOCOL_VERSION,
     compact: true,
     name: "AgentShell",
-    version: "0.25.3",
+    version: "1.0.0",
     topic,
     ...payload,
     full: "agentshell manual --full"
@@ -208,7 +208,7 @@ function fullManual() {
     protocolVersion: PROTOCOL_VERSION,
     compact: false,
     name: "AgentShell",
-    version: "0.25.3",
+    version: "1.0.0",
     purpose: "Structured local execution for AI coding agents with compact JSON output, task-level run status, hash-checked edits, and undo.",
     commandMap: [
       {

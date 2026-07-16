@@ -125,7 +125,7 @@ test("dashboard serves local read-only UI and metrics with security headers", as
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
     assert.match(html, /AgentShell Dashboard/);
-    assert.match(html, /Verified tokens saved/);
+    assert.match(html, /Verified context saved/);
     assert.match(html, /Verified time saved/);
 
     const api = await fetch(new URL("/api/metrics", session.report.url));

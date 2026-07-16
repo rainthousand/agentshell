@@ -267,13 +267,14 @@ export function writeZip(outDir, packageName, zipPath) {
 function renderStartHere(packageName) {
   return `# AgentShell Share Package
 
-This folder is a local AgentShell share package for Codex users. It is not a public plugin release.
+This folder contains the AgentShell Core package for Codex users. Official
+release copies are accompanied by a SHA-256 checksum and release audit report.
 
 ## Install For Codex
 
 Requirements:
 
-- Apple silicon Mac (the current Beta build target)
+- Apple silicon Mac (the V1.0 Core build target)
 - Codex CLI available on PATH
 
 Easiest path on macOS:

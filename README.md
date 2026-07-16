@@ -18,7 +18,9 @@ Use it when raw shell output is wasting context. AgentShell is built for:
 
 Start here: [Quickstart](docs/quickstart.md). For a PM-friendly product summary,
 see [Product Status](docs/product-status-pm.html). For scope, freeze criteria,
-and fallback behavior, see [Product Boundary](docs/product-boundary.md).
+and fallback behavior, see [Product Boundary](docs/product-boundary.md). Stable
+release details are in [V1.0 Release Notes](docs/release-notes-v1.0.md), with
+security reporting covered by [SECURITY.md](SECURITY.md).
 
 Latest local evidence in this tree: `agentshell verify test` reduced default
 test-output context by about **94%** versus raw `npm test` on the noisy demo.
@@ -37,7 +39,9 @@ See [Benchmarks](#benchmarks).
 
 ## Quick Start
 
-Requires Node.js 20+.
+The V1.0 release package includes a native Apple Silicon CLI. End users do not
+need Node.js, npm, Bun, or a source checkout. Maintainers building from source
+need Node.js 20+ and the pinned release toolchain.
 
 Full guide: [docs/quickstart.md](docs/quickstart.md).
 
@@ -47,7 +51,7 @@ For a non-developer Codex user with a share package:
 2. Double-click `install.command`. If Terminal is easier, run:
 
    ```bash
-   npm run install:codex
+   ./install.command
    ```
 
 3. Quit and reopen Codex, then start a new Codex thread.
@@ -65,15 +69,16 @@ To preview the exact install sequence without changing files, links, or Codex
 settings:
 
 ```bash
-npm run install:codex -- --dry-run
+agentshell setup codex install --channel stable --dry-run
 ```
 
 Lifecycle commands are symmetric and rollback-aware:
 
 ```bash
-npm run update:codex
-npm run doctor:codex
-npm run uninstall:codex
+agentshell setup codex update --channel stable
+agentshell setup codex doctor
+agentshell setup codex uninstall
+agentshell support export --out agentshell-support.zip
 ```
 
 Install and update stage a complete copy before swapping it into place, retain up
@@ -110,7 +115,7 @@ agentshell fix test --safe --compact
 agentshell fix test --fast --compact
 ```
 
-The v0.25 managed installer adds `~/.local/bin` to supported shell profiles when
+The V1.0 managed installer adds `~/.local/bin` to supported shell profiles when
 needed. Until a new shell is opened, or when working without the installer, use
 `node src/cli.js <command>` from this checkout or `bin/agentshell <command>` from
 a source/plugin-cache checkout.
@@ -266,7 +271,7 @@ coverage, Codex plugin trial scoring, and strategy intake. Use
 [Product Boundary](docs/product-boundary.md) as the freeze/scope contract for
 v0.25 and the v1.0 bar. MCP remains deferred and non-blocking for this phase.
 
-The current candidate is `0.25.3+codex.20260716020843`. The source has been
+The current V1 candidate is `1.0.0+codex.20260716102207`. The source has been
 imported into Git and pushed to its private GitHub repository. Local release
 artifacts, the share ZIP, checksum verification, archive integrity, and the
 isolated-HOME packaged lifecycle smoke are complete. GitHub Release `v0.25.3`
@@ -275,9 +280,16 @@ been verified. Three fresh verified
 tasks from external users are no longer a release requirement. External trial
 exports remain available as an optional post-release learning channel.
 
+V1.0 is a Core GitHub/Codex plugin release. Its published assets are the source,
+Codex plugin ZIP, standalone CLI, SHA-256 checksums, and release audit report.
+It does not publish a native PKG or use App Store distribution, and therefore
+does not require Apple Developer credentials. The standalone CLI and optional
+menu-bar Dashboard are not represented as Apple-notarized software; a signed
+Desktop release is deferred.
+
 ## Share Package
 
-For a real-user handoff without publishing a plugin, create a local share
+For a local real-user handoff or release-candidate inspection, create a share
 package:
 
 ```bash
@@ -308,7 +320,7 @@ the pinned toolchain, then publish the executable, checksums, plugin ZIP, and
 release report as GitHub Release Assets.
 
 The latest local Dashboard snapshot covers 30 registered workspaces and reports
-351,219 verified tokens saved, 12.371 seconds of verified time saved, and 83%
+351,219 verified context tokens avoided, 12.371 seconds of verified time saved, and 83%
 exact attribution. These are point-in-time measurements from this development
 machine, not a general performance promise or full Codex session accounting.
 

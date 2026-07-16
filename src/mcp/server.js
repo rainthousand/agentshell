@@ -143,7 +143,7 @@ export async function handleRequest(message, options = {}) {
         },
         serverInfo: {
           name: "agentshell-mcp",
-          version: "0.25.3"
+          version: "1.0.0"
         }
       });
     }

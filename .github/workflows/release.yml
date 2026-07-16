@@ -50,6 +50,7 @@ jobs:
             --bun 1.2.20
           npm run plugin:smoke -- --path artifacts/release/agentshell-codex-plugin
           artifacts/release/agentshell-darwin-arm64 --version
+          codesign --verify --strict --verbose=2 artifacts/release/agentshell-darwin-arm64
       - name: Upload audited release artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -65,12 +66,14 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "${GITHUB_REF_NAME}"
-          artifacts/release/agentshell-darwin-arm64
-          artifacts/release/agentshell-darwin-arm64.sha256
-          artifacts/release/agentshell-codex-plugin.zip
-          artifacts/release/agentshell-codex-plugin.zip.sha256
-          artifacts/release/release-report.json
-          --title "AgentShell ${GITHUB_REF_NAME}"
-          --generate-notes
+        run: |
+          assets=(
+            artifacts/release/agentshell-darwin-arm64
+            artifacts/release/agentshell-darwin-arm64.sha256
+            artifacts/release/agentshell-codex-plugin.zip
+            artifacts/release/agentshell-codex-plugin.zip.sha256
+            artifacts/release/release-report.json
+          )
+          gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
+            --title "AgentShell ${GITHUB_REF_NAME}" \
+            --generate-notes

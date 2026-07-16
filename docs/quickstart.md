@@ -4,13 +4,16 @@ This guide gets a local user from zero to a useful AgentShell run in about 5-10 
 
 ## Requirements
 
-- Node.js 20+
-- A local checkout of AgentShell
-- A project with a `package.json` test script if you want to try AgentShell outside the bundled demos
+- macOS 13+ on Apple Silicon
+- Codex desktop or CLI with local plugin support
+- A project with a `package.json` test script for managed test repair
+
+The release package includes the native CLI. Node.js 20+, Bun, npm, and a source
+checkout are maintainer build requirements, not end-user requirements.
 
 AgentShell runs locally. The core CLI does not need a service or API key.
 
-The current candidate is `0.25.3+codex.20260716020843`. Its local share ZIP and
+The current V1 candidate is `1.0.0+codex.20260716102207`. Its local share ZIP and
 packaged install/update/doctor/uninstall flow have been verified. GitHub Release
 `v0.25.3` contains the standalone binary, plugin ZIP, checksums, and audit report;
 clean downloaded copies passed checksum and standalone version verification.
@@ -23,7 +26,7 @@ If you received an AgentShell share package:
 2. Double-click `install.command`. If you prefer Terminal, run:
 
    ```bash
-   npm run install:codex
+   ./install.command
    ```
 
 3. Quit and reopen Codex, then start a new Codex thread.
@@ -37,15 +40,16 @@ there is no separate Dashboard startup step.
 To preview the same steps without changing anything, run:
 
 ```bash
-npm run install:codex -- --dry-run
+./bin/agentshell-darwin-arm64 setup codex install --source "$PWD" --dry-run
 ```
 
 Update, diagnose, or remove only AgentShell-managed state with:
 
 ```bash
-npm run update:codex
-npm run doctor:codex
-npm run uninstall:codex
+agentshell setup codex update --channel stable
+agentshell setup codex doctor
+agentshell setup codex uninstall
+agentshell support export --out agentshell-support.zip
 ```
 
 The share package exposes the same actions through `update.command`,
@@ -58,8 +62,7 @@ rerunning with `--skip-link`, or retrying only the AgentShell policy step.
 ## For A Shared Folder
 
 The share package is meant for local handoff: unzip, double-click
-`install.command` or run `npm run install:codex`, restart Codex, then verify in a
-new Codex thread.
+`install.command`, restart Codex, then verify in a new Codex thread.
 
 The sender can create that folder or zip without publishing a plugin:
 

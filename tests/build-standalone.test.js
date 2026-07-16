@@ -12,7 +12,8 @@ import {
   assertSeaBundleCompatibility,
   buildStandalone,
   evaluateReleaseToolchain,
-  parseBuildStandaloneArgs
+  parseBuildStandaloneArgs,
+  resolveSigningConfiguration
 } from "../scripts/build-standalone.js";
 
 test("standalone bundle compatibility rejects Node 20 CJS hazards", () => {
@@ -44,11 +45,54 @@ test("standalone dry run describes the macOS arm64 artifact and smoke checks", (
     assert.equal(result.runtimeDependency, false);
     assert.equal(result.toolchain.enforcement, "informational");
     assert.equal(result.toolchain.actual.bunVersion, null);
-    assert.deepEqual(result.signing, { identity: "ad-hoc", status: "planned" });
+    assert.deepEqual(result.signing, {
+      identity: "ad-hoc",
+      status: "planned",
+      hardenedRuntime: false,
+      timestamp: false
+    });
     assert.equal(result.build.args.includes("--target=node"), true);
     assert.equal(result.build.args.includes("--format=cjs"), true);
     assert.deepEqual(result.build.args.slice(-2), ["--outfile", "<temporary>/agentshell.cjs"]);
     assert.deepEqual(result.smokeChecks.map((check) => check.name), ["version", "schema-list", "plugin-status"]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("standalone signing defaults to ad-hoc and opts into hardened Developer ID signing", () => {
+  assert.deepEqual(resolveSigningConfiguration({}), {
+    identity: "ad-hoc",
+    codesignIdentity: "-",
+    hardenedRuntime: false,
+    timestamp: false
+  });
+  assert.deepEqual(resolveSigningConfiguration({
+    AGENTSHELL_CODESIGN_IDENTITY: "Developer ID Application: AgentShell (TEAM123)"
+  }), {
+    identity: "Developer ID Application: AgentShell (TEAM123)",
+    codesignIdentity: "Developer ID Application: AgentShell (TEAM123)",
+    hardenedRuntime: true,
+    timestamp: true
+  });
+});
+
+test("standalone dry run reports planned Developer ID release signing", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-signing-test-"));
+  try {
+    const identity = "Developer ID Application: AgentShell (TEAM123)";
+    const result = buildStandalone({ dryRun: true }, {
+      root,
+      platform: "darwin",
+      arch: "arm64",
+      env: { AGENTSHELL_CODESIGN_IDENTITY: identity }
+    });
+    assert.deepEqual(result.signing, {
+      identity,
+      status: "planned",
+      hardenedRuntime: true,
+      timestamp: true
+    });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

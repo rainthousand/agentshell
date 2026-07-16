@@ -4,6 +4,12 @@ All notable changes to AgentShell are documented here.
 
 ## Unreleased
 
+## 1.0.0 - 2026-07-16
+
+- Freeze the first stable local CLI and Codex plugin product contract.
+- Define a checksum-verified Core release path that does not require Apple credentials; defer native PKG and App Store distribution.
+- Add stable-channel installation, atomic upgrades, clean-machine acceptance, and privacy-safe support diagnostics.
+
 ## 0.25.3 - 2026-07-16
 
 - Remove a redundant schema subprocess assertion from the run-status integration test; the same schema contract remains covered by the CLI schema smoke suite.

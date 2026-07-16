@@ -36,6 +36,24 @@ export function parseBuildStandaloneArgs(args) {
   return options;
 }
 
+export function resolveSigningConfiguration(environment = process.env) {
+  const identity = String(environment.AGENTSHELL_CODESIGN_IDENTITY || "").trim();
+  if (!identity) {
+    return {
+      identity: "ad-hoc",
+      codesignIdentity: "-",
+      hardenedRuntime: false,
+      timestamp: false
+    };
+  }
+  return {
+    identity,
+    codesignIdentity: identity,
+    hardenedRuntime: true,
+    timestamp: true
+  };
+}
+
 export function buildStandalone(options = {}, dependencies = {}) {
   const platform = dependencies.platform || process.platform;
   const arch = dependencies.arch || process.arch;
@@ -45,6 +63,7 @@ export function buildStandalone(options = {}, dependencies = {}) {
   const target = `${platform}-${arch}`;
   const output = path.resolve(packageRoot, options.out || path.join("bin", `agentshell-${target}`));
   const entitlements = path.join(packageRoot, "desktop", "macos", "AgentShellCLI.entitlements");
+  const signing = resolveSigningConfiguration(dependencies.env || process.env);
 
   if (platform !== "darwin" || arch !== "arm64") {
     throw new Error(`Unsupported standalone target: ${target}. AgentShell currently builds standalone releases for macOS arm64 only.`);
@@ -74,7 +93,12 @@ export function buildStandalone(options = {}, dependencies = {}) {
       runtimeDependency: false,
       toolchain: evaluateReleaseToolchain({ nodeVersion, bunVersion: null }, { enforce: false }),
       build: bundleCommand,
-      signing: { identity: "ad-hoc", status: "planned" },
+      signing: {
+        identity: signing.identity,
+        status: "planned",
+        hardenedRuntime: signing.hardenedRuntime,
+        timestamp: signing.timestamp
+      },
       smokeChecks: plannedSmokeChecks()
     };
   }
@@ -117,8 +141,15 @@ export function buildStandalone(options = {}, dependencies = {}) {
       "--sentinel-fuse", "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
       "--macho-segment-name", "NODE_SEA"
     ], { cwd: packageRoot }), "postject failed to inject the Node SEA blob.");
-    ensureSucceeded(run("codesign", ["--force", "--deep", "--sign", "-", "--entitlements", entitlements, output], { cwd: packageRoot }), "macOS ad-hoc signing failed for the standalone binary.");
-    ensureSucceeded(run("codesign", ["--verify", "--strict", output], { cwd: packageRoot }), "macOS rejected the standalone binary signature.");
+    const signingArgs = ["--force", "--sign", signing.codesignIdentity];
+    if (signing.timestamp) signingArgs.push("--timestamp");
+    if (signing.hardenedRuntime) signingArgs.push("--options", "runtime");
+    signingArgs.push("--entitlements", entitlements, output);
+    ensureSucceeded(
+      run("codesign", signingArgs, { cwd: packageRoot }),
+      `macOS ${signing.identity === "ad-hoc" ? "ad-hoc" : "Developer ID"} signing failed for the standalone binary.`
+    );
+    ensureSucceeded(run("codesign", ["--verify", "--strict", "--verbose=2", output], { cwd: packageRoot }), "macOS rejected the standalone binary signature.");
   } catch (error) {
     fs.rmSync(output, { force: true });
     throw error;
@@ -144,7 +175,13 @@ export function buildStandalone(options = {}, dependencies = {}) {
     bytes: artifact.byteLength,
     sha256: crypto.createHash("sha256").update(artifact).digest("hex"),
     runtimeDependency: false,
-    signing: { identity: "ad-hoc", status: "signed", verified: true },
+    signing: {
+      identity: signing.identity,
+      status: "signed",
+      verified: true,
+      hardenedRuntime: signing.hardenedRuntime,
+      timestamp: signing.timestamp
+    },
     builder: {
       bundler: "bun",
       bunVersion: toolchain.actual.bunVersion,

@@ -30,6 +30,7 @@ import { appendEvent, appendRunCommandStats } from "./core/store.js";
 import { registerWorkspace } from "./core/workspace-registry.js";
 import { resolvePackageRoot } from "./core/package-root.js";
 import { writeDashboardSnapshot } from "./core/dashboard-snapshot.js";
+import { createSupportBundle } from "./core/support-bundle.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -42,7 +43,7 @@ async function main() {
       ok: true,
       protocolVersion: "agentshell.version.v1",
       name: "agentshell",
-      version: "0.25.3"
+      version: "1.0.0"
     });
     return;
   }
@@ -50,7 +51,7 @@ async function main() {
     printJson({
       ok: true,
       name: "agentshell",
-      version: "0.25.3",
+      version: "1.0.0",
       commands: [
         "agentshell --version",
         "agentshell manual [--full|--topic <repair|plugin|benchmark|profile|onboarding|log-triage|reference>]",
@@ -61,8 +62,9 @@ async function main() {
         "agentshell plugin validate [--compact] [--source-only] [--profile] [--home <home>] [--marketplace <path>] [--cache-root <path>]",
         "agentshell trial status [--project <path>]",
         "agentshell trial export [--verify] [--project <path>] [--out <file>] [--id <label>] [--fixture <label>] [--rating 1-5]",
+        "agentshell support export --out <bundle.json|bundle.zip> [--format json|zip] [--dry-run]",
         "agentshell dashboard [--port N] [--menubar|--window|--browser] [--daemon] [--no-open|--status|--stop]",
-        "agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--home <path>] [--dry-run]",
+        "agentshell setup codex [install|update|uninstall|doctor] [--channel stable|beta|--source <package>] [--home <path>] [--dry-run]",
         "agentshell understand [--compact]",
         "agentshell find <query>",
         "agentshell read <file> --lines A:B",
@@ -93,26 +95,37 @@ async function main() {
 
   if (command === "setup") {
     if (args[1] !== "codex") {
-      printJson(fail("INVALID_ARGUMENT", "Usage: agentshell setup codex [install|update|uninstall|doctor] [--source <package>] [--home <path>] [--dry-run]"));
+      printJson(fail("INVALID_ARGUMENT", "Usage: agentshell setup codex [install|update|uninstall|doctor] [--channel stable|beta|--source <package>] [--home <path>] [--dry-run]"));
       process.exitCode = 2;
       return;
     }
     const action = args[2] && !args[2].startsWith("--") ? args[2] : "install";
     const sourceFlag = args.indexOf("--source");
+    const channelFlag = args.indexOf("--channel");
     const homeFlag = args.indexOf("--home");
     let source;
+    let channel;
     let home;
     try {
       if (sourceFlag >= 0 && (!args[sourceFlag + 1] || args[sourceFlag + 1].startsWith("--"))) throw new Error("--source requires a path");
+      if (channelFlag >= 0 && (!args[channelFlag + 1] || args[channelFlag + 1].startsWith("--"))) throw new Error("--channel requires stable or beta");
       if (homeFlag >= 0 && (!args[homeFlag + 1] || args[homeFlag + 1].startsWith("--"))) throw new Error("--home requires a path");
-      source = sourceFlag >= 0 ? path.resolve(args[sourceFlag + 1]) : resolvePackageRoot();
+      if (sourceFlag >= 0 && channelFlag >= 0) throw new Error("--source and --channel cannot be used together");
+      source = sourceFlag >= 0 ? path.resolve(args[sourceFlag + 1]) : undefined;
+      channel = channelFlag >= 0 ? args[channelFlag + 1] : undefined;
       home = homeFlag >= 0 ? path.resolve(args[homeFlag + 1]) : undefined;
     } catch (error) {
-      printJson(fail("PACKAGE_ROOT_NOT_FOUND", error.message));
-      process.exitCode = 1;
+      printJson(fail("INVALID_ARGUMENT", error.message));
+      process.exitCode = 2;
       return;
     }
-    const result = await setupCodex(action, { source, home, dryRun: args.includes("--dry-run") });
+    const result = await setupCodex(action, {
+      source,
+      sourceMode: source ? "local" : "remote",
+      channel,
+      home,
+      dryRun: args.includes("--dry-run")
+    });
     printJson(result);
     process.exitCode = result.ok ? 0 : 1;
     return;
@@ -128,6 +141,27 @@ async function main() {
     const result = await manual(options.value);
     emit(result);
     process.exitCode = result.ok ? 0 : 2;
+    return;
+  }
+
+  if (command === "support") {
+    if (args[1] !== "export") {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell support export --out <bundle.json|bundle.zip> [--format json|zip] [--dry-run]"));
+      process.exitCode = 2;
+      return;
+    }
+    try {
+      const options = parseSupportOptions(args.slice(2));
+      emit(createSupportBundle({
+        packageDir: resolvePackageRoot(),
+        output: options.output,
+        format: options.format,
+        dryRun: options.dryRun
+      }));
+    } catch (error) {
+      emit(fail(error.code || "SUPPORT_BUNDLE_FAILED", error.message));
+      process.exitCode = 1;
+    }
     return;
   }
 
@@ -557,6 +591,38 @@ function parseManualOptions(argv) {
     return fail("INVALID_ARGUMENT", "Choose either --full or --topic, not both");
   }
   return { ok: true, value: options };
+}
+
+function parseSupportOptions(argv) {
+  const options = { output: null, format: null, dryRun: false };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--out" || arg === "--format") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) {
+        const error = new Error(`${arg} requires a value`);
+        error.code = "INVALID_ARGUMENT";
+        throw error;
+      }
+      if (arg === "--out") options.output = path.resolve(value);
+      else options.format = value;
+      index += 1;
+      continue;
+    }
+    if (arg === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
+    const error = new Error(`Unknown support argument: ${arg}`);
+    error.code = "INVALID_ARGUMENT";
+    throw error;
+  }
+  if (!options.output && !options.dryRun) {
+    const error = new Error("--out is required unless --dry-run is used");
+    error.code = "OUTPUT_REQUIRED";
+    throw error;
+  }
+  return options;
 }
 
 function parsePluginStatusOptions(argv) {

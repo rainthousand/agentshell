@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
+import { setupCodex } from "../src/commands/setup-codex.js";
+import { DEFAULT_RELEASE_CHANNEL, normalizeReleaseChannel } from "../src/core/release-channel.js";
+
 const root = path.resolve(import.meta.dirname, "..");
-const manifestPath = path.join(root, ".codex-plugin", "plugin.json");
 
 let args;
 try {
@@ -23,36 +24,43 @@ if (args.help) {
     "  npm run update:codex",
     "  npm run uninstall:codex",
     "  npm run doctor:codex",
-    "  node scripts/install-for-codex-user.js [--action install|update|uninstall|doctor] [--dry-run] [--skip-link] [--json]",
+    "  node scripts/install-for-codex-user.js [--action install|update|uninstall|doctor] [--channel stable|beta] [--source <package>] [--dry-run] [--json]",
     "",
-    "Install and update use atomic staging, retain three backups, and roll back when post-install validation fails.",
+    "Stable is the default channel. Release downloads are SHA-256 verified, atomically installed, and rolled back after failed validation.",
+    "--source keeps local package installation available for development and offline recovery.",
+    "The installer only downloads release files and never uploads usage data.",
     "After success, open a new Codex thread."
   ].join("\n"));
   process.exit(0);
 }
 
-const versionBefore = readPluginVersion();
 const steps = buildSteps(args);
 const results = [];
 for (const step of steps) {
-  const result = runStep(step, args);
+  const result = await runStep(step, args);
   results.push(result);
   if (!result.ok) break;
 }
 
-let rollback = null;
-if (!args.dryRun && results.some((step) => step.name === "install-local" && step.ok) && results.some((step) => !step.ok)) {
-  rollback = runCommand("node", ["scripts/plugin-lifecycle.js", "rollback"]);
-  restorePluginVersion(versionBefore);
-}
-
+const setupResult = results.find((step) => step.name === "setup-codex")?.details || null;
 const report = {
   protocolVersion: "agentshell.codex-user-install.v1",
   ok: results.every((step) => step.ok),
   action: args.action,
+  channel: args.channel,
+  source: args.source ? { type: "local", path: args.source } : { type: "github-release" },
   dryRun: args.dryRun,
-  installedVersion: readPluginVersion(),
-  rollback,
+  installedVersion: setupResult?.release?.version || setupResult?.plugin?.version || null,
+  release: setupResult?.release || {
+    ok: true,
+    status: args.dryRun && !args.source ? "would-resolve" : args.source ? "local-source" : "not-started",
+    channel: args.channel,
+    source: args.source ? "local" : "github-release",
+    checksumVerified: false,
+    dataUploaded: false
+  },
+  rollback: setupResult?.rollback || null,
+  privacy: { dataUploaded: false, telemetry: "disabled" },
   summary: {
     total: results.length,
     passed: results.filter((step) => step.ok).length,
@@ -67,53 +75,55 @@ else printHumanReport(report);
 if (!report.ok) process.exitCode = 1;
 
 function parseArgs(argv) {
-  const parsed = { action: "install", dryRun: false, skipLink: false, json: false, help: false };
+  const parsed = {
+    action: "install",
+    channel: DEFAULT_RELEASE_CHANNEL,
+    source: null,
+    dryRun: false,
+    json: false,
+    help: false
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--dry-run") parsed.dryRun = true;
-    else if (arg === "--skip-link") parsed.skipLink = true;
     else if (arg === "--json") parsed.json = true;
+    else if (arg === "--skip-link") continue;
     else if (arg === "--help" || arg === "-h") parsed.help = true;
     else if (arg === "--action") {
-      parsed.action = argv[++index];
+      parsed.action = requiredValue(argv, ++index, "--action");
       if (!["install", "update", "uninstall", "doctor"].includes(parsed.action)) {
         throw new Error("--action must be install, update, uninstall, or doctor");
       }
+    } else if (arg === "--channel") {
+      parsed.channel = normalizeReleaseChannel(requiredValue(argv, ++index, "--channel"));
+    } else if (arg === "--source") {
+      parsed.source = path.resolve(requiredValue(argv, ++index, "--source"));
     } else throw new Error(`Unknown argument: ${arg}`);
   }
+  if (parsed.source && argv.includes("--channel")) throw new Error("--channel and --source cannot be used together");
   return parsed;
 }
 
+function requiredValue(argv, index, option) {
+  const value = argv[index];
+  if (!value || value.startsWith("--")) throw new Error(`${option} requires a value`);
+  return value;
+}
+
 function buildSteps(options) {
-  if (options.action === "uninstall") {
-    return [
-      commandStep("dashboard-stop", "Stop AgentShell Dashboard", "node", ["src/cli.js", "dashboard", "--stop"]),
-      commandStep("uninstall-local", "Remove AgentShell managed files", "node", ["scripts/plugin-lifecycle.js", "uninstall"])
-    ];
-  }
-  if (options.action === "doctor") {
-    return [commandStep("lifecycle-doctor", "Check AgentShell installation", "node", ["scripts/plugin-lifecycle.js", "doctor"])];
+  if (options.action === "doctor" || options.action === "uninstall") {
+    return [setupStep(options.action, options)];
   }
   return [
     checkNodeStep(),
     commandStep("codex-version", "Check Codex CLI", "codex", ["--version"]),
-    commandStep("dashboard-stop", "Stop previous AgentShell Dashboard", "node", ["src/cli.js", "dashboard", "--stop"]),
-    commandStep("npm-link", "Put agentshell on PATH", "npm", ["link"], { skipped: options.skipLink, skipReason: "--skip-link" }),
+    setupStep(options.action, options),
     {
-      name: "cachebuster",
-      label: "Refresh plugin version",
-      run: () => {
-        const before = readPluginVersion();
-        const after = updateCachebuster();
-        return success(`${before} -> ${after}`);
-      }
-    },
-    commandStep("source-validate", "Validate plugin source", "node", ["src/cli.js", "plugin", "validate", "--source-only", "--compact"]),
-    commandStep("install-local", "Atomically install marketplace copy", "node", ["scripts/install-codex-plugin.js"]),
-    commandStep("codex-add", "Add plugin to Codex", "codex", ["plugin", "add", "agentshell@personal"]),
-    commandStep("agent-policy", "Install global AgentShell policy", "node", ["scripts/install-agent-policy.js", "--json"]),
-    commandStep("plugin-smoke", "Run installed plugin smoke", "node", ["scripts/plugin-smoke.js"]),
-    commandStep("plugin-validate", "Validate installed plugin", "node", ["src/cli.js", "plugin", "validate", "--compact"])
+      name: "agent-policy",
+      label: "Confirm global AgentShell policy",
+      command: "node scripts/install-agent-policy.js --json",
+      run: async () => success("Installed atomically by setup codex")
+    }
   ];
 }
 
@@ -121,20 +131,18 @@ function checkNodeStep() {
   return {
     name: "node-version",
     label: "Check Node.js 20+",
-    run: () => Number.parseInt(process.versions.node.split(".")[0], 10) >= 20
+    run: async () => Number.parseInt(process.versions.node.split(".")[0], 10) >= 20
       ? success(`Node.js ${process.versions.node}`)
       : failure(`Node.js 20+ is required, found ${process.versions.node}`)
   };
 }
 
-function commandStep(name, label, command, commandArgs, options = {}) {
+function commandStep(name, label, command, commandArgs) {
   return {
     name,
     label,
     command: [command, ...commandArgs].join(" "),
-    skipped: options.skipped,
-    skipReason: options.skipReason,
-    run: () => {
+    run: async () => {
       const result = runCommand(command, commandArgs);
       return result.ok
         ? success(result.message || `${command} ok`)
@@ -143,21 +151,39 @@ function commandStep(name, label, command, commandArgs, options = {}) {
   };
 }
 
+function setupStep(action, options) {
+  const sourceArgs = options.source ? ["--source", options.source] : ["--channel", options.channel];
+  return {
+    name: "setup-codex",
+    label: `${action[0].toUpperCase()}${action.slice(1)} AgentShell`,
+    command: ["agentshell", "setup", "codex", action, ...sourceArgs].join(" "),
+    run: async () => {
+      const result = await setupCodex(action, {
+        channel: options.channel,
+        ...(options.source ? { source: options.source, sourceMode: "local" } : { sourceMode: "remote" })
+      });
+      return result.ok
+        ? success(`AgentShell ${action} completed`, result)
+        : failure(result.error?.message || `AgentShell ${action} failed`, result);
+    }
+  };
+}
+
 function runCommand(command, commandArgs) {
   const result = spawnSync(command, commandArgs, { cwd: root, encoding: "utf8" });
   return {
     ok: result.status === 0,
-    command: [command, ...commandArgs].join(" "),
     status: result.status,
     message: firstUsefulLine(result.stdout) || firstUsefulLine(result.stderr) || result.error?.message || ""
   };
 }
 
-function runStep(step, options) {
-  if (options.dryRun) return { name: step.name, label: step.label, status: "dry-run", ok: true, command: step.command || null };
-  if (step.skipped) return { name: step.name, label: step.label, status: "skipped", ok: true, reason: step.skipReason, command: step.command || null };
+async function runStep(step, options) {
+  if (options.dryRun) {
+    return { name: step.name, label: step.label, status: "dry-run", ok: true, command: step.command || null };
+  }
   const started = Date.now();
-  const output = step.run();
+  const output = await step.run();
   return {
     name: step.name,
     label: step.label,
@@ -166,34 +192,17 @@ function runStep(step, options) {
     durationMs: Date.now() - started,
     message: output.message,
     command: step.command || null,
-    details: output.details
+    ...(output.details ? { details: output.details } : {})
   };
 }
 
-function success(message) { return { ok: true, message }; }
+function success(message, details) { return { ok: true, message, details }; }
 function failure(message, details) { return { ok: false, message, details }; }
-
-function readPluginVersion() {
-  return JSON.parse(fs.readFileSync(manifestPath, "utf8")).version;
-}
-
-function updateCachebuster() {
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  const base = String(manifest.version || "0.0.0").split("+")[0];
-  manifest.version = `${base}+codex.${new Date().toISOString().replace(/[-:.TZ]/g, "")}`;
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  return manifest.version;
-}
-
-function restorePluginVersion(version) {
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  manifest.version = version;
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-}
 
 function printHumanReport(report) {
   console.log("\nAgentShell Codex Lifecycle\n==========================");
-  if (report.dryRun) console.log("Preview only. No files, links, or Codex settings were changed.\n");
+  console.log(`Channel: ${report.channel}${report.source.type === "local" ? " (local source)" : ""}`);
+  if (report.dryRun) console.log("Preview only. No files, downloads, links, or Codex settings were changed.\n");
   for (const step of report.steps) {
     const mark = step.status === "dry-run" ? "PLAN" : step.ok ? "OK" : "NEEDS ACTION";
     console.log(`[${mark}] ${step.label}${step.message ? ` - ${step.message}` : ""}`);
@@ -217,7 +226,13 @@ function scriptFor(action) {
 }
 
 function printArgumentError(error, argv) {
-  const message = { protocolVersion: "agentshell.codex-user-install.v1", ok: false, error: error.message };
+  const message = {
+    protocolVersion: "agentshell.codex-user-install.v1",
+    ok: false,
+    channel: DEFAULT_RELEASE_CHANNEL,
+    privacy: { dataUploaded: false, telemetry: "disabled" },
+    error: error.message
+  };
   if (argv.includes("--json")) console.log(JSON.stringify(message, null, 2));
   else console.error(`Install option error: ${error.message}\nRun node scripts/install-for-codex-user.js --help for supported flags.`);
 }
@@ -226,9 +241,9 @@ function nextActionsFor(results, action) {
   const failed = results.find((step) => !step.ok);
   if (!failed) return action === "uninstall" ? ["Quit and reopen Codex."] : ["Open a new Codex thread."];
   if (failed.name === "codex-version") return ["Install or open Codex first, then retry."];
-  return ["Run npm run doctor:codex.", `Retry npm run ${scriptFor(action)}.`];
+  return ["Run agentshell setup codex doctor.", `Retry npm run ${scriptFor(action)}.`];
 }
 
 function firstUsefulLine(text = "") {
-  return String(text).trim().split(/\r?\n/).find((line) => line.trim() && !line.startsWith(">")) || "";
+  return String(text).trim().split(/\r?\n/u).find((line) => line.trim() && !line.startsWith(">")) || "";
 }

@@ -43,4 +43,8 @@ Set `AGENTSHELL_TEST_STANDALONE=1` to include the real signed SEA build in the t
 
 ## Scope
 
-The standalone executable removes Node/npm from AgentShell's end-user runtime. This Beta artifact is ad-hoc signed; Developer ID signing and notarization remain release requirements before public distribution. Intel macOS, Linux, and Windows are not yet claimed as supported targets.
+The standalone executable removes Node/npm from AgentShell's end-user runtime.
+The Core release artifact is ad-hoc signed and checksum verified; it is not
+represented as Apple-notarized software. Developer ID signing and notarization
+are deferred to a future native PKG/Desktop distribution. Intel macOS, Linux,
+and Windows are not yet claimed as supported targets.

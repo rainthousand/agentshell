@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible AgentShell problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, private source code, command output, or absolute user paths.
+  - type: input
+    id: version
+    attributes:
+      label: AgentShell version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Codex plugin
+        - CLI
+        - Installer or update
+        - Menu-bar Dashboard
+        - Release package
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use redacted commands and paths.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

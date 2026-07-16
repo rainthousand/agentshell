@@ -31,7 +31,7 @@ agentshell dashboard --stop
 
 On macOS the command opens a native AppKit menu-bar utility by default. The status
 item shows compact verified savings such as `AS 79K`; clicking it reveals the full
-`Verified tokens saved` and `Verified time saved` values across all registered workspaces. The
+`Verified context saved` and `Verified time saved` values across all registered workspaces. The
 popover labels this scope as `All workspaces` without exposing project paths. It
 does not appear in the Dock or open a window at launch. Use `--window` when the
 optional detailed panel is useful.

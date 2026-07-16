@@ -1,6 +1,6 @@
 {
   "name": "agentshell",
-  "version": "0.25.3",
+  "version": "1.0.0",
   "description": "A structured local CLI for AI coding agents.",
   "type": "module",
   "bin": {
@@ -61,6 +61,8 @@
     "security:scan": "node scripts/security-scan.js",
     "release:gate": "node scripts/release-gate.js",
     "release:artifacts": "node scripts/release-artifacts.js",
+    "v1:smoke": "node scripts/v1-clean-machine-smoke.js",
+    "support:bundle": "node scripts/support-bundle.js",
     "install:agent-policy": "node scripts/install-agent-policy.js"
   },
   "engines": {

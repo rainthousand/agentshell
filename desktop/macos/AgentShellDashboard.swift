@@ -79,7 +79,7 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         savingsValue = label("--", size: 22, weight: .semibold, color: .labelColor)
         timeValue = label("--", size: 22, weight: .semibold, color: .labelColor)
 
-        let savings = metric(title: "Verified tokens saved", value: savingsValue)
+        let savings = metric(title: "Verified context saved", value: savingsValue)
         let time = metric(title: "Verified time saved", value: timeValue)
         let metrics = NSStackView(views: [savings, time])
         metrics.orientation = .horizontal

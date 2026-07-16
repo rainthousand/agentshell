@@ -2,12 +2,24 @@
 
 ## Current Candidate
 
-- Version: `0.25.3+codex.20260716020843`.
+- Version: `1.0.0+codex.20260716102207`.
 - Git import: complete.
 - Private GitHub repository push: complete.
 - Local standalone, release report, share ZIP, checksum/archive verification,
   and packaged install/update/doctor/uninstall smoke: complete.
 - Canonical product path: local CLI + Codex plugin on macOS.
+
+## V1.0 Release Gates
+
+- [x] Define V1.0 as a Core GitHub/Codex plugin release without native PKG or
+  App Store distribution; Apple credentials are not required for this track.
+- [x] Pass stable-channel install, update, rollback, doctor, Dashboard, support
+  export, and uninstall acceptance in a clean HOME.
+- [ ] Make the repository public after the Core release assets and documentation
+  pass their final local audit.
+- [ ] Decide whether to rewrite Git history to remove legacy standalone blobs;
+  this requires an explicit force-push approval and is not needed for runtime.
+- [ ] Publish the immutable `v1.0.0` tag and verify every Release Asset.
 
 ## Completed Release Work
 
@@ -23,6 +35,10 @@
 - Release: `https://github.com/rainthousand/agentshell/releases/tag/v0.25.3`.
 
 No blocking release-engineering task remains for v0.25.3.
+
+The failed `v0.25.1` and `v0.25.2` workflow tags have no GitHub Releases and
+must not be presented as published versions. Their tags remain immutable audit
+records of failed release attempts.
 
 ### Post-release: Optional External Evidence
 
@@ -47,6 +63,8 @@ learning and broader claims, but it does not block v0.25.3 or v1.0.
 
 ## Deferred
 
+- Developer ID signing, Apple notarization, native PKG, and App Store/Desktop
+  distribution. These belong to a future Desktop release, not V1.0 Core.
 - MCP productization, host packaging, and broader mutating tool coverage.
 - Native Windows and Linux Dashboard/status-bar applications.
 - Cloud telemetry, hosted execution, and account-dependent services.
