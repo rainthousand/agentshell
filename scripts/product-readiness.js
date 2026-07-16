@@ -502,7 +502,7 @@ const options = parseArgs(process.argv.slice(2));
 
 const mainFile = process.argv[1] ? path.resolve(process.argv[1]) : null;
 
-if (mainFile === path.resolve(import.meta.filename)) {
+if (mainFile && path.basename(mainFile) === "product-readiness.js") {
   if (options.help) {
     console.log(JSON.stringify({
       ok: true,
