@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentShell social preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 1280px; height: 640px; margin: 0; overflow: hidden; }
+    body {
+      background: #f8fafc;
+      color: #111827;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: 100%; height: 100%; padding: 72px 80px;
+      display: grid; grid-template-columns: 1.2fr .8fr; gap: 56px; align-items: center;
+      border: 18px solid #ffffff;
+    }
+    .brand { display: flex; align-items: center; gap: 22px; margin-bottom: 34px; }
+    .brand img { width: 92px; height: 92px; }
+    .brand strong { font-size: 62px; line-height: 1; letter-spacing: 0; }
+    h1 { margin: 0; max-width: 720px; font-size: 50px; line-height: 1.08; letter-spacing: 0; }
+    .sub { margin-top: 24px; font-size: 24px; line-height: 1.45; color: #4b5563; }
+    .metric {
+      border: 2px solid #dbe3ee; border-radius: 8px; background: #ffffff;
+      padding: 36px; box-shadow: 0 16px 36px rgba(17,24,39,.08);
+    }
+    .metric-label { font-size: 19px; color: #64748b; text-transform: uppercase; font-weight: 700; }
+    .metric-big { margin-top: 16px; font-size: 76px; line-height: 1; font-weight: 800; color: #2563eb; }
+    .metric-flow { margin-top: 28px; font: 700 29px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .metric-note { margin-top: 20px; font-size: 17px; line-height: 1.4; color: #64748b; }
+    .footer { position: absolute; left: 98px; bottom: 50px; font: 600 18px ui-monospace, SFMono-Regular, Menlo, monospace; color: #475569; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <div class="brand"><img src="../agentshell-mark.svg" alt=""><strong>AgentShell</strong></div>
+      <h1>Structured shell workflows for coding agents</h1>
+      <p class="sub">Compact project inspection, focused reads, test repair, verification, and rollback guidance.</p>
+    </section>
+    <aside class="metric">
+      <div class="metric-label">Scoped demo benchmark</div>
+      <div class="metric-big">94% less</div>
+      <div class="metric-flow">3,713 → 212 tokens</div>
+      <div class="metric-note">Estimated agent-visible terminal-output context. Not total model-token accounting.</div>
+    </aside>
+    <div class="footer">github.com/rainthousand/agentshell</div>
+  </main>
+</body>
+</html>

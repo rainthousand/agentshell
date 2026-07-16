@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentShell benchmark demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 1200px; height: 675px; margin: 0; overflow: hidden; }
+    body { background: #f8fafc; color: #111827; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { height: 100%; padding: 38px 46px 32px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 800; }
+    .brand img { width: 48px; height: 48px; }
+    .scope { font-size: 15px; color: #64748b; }
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .panel { min-height: 470px; border: 2px solid #dbe3ee; border-radius: 8px; background: #fff; overflow: hidden; }
+    .panel.active { border-color: #2563eb; box-shadow: 0 12px 30px rgba(37,99,235,.14); }
+    .panel-head { height: 56px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; font-weight: 750; }
+    .badge { border-radius: 4px; padding: 6px 9px; font: 700 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: #eef2f7; color: #475569; }
+    .active .badge { background: #dbeafe; color: #1d4ed8; }
+    pre { height: 350px; margin: 0; padding: 20px; overflow: hidden; background: #111827; color: #d1d5db; font: 16px/1.47 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .error { color: #fca5a5; } .ok { color: #86efac; } .key { color: #93c5fd; }
+    .panel-foot { height: 62px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; font-size: 16px; }
+    .token { font: 800 20px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .result {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 620px; padding: 42px; border: 3px solid #2563eb; border-radius: 8px;
+      background: #fff; text-align: center; box-shadow: 0 24px 70px rgba(15,23,42,.24);
+      display: none;
+    }
+    .result.show { display: block; }
+    .result strong { display: block; font-size: 70px; line-height: 1; color: #2563eb; }
+    .result h1 { margin: 18px 0 10px; font-size: 34px; }
+    .result p { margin: 0; color: #64748b; font-size: 18px; line-height: 1.45; }
+    footer { margin-top: 18px; text-align: center; color: #64748b; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand"><img src="../agentshell-mark.svg" alt="">AgentShell</div>
+      <div class="scope">Same noisy demo test · agent-visible terminal output</div>
+    </header>
+    <div class="panels">
+      <section class="panel" id="raw">
+        <div class="panel-head"><span>Raw test command</span><span class="badge">npm test</span></div>
+        <pre>$ npm test
+
+TAP version 13
+# Subtest: normalizes checkout result
+<span class="error">not ok 1 - normalizes checkout result</span>
+  ---
+  duration_ms: 42.817
+  location: tests/checkout.test.js:18:1
+  failureType: testCodeFailure
+  <span class="error">error: Expected values to be strictly equal</span>
+  <span class="error">+ actual - expected</span>
+  <span class="error">+ "pending"</span>
+  <span class="error">- "ready"</span>
+  stack: |-
+    TestContext.&lt;anonymous&gt; (...)
+    Test.runInAsyncScope (...)
+    Test.run (...)
+... thousands of additional characters</pre>
+        <div class="panel-foot"><span>Full raw log enters context</span><span class="token">≈ 3,713 tokens</span></div>
+      </section>
+      <section class="panel" id="compact">
+        <div class="panel-head"><span>AgentShell verification</span><span class="badge">--compact</span></div>
+        <pre>$ agentshell verify test --compact
+{
+  <span class="key">"ok"</span>: false,
+  <span class="key">"exitCode"</span>: 1,
+  <span class="key">"summary"</span>: {
+    <span class="key">"mainError"</span>: "Expected ready",
+    <span class="key">"failedTests"</span>: 1
+  },
+  <span class="key">"relatedFiles"</span>: [
+    "src/checkout.js",
+    "tests/checkout.test.js"
+  ],
+  <span class="key">"logRef"</span>: "log_...",
+  <span class="key">"suggestedNextActions"</span>: [...]
+}</pre>
+        <div class="panel-foot"><span>Details stay behind a log reference</span><span class="token">≈ 212 tokens</span></div>
+      </section>
+    </div>
+    <footer>Scoped benchmark estimate using ceil(output characters / 4). Not total Codex model-token accounting.</footer>
+    <div class="result" id="result">
+      <strong>94% less</strong>
+      <h1>terminal-output context</h1>
+      <p>3,713 → 212 estimated tokens on the same noisy demo verification.</p>
+    </div>
+  </main>
+  <script>
+    const frame = Number(new URLSearchParams(location.search).get("frame") || 1);
+    if (frame === 1) document.querySelector("#raw").classList.add("active");
+    if (frame === 2) document.querySelector("#compact").classList.add("active");
+    if (frame === 3) document.querySelector("#result").classList.add("show");
+  </script>
+</body>
+</html>

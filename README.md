@@ -1,46 +1,75 @@
 # AgentShell
 
-AgentShell is an agent-native local CLI and Codex plugin for coding assistants.
+**AgentShell turns noisy test and terminal output into compact, actionable JSON,
+so coding agents can find the next step with less context.**
 
-It turns noisy terminal workflows into compact JSON that an AI agent can act on:
-read only the lines it needs, diagnose failing tests, suggest conservative
-patches, apply hash-checked edits, verify the result, and report rollback
-commands.
+> **Measured on the checked-in noisy demo:** raw `npm test` produced an estimated
+> **3,713** terminal-output tokens; `agentshell verify test` produced **212**.
+> That is **94% less scoped terminal-output context**. It is not a measurement or
+> claim about total model tokens, reasoning tokens, or full-session usage. See the
+> reproducible [benchmark method and commands](#benchmarks).
 
-Use it when raw shell output is wasting context. AgentShell is built for:
+![Raw terminal output compared with AgentShell compact verification](docs/images/agentshell-benchmark.gif)
 
-- **Less token burn:** compact test summaries instead of full terminal logs.
-- **Less terminal noise:** structured `relatedFiles`, `logRef`, next actions,
+## Install in Codex
+
+```bash
+codex plugin marketplace add rainthousand/agentshell --ref main
+codex plugin add agentshell@agentshell
+```
+
+Quit and reopen Codex, then start a new task.
+
+## Verify in 60 seconds
+
+From the project where you want the agent to work:
+
+```bash
+agentshell start --compact
+```
+
+A successful response reports `"ok": true` and `"status": "ready"`, plus the next
+recommended command. In a JavaScript or TypeScript project with a `package.json`
+test script, you can then exercise compact test output with
+`agentshell verify test --compact`; its runtime depends on the project's test
+suite.
+
+AgentShell is an agent-native local CLI and Codex plugin built for:
+
+- **Compact evidence:** bounded reads and test summaries instead of full logs.
+- **Actionable failures:** structured related files, log references, next actions,
   schemas, and machine-readable errors.
-- **Faster failing-test repair:** one-command diagnose/suggest/apply/verify for
+- **Faster supported repairs:** one-command diagnose/suggest/apply/verify for
   supported JavaScript and TypeScript failures.
-- **Safer agent edits:** hash-checked change plans, dry runs, and undo guidance.
+- **Safer edits:** hash-checked change plans, dry runs, verification, and undo
+  guidance.
 
 Start here: [Quickstart](docs/quickstart.md). For a PM-friendly product summary,
 see [Product Status](docs/product-status-pm.html). For scope, freeze criteria,
 and fallback behavior, see [Product Boundary](docs/product-boundary.md). Stable
 release details are in [V1.0 Release Notes](docs/release-notes-v1.0.md), with
 security reporting covered by [SECURITY.md](SECURITY.md).
+Ready-to-publish community copy and claim guardrails are in the
+[V1.0 Launch Kit](docs/launch-kit.md).
 
 Download the current public release:
 [AgentShell V1.0 Codex plugin ZIP](https://github.com/rainthousand/agentshell/releases/download/v1.0.0/agentshell-codex-plugin.zip).
 The matching checksum and release audit report are on the
 [V1.0 release page](https://github.com/rainthousand/agentshell/releases/tag/v1.0.0).
 
-Latest local evidence in this tree: `agentshell verify test` reduced default
-test-output context by about **94%** versus raw `npm test` on the noisy demo.
-On the checked-in repair fixture suite, `real-project-eval --mode fix-first
---runs 3` passed **51/51** repeated repair runs with **262** estimated output
-tokens per repair run on average. Compared with running one full raw/split/fix
-matrix across the same checked-in fixtures, the one-run average fix-first path
-reduced estimated output tokens from **22,112** to **4,459**.
+Additional checked-in evidence: on the repair fixture suite,
+`real-project-eval --mode fix-first --runs 3` passed **51/51** repeated repair
+runs with **262** estimated output tokens per repair run on average. Compared with
+running one full raw/split/fix matrix across the same checked-in fixtures, the
+one-run average fix-first path reduced estimated output tokens from **22,112** to
+**4,459**.
 The compact diagnose path now also skips generic file reads and symbol search
 for deterministic TypeScript and import-path diagnostics; local profile samples
 show those diagnoses completing their AgentShell-side work in about 16-18ms when
 the verification result is cached.
 On three local healthy real-project snapshots, fix-first preserved **9/9**
 repeated passing smoke runs with **194** estimated output tokens per run.
-See [Benchmarks](#benchmarks).
+See [Benchmarks](#benchmarks) for scope and reproduction commands.
 
 ## Quick Start
 

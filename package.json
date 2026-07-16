@@ -29,6 +29,7 @@
     "performance:summary": "node scripts/performance-summary.js",
     "dashboard": "node src/cli.js dashboard",
     "dashboard:build-app": "node scripts/build-dashboard-app.js",
+    "marketing:assets": "node scripts/build-marketing-assets.js",
     "build:standalone": "node scripts/build-standalone.js",
     "eval:real-projects": "node scripts/real-project-eval.js",
     "eval:real-project-candidates": "node scripts/real-project-candidates.js",
