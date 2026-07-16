@@ -500,7 +500,9 @@ function parseArgs(argv) {
 
 const options = parseArgs(process.argv.slice(2));
 
-if (process.argv[1] === import.meta.filename) {
+const mainFile = process.argv[1] ? path.resolve(process.argv[1]) : null;
+
+if (mainFile === path.resolve(import.meta.filename)) {
   if (options.help) {
     console.log(JSON.stringify({
       ok: true,
