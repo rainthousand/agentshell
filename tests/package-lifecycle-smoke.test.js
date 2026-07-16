@@ -7,9 +7,10 @@ import path from "node:path";
 
 const script = "scripts/package-lifecycle-smoke.js";
 const standaloneAvailable = fs.existsSync(path.resolve("bin", "agentshell-darwin-arm64"));
+const deliveryPlatformSupported = process.platform === "darwin" && process.arch === "arm64";
 
 test("delivery package completes isolated install, doctor, update, and uninstall through its prebuilt CLI", {
-  skip: !standaloneAvailable
+  skip: !standaloneAvailable || !deliveryPlatformSupported
 }, () => {
   const result = spawnSync(process.execPath, [script, "--package-dir", process.cwd()], {
     cwd: process.cwd(),

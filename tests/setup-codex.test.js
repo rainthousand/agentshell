@@ -40,7 +40,7 @@ test("setupCodex installs plugin, policy, and native CLI without node or npm", a
   assert.equal(record.pathProfile.path, path.join(fixture.home, ".zprofile"));
   assert.equal(result.commandPath.status, "profile-updated");
   assert.equal(result.commandPath.fallbackCommand, installed);
-  assert.equal(result.plugin.legacyDashboardMigration.reason, "isolated-home");
+  assert.equal(result.plugin.legacyDashboardMigration.reason, process.platform === "darwin" ? "isolated-home" : "not-macos");
   assert.equal(fs.statSync(recordPath).mode & 0o777, 0o600);
   assert.equal(fs.statSync(path.dirname(recordPath)).mode & 0o777, 0o700);
 });
