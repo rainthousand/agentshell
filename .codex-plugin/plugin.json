@@ -1,10 +1,13 @@
 {
   "name": "agentshell",
-  "version": "1.0.0+codex.20260716102207",
+  "version": "1.0.0+codex.20260716044306",
   "description": "A structured local CLI and Codex skill for AI coding agents.",
   "author": {
-    "name": "Alvin"
+    "name": "Alvin",
+    "url": "https://github.com/rainthousand"
   },
+  "homepage": "https://github.com/rainthousand/agentshell",
+  "repository": "https://github.com/rainthousand/agentshell",
   "license": "MIT",
   "keywords": [
     "agents",
@@ -23,11 +26,16 @@
       "CLI",
       "Structured Output"
     ],
+    "websiteURL": "https://github.com/rainthousand/agentshell",
+    "privacyPolicyURL": "https://github.com/rainthousand/agentshell/blob/main/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/rainthousand/agentshell/blob/main/TERMS.md",
     "defaultPrompt": [
       "Use AgentShell to inspect this repo.",
       "Use AgentShell to fix supported failing tests.",
       "Compare raw shell output with AgentShell JSON."
     ],
-    "brandColor": "#2563EB"
+    "brandColor": "#111827",
+    "composerIcon": "./assets/agentshell-icon.png",
+    "logo": "./assets/agentshell-logo.png"
   }
 }

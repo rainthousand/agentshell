@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">AgentShell</title>
+  <desc id="desc">A compact terminal prompt forming the letters AS.</desc>
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+  <rect x="40" y="40" width="432" height="432" rx="72" fill="#111827"/>
+  <path d="M126 338 206 174h37l80 164h-45l-16-36h-78l-16 36h-42Zm74-72h46l-23-54-23 54Z" fill="#ffffff"/>
+  <path d="M339 202h61v34h-61c-13 0-20 5-20 14 0 8 6 12 18 15l27 7c29 8 44 25 44 52 0 35-25 54-69 54h-58v-35h59c16 0 24-5 24-16 0-8-7-13-20-16l-27-7c-28-7-42-24-42-50 0-34 23-52 64-52Z" fill="#60a5fa"/>
+  <rect x="112" y="389" width="288" height="12" rx="6" fill="#374151"/>
+</svg>

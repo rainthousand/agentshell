@@ -22,6 +22,11 @@ and fallback behavior, see [Product Boundary](docs/product-boundary.md). Stable
 release details are in [V1.0 Release Notes](docs/release-notes-v1.0.md), with
 security reporting covered by [SECURITY.md](SECURITY.md).
 
+Download the current public release:
+[AgentShell V1.0 Codex plugin ZIP](https://github.com/rainthousand/agentshell/releases/download/v1.0.0/agentshell-codex-plugin.zip).
+The matching checksum and release audit report are on the
+[V1.0 release page](https://github.com/rainthousand/agentshell/releases/tag/v1.0.0).
+
 Latest local evidence in this tree: `agentshell verify test` reduced default
 test-output context by about **94%** versus raw `npm test` on the noisy demo.
 On the checked-in repair fixture suite, `real-project-eval --mode fix-first
@@ -269,12 +274,12 @@ Codex plugin docs, adapter trial suite, manual topics, package scripts, and JSON
 schema registry. Heavy mode adds benchmark CI, cache/cold-start checks, strategy
 coverage, Codex plugin trial scoring, and strategy intake. Use
 [Product Boundary](docs/product-boundary.md) as the freeze/scope contract for
-v0.25 and the v1.0 bar. MCP remains deferred and non-blocking for this phase.
+V1.0. MCP remains deferred and non-blocking for this phase.
 
-The current V1 candidate is `1.0.0+codex.20260716102207`. The source has been
-imported into Git and pushed to its private GitHub repository. Local release
+The current Core release is `1.0.0`. The source is published in the public
+[AgentShell GitHub repository](https://github.com/rainthousand/agentshell). Local release
 artifacts, the share ZIP, checksum verification, archive integrity, and the
-isolated-HOME packaged lifecycle smoke are complete. GitHub Release `v0.25.3`
+isolated-HOME packaged lifecycle smoke are complete. GitHub Release `v1.0.0`
 is published, and its downloaded binary, ZIP, checksums, and audit report have
 been verified. Three fresh verified
 tasks from external users are no longer a release requirement. External trial
@@ -451,7 +456,7 @@ agentshell verify test
 In short: `start --compact -> fix/diagnose/verify`.
 
 Keep MCP as a later, lower-priority integration path; the local CLI and plugin
-flow are the supported first path for v0.25.
+flow are the supported V1.0 path.
 
 ```bash
 npm run plugin:validate

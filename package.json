@@ -2,6 +2,14 @@
   "name": "agentshell",
   "version": "1.0.0",
   "description": "A structured local CLI for AI coding agents.",
+  "homepage": "https://github.com/rainthousand/agentshell",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rainthousand/agentshell.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rainthousand/agentshell/issues"
+  },
   "type": "module",
   "bin": {
     "agentshell": "./bin/agentshell",

@@ -60,10 +60,10 @@ v0.25 should freeze the externally visible product shape around:
 
 During the v0.25 freeze, avoid expanding the automatic repair surface unless the new strategy is conservative, covered by fixtures, exposed in docs, and does not change the core protocol contract. Prefer documentation, evidence, installer hardening, and clearer fallback guidance over new feature categories.
 
-The current V1 candidate is `1.0.0+codex.20260716102207`. Git import and the
-private-repository push are complete. Local release artifacts, share ZIP
+The current Core release is `1.0.0`. The public repository and local release
+artifacts, share ZIP
 creation, checksum/archive verification, and packaged lifecycle smoke are also
-complete. GitHub Release `v0.25.3` is published, and clean downloaded copies of
+complete. GitHub Release `v1.0.0` is published, and clean downloaded copies of
 the standalone binary and plugin ZIP passed their published checksums. No
 blocking release-engineering gate remains for this version.
 

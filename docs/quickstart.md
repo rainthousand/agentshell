@@ -13,14 +13,17 @@ checkout are maintainer build requirements, not end-user requirements.
 
 AgentShell runs locally. The core CLI does not need a service or API key.
 
-The current V1 candidate is `1.0.0+codex.20260716102207`. Its local share ZIP and
-packaged install/update/doctor/uninstall flow have been verified. GitHub Release
-`v0.25.3` contains the standalone binary, plugin ZIP, checksums, and audit report;
+The current Core release is `1.0.0`. Its local share ZIP and packaged
+install/update/doctor/uninstall flow have been verified. GitHub Release
+[`v1.0.0`](https://github.com/rainthousand/agentshell/releases/tag/v1.0.0)
+contains the standalone binary, plugin ZIP, checksums, and audit report;
 clean downloaded copies passed checksum and standalone version verification.
 
 ## Easiest Codex Install
 
-If you received an AgentShell share package:
+Download
+[`agentshell-codex-plugin.zip`](https://github.com/rainthousand/agentshell/releases/download/v1.0.0/agentshell-codex-plugin.zip)
+from the V1.0 release, or use a share package supplied by the publisher:
 
 1. Unzip it, if needed, and open the `agentshell-codex-plugin` folder.
 2. Double-click `install.command`. If you prefer Terminal, run:

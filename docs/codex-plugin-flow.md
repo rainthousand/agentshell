@@ -302,9 +302,9 @@ The migration leaves unrelated launch jobs untouched. The v0.24-to-v0.25
 migration path is covered with preservation tests for user policy/profile content
 and precise cleanup tests for AgentShell-owned state.
 
-The current V1 candidate is `1.0.0+codex.20260716102207`. Git import, the private
-repository push, local release artifacts, share ZIP integrity/checksum checks,
-and packaged lifecycle smoke are complete.
+The current Core release is `1.0.0`. The public repository, local release
+artifacts, share ZIP integrity/checksum checks, and packaged lifecycle smoke are
+complete.
 
 Later plugin distribution can add:
 
@@ -313,7 +313,7 @@ Later plugin distribution can add:
 - optional MCP server, kept lower priority than the local CLI/plugin flow until
   the primary contracts stabilize
 
-GitHub Release `v0.25.3` is published with the standalone binary, plugin ZIP,
+GitHub Release `v1.0.0` is published with the standalone binary, plugin ZIP,
 checksums, and release report. Clean-location downloads passed checksum and
 standalone version smoke verification. External-user trial exports remain an optional post-release
 learning channel rather than a release gate. MCP and native Windows/Linux
