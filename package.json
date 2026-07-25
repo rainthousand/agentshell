@@ -21,6 +21,7 @@
     "test:mcp": "node --test tests/mcp-server.test.js",
     "demo": "cd examples/failing-test-demo && node ../../src/cli.js verify test",
     "benchmark": "node scripts/benchmark-demo.js",
+    "benchmark:noise-matrix": "node scripts/noise-matrix-benchmark.js",
     "benchmark:cache": "node scripts/cache-benchmark.js",
     "benchmark:cold-start": "node scripts/cold-start-benchmark.js",
     "benchmark:first-round": "node scripts/first-round-benchmark.js",
