@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { spawnSync } from "node:child_process";
 import { gitInfo } from "../core/git.js";
-import { detectPackageManager, getPackageInfo, scriptCommand } from "../core/package-json.js";
+import { getProjectInfo, projectCommand } from "../core/project.js";
 import { ensureState, readActiveRun, stateDir } from "../core/store.js";
 import { summarizeRun } from "./run-status.js";
 
@@ -10,14 +11,19 @@ const PROTOCOL_VERSION = "agentshell.doctor.v1";
 const REQUIRED_NODE_MAJOR = 20;
 
 export async function doctor(root) {
-  const packageInfo = getPackageInfo(root);
-  const workspaceRoot = packageInfo?.root || root;
-  const packageManager = packageInfo ? detectPackageManager(packageInfo.root) : null;
+  const project = getProjectInfo(root);
+  const workspaceRoot = project?.root || root;
+  const packageManager = project?.manager || null;
   const git = gitInfo(workspaceRoot);
   const state = checkState(workspaceRoot);
   const activeRun = checkActiveRun(workspaceRoot);
   const node = checkNode();
-  const scripts = packageInfo?.scripts || {};
+  const go = project?.kind === "go" ? {
+    ...checkGo(),
+    tools: checkGoTools()
+  } : null;
+  const scripts = project?.rawScripts || {};
+  const testCommand = projectCommand(project, "test");
   const checks = [
     {
       name: "node",
@@ -29,16 +35,26 @@ export async function doctor(root) {
     },
     {
       name: "package-json",
-      ok: Boolean(packageInfo),
-      severity: packageInfo ? "info" : "warning",
-      message: packageInfo ? `package.json found for ${packageInfo.name}` : "No package.json found"
+      ok: Boolean(project),
+      severity: project ? "info" : "warning",
+      message: project?.kind === "go"
+        ? `go.mod found for ${project.name}`
+        : (project ? `package.json found for ${project.name}` : "No package.json found")
     },
     {
       name: "test-script",
-      ok: Boolean(scripts.test),
-      severity: scripts.test ? "info" : "warning",
-      message: scripts.test ? `test script available: ${scriptCommand(packageManager, "test")}` : "No npm-style test script found"
+      ok: Boolean(testCommand),
+      severity: testCommand ? "info" : "warning",
+      message: project?.kind === "go"
+        ? `test command available: ${testCommand}`
+        : (testCommand ? `test script available: ${testCommand}` : "No npm-style test script found")
     },
+    ...(go ? [{
+      name: "go",
+      ok: go.available,
+      severity: go.available ? "info" : "error",
+      message: go.available ? `Go ${go.version} is available` : `Go executable is not available${go.error ? `: ${go.error}` : ""}`
+    }] : []),
     {
       name: "state-dir",
       ok: state.writable,
@@ -70,14 +86,19 @@ export async function doctor(root) {
     status: statusFor(summary),
     workspace: {
       root: workspaceRoot,
-      name: packageInfo?.name || path.basename(workspaceRoot)
+      name: project?.name || path.basename(workspaceRoot)
     },
     runtime: {
-      node
+      node,
+      ...(go ? { go } : {})
     },
     package: {
-      found: Boolean(packageInfo),
+      found: Boolean(project),
       manager: packageManager,
+      ...(project?.kind === "go" ? {
+        kind: project.kind,
+        manifest: project.manifest
+      } : {}),
       scripts: {
         test: scripts.test || null,
         build: scripts.build || null,
@@ -89,7 +110,7 @@ export async function doctor(root) {
     git,
     checks,
     summary,
-    suggestedNextActions: suggestedNextActions({ packageInfo, packageManager, scripts, state, activeRun, git, summary })
+    suggestedNextActions: suggestedNextActions({ project, testCommand, state, activeRun, git, summary })
   };
 }
 
@@ -100,6 +121,64 @@ function checkNode() {
     required: `>=${REQUIRED_NODE_MAJOR}`,
     ok: Number.isFinite(major) && major >= REQUIRED_NODE_MAJOR
   };
+}
+
+function checkGo() {
+  const result = spawnSync("go", ["version"], {
+    encoding: "utf8",
+    timeout: 5000
+  });
+  const output = String(result.stdout || result.stderr || "").trim();
+  const version = output.match(/\bgo version go(\S+)/)?.[1] || null;
+  const available = result.status === 0 && Boolean(version);
+  return {
+    available,
+    version,
+    error: available ? null : (result.error?.message || output || "go version failed")
+  };
+}
+
+function checkGoTools() {
+  return {
+    golangciLint: checkOptionalTool("golangci-lint", ["version"]),
+    goimports: checkOptionalTool("goimports", ["-version"])
+  };
+}
+
+function checkOptionalTool(command, versionArgs) {
+  const executablePath = resolveExecutable(command);
+  if (!executablePath) return { available: false };
+
+  const result = spawnSync(executablePath, versionArgs, {
+    encoding: "utf8",
+    timeout: 5000
+  });
+  const output = String(result.stdout || result.stderr || "").trim();
+  return {
+    available: true,
+    version: output.split(/\r?\n/, 1)[0] || null,
+    path: executablePath
+  };
+}
+
+function resolveExecutable(command) {
+  const pathEntries = String(process.env.PATH || "").split(path.delimiter).filter(Boolean);
+  const extensions = process.platform === "win32"
+    ? String(process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM").split(";")
+    : [""];
+
+  for (const entry of pathEntries) {
+    for (const extension of extensions) {
+      const candidate = path.resolve(entry, `${command}${extension}`);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        if (fs.statSync(candidate).isFile()) return candidate;
+      } catch {
+        // Continue searching PATH when an entry is missing or not executable.
+      }
+    }
+  }
+  return null;
 }
 
 function checkState(root) {
@@ -186,7 +265,7 @@ function statusFor(summary) {
   return "ready";
 }
 
-function suggestedNextActions({ packageInfo, packageManager, scripts, state, activeRun, git, summary }) {
+function suggestedNextActions({ project, testCommand, state, activeRun, git, summary }) {
   const actions = [];
   if (summary.errorCount > 0) {
     actions.push({
@@ -194,15 +273,17 @@ function suggestedNextActions({ packageInfo, packageManager, scripts, state, act
       reason: "Fix blocking environment checks, then rerun doctor"
     });
   }
-  if (!packageInfo) {
+  if (!project) {
     actions.push({
       command: "agentshell understand",
       reason: "Inspect the workspace structure before using package-aware commands"
     });
-  } else if (scripts.test) {
+  } else if (testCommand) {
     actions.push({
       command: "agentshell verify test",
-      reason: `Run the configured test script via ${scriptCommand(packageManager, "test")}`
+      reason: project.kind === "go"
+        ? `Run the configured test command via ${testCommand}`
+        : `Run the configured test script via ${testCommand}`
     });
   } else {
     actions.push({

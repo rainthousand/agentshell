@@ -78,6 +78,8 @@ export async function diagnose(root, type, options = {}) {
             });
             const implementation = search.matches.find((match) => (
               !match.file.endsWith("package.json") &&
+              !match.file.endsWith("go.mod") &&
+              !match.file.endsWith("_test.go") &&
               !match.file.includes(".test.") &&
               !match.file.includes("/test/") &&
               !match.file.includes("test/")
@@ -290,7 +292,9 @@ function queryFromError(error) {
 
 function localImports(root, file) {
   const absolute = path.join(root, file);
-  if (!fs.existsSync(absolute) || !/\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(file)) return [];
+  if (!fs.existsSync(absolute)) return [];
+  if (file.endsWith("_test.go")) return siblingGoImplementations(root, file);
+  if (!/\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(file)) return [];
 
   const content = fs.readFileSync(absolute, "utf8");
   const imports = new Set();
@@ -307,6 +311,17 @@ function localImports(root, file) {
   }
 
   return [...imports].sort();
+}
+
+function siblingGoImplementations(root, testFile) {
+  const directory = path.dirname(testFile);
+  const absoluteDirectory = path.join(root, directory);
+  if (!isInside(root, absoluteDirectory) || !fs.existsSync(absoluteDirectory)) return [];
+  return fs.readdirSync(absoluteDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".go") && !entry.name.endsWith("_test.go"))
+    .map((entry) => path.join(directory, entry.name))
+    .sort()
+    .slice(0, 8);
 }
 
 function resolveImport(root, fromDir, specifier) {
@@ -338,7 +353,9 @@ function isInside(root, candidate) {
 }
 
 function isTestFile(file) {
-  return /(?:^|\/)(?:test|tests)\//.test(file) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
+  return /(?:^|\/)(?:test|tests)\//.test(file) ||
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) ||
+    /_test\.go$/.test(file);
 }
 
 function expectedPropertyFromError(error) {

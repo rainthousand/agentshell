@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/git-status.schema.json",
+  "title": "AgentShell Git Status Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "branch", "summary", "files", "risks", "suggestedNextActions"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.git-status.v1" },
+    "compact": { "type": "boolean" },
+    "branch": { "$ref": "#/$defs/branch" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "suggestedNextActions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/suggestedNextAction" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "branch": {
+      "type": "object",
+      "required": ["name", "detached", "upstream", "ahead", "behind"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "detached": { "type": "boolean" },
+        "upstream": { "type": ["string", "null"] },
+        "ahead": { "type": "integer", "minimum": 0 },
+        "behind": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["dirty", "clean", "staged", "unstaged", "untracked", "renamed", "deleted", "totalFiles", "listedFiles", "truncated"],
+      "properties": {
+        "dirty": { "type": "boolean" },
+        "clean": { "type": "boolean" },
+        "staged": { "type": "integer", "minimum": 0 },
+        "unstaged": { "type": "integer", "minimum": 0 },
+        "untracked": { "type": "integer", "minimum": 0 },
+        "renamed": { "type": "integer", "minimum": 0 },
+        "deleted": { "type": "integer", "minimum": 0 },
+        "totalFiles": { "type": "integer", "minimum": 0 },
+        "listedFiles": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "required": ["path", "originalPath", "code", "status", "staged", "unstaged", "risks"],
+      "properties": {
+        "path": { "type": "string" },
+        "originalPath": { "type": ["string", "null"] },
+        "code": { "type": "string", "minLength": 2, "maxLength": 2 },
+        "status": { "enum": ["added", "modified", "deleted", "renamed", "copied", "unmerged", "untracked", "ignored", "changed", "clean"] },
+        "staged": { "type": ["string", "null"], "enum": ["added", "modified", "deleted", "renamed", "copied", "unmerged", "untracked", "ignored", "changed", null] },
+        "unstaged": { "type": ["string", "null"], "enum": ["added", "modified", "deleted", "renamed", "copied", "unmerged", "untracked", "ignored", "changed", null] },
+        "risks": {
+          "type": "array",
+          "items": { "enum": ["lockfile", "generated"] }
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["type", "severity", "files", "count", "message"],
+      "properties": {
+        "type": { "enum": ["lockfile", "generated"] },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "count": { "type": "integer", "minimum": 1 },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "suggestedNextAction": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

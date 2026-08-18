@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/package-deps.schema.json",
+  "title": "AgentShell Package Deps Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "ecosystem", "summary", "dependencies", "frameworks", "runtimes", "risks", "suggestedNextActions"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.package-deps.v1" },
+    "compact": { "type": "boolean" },
+    "ecosystem": { "enum": ["node", "go", "mixed"] },
+    "summary": { "$ref": "#/$defs/summary" },
+    "dependencies": { "$ref": "#/$defs/dependencies" },
+    "frameworks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/framework" }
+    },
+    "runtimes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/runtime" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "suggestedNextActions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/suggestedNextAction" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": ["manifests", "dependencyCount", "nodeDependencyCount", "goDependencyCount", "productionCount", "developmentCount", "peerCount", "optionalCount", "frameworkCount", "runtimeCount", "lockfiles"],
+      "properties": {
+        "manifests": {
+          "type": "array",
+          "items": { "enum": ["package.json", "go.mod"] }
+        },
+        "dependencyCount": { "type": "integer", "minimum": 0 },
+        "nodeDependencyCount": { "type": "integer", "minimum": 0 },
+        "goDependencyCount": { "type": "integer", "minimum": 0 },
+        "productionCount": { "type": "integer", "minimum": 0 },
+        "developmentCount": { "type": "integer", "minimum": 0 },
+        "peerCount": { "type": "integer", "minimum": 0 },
+        "optionalCount": { "type": "integer", "minimum": 0 },
+        "frameworkCount": { "type": "integer", "minimum": 0 },
+        "runtimeCount": { "type": "integer", "minimum": 0 },
+        "lockfiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "dependencies": {
+      "type": "object",
+      "required": ["production", "development", "peer", "optional", "go"],
+      "properties": {
+        "production": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeDependency" }
+        },
+        "development": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeDependency" }
+        },
+        "peer": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeDependency" }
+        },
+        "optional": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeDependency" }
+        },
+        "go": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/goDependency" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodeDependency": {
+      "type": "object",
+      "required": ["name", "version", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "type": { "enum": ["production", "development", "peer", "optional"] }
+      },
+      "additionalProperties": false
+    },
+    "goDependency": {
+      "type": "object",
+      "required": ["name", "version", "type", "indirect"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "type": { "enum": ["direct", "indirect"] },
+        "indirect": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "framework": {
+      "type": "object",
+      "required": ["name", "ecosystem", "package", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "ecosystem": { "enum": ["node", "go"] },
+        "package": { "type": ["string", "null"] },
+        "version": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["name", "version", "source"],
+      "properties": {
+        "name": { "enum": ["node", "typescript", "go"] },
+        "version": { "type": ["string", "null"] },
+        "source": { "enum": ["package.json", "go.mod"] }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["type", "severity", "message"],
+      "properties": {
+        "type": { "enum": ["large-dependency-count", "lockfile-missing", "lockfile-present"] },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "message": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "suggestedNextAction": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

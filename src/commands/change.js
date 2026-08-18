@@ -197,6 +197,15 @@ export async function suggestChange(root, options = {}) {
   if (!validation.ok) return validation;
 
   const edit = template.edits[0];
+  if (edit.file.endsWith(".go")) {
+    return fail("SUGGESTION_UNAVAILABLE", "Automatic Go source repair is not supported yet", {
+      template: templateFile,
+      unsupportedReason: "unsupported-language-go"
+    }, [{
+      command: `agentshell change fill ${templateFile} <fill.json> --apply`,
+      reason: "Review and fill the hash-checked Go change manually"
+    }]);
+  }
   const resolved = resolveInsideWorkspace(root, edit.file);
   if (!resolved.ok) return fail(resolved.reason, `Cannot read ${edit.file}`);
   if (!fs.existsSync(resolved.absTarget)) return fail("FILE_NOT_FOUND", `File not found: ${edit.file}`);

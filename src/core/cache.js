@@ -5,6 +5,37 @@ import { ensureState } from "./store.js";
 
 const CACHE_VERSION = 1;
 const MAX_ENTRIES = 20;
+const MAX_GO_CACHE_FILES = 2000;
+const GO_INPUT_EXTENSIONS = new Set([
+  ".go",
+  ".c",
+  ".h",
+  ".hh",
+  ".hpp",
+  ".hxx",
+  ".cc",
+  ".cpp",
+  ".cxx",
+  ".f",
+  ".for",
+  ".f90",
+  ".m",
+  ".mm",
+  ".s",
+  ".swig",
+  ".swigcxx",
+  ".syso"
+]);
+const GO_IGNORED_DIRECTORIES = new Set([
+  ".git",
+  ".agentshell",
+  ".cache",
+  "node_modules",
+  "vendor",
+  "dist",
+  "build",
+  "coverage"
+]);
 const LOCK_FILES = [
   "package-lock.json",
   "pnpm-lock.yaml",
@@ -18,7 +49,7 @@ export function findTestResultCache(root, { type, command, packagePath }) {
   return findTestResultCacheFromContext(context);
 }
 
-export function createTestResultCacheContext(root, { type, command, packagePath }) {
+export function createTestResultCacheContext(root, { type, command, packagePath, project = null }) {
   const identity = cacheIdentity(root, { type, command, packagePath });
   const cache = readCache(root);
   const entries = cache.entries
@@ -29,6 +60,7 @@ export function createTestResultCacheContext(root, { type, command, packagePath 
     type,
     command,
     packagePath,
+    project,
     identity,
     cache,
     entries
@@ -39,7 +71,11 @@ export function findTestResultCacheFromContext(context) {
   for (const entry of context.entries) {
     const root = context.root;
     if (!hasLog(root, entry.logRef)) continue;
-    const fingerprint = fingerprintFromFiles(root, entry.files || []);
+    const currentFiles = context.project?.kind === "go" || path.basename(context.packagePath) === "go.mod"
+      ? collectFingerprintFiles(root, context.packagePath, entry.relatedFiles || [], context.project)
+      : entry.files || [];
+    if (currentFiles.length <= 1) continue;
+    const fingerprint = fingerprintFromFiles(root, currentFiles);
     if (!fingerprint.ok) continue;
     const cacheKey = buildCacheKey(context.identity, fingerprint.files);
     if (cacheKey === entry.cacheKey) {
@@ -99,7 +135,7 @@ export function writeTestResultCacheFromContext(context, { result, summary, rela
     return null;
   }
 
-  const files = collectFingerprintFiles(root, packagePath, relatedFiles);
+  const files = collectFingerprintFiles(root, packagePath, relatedFiles, context.project);
   if (files.length <= 1) return null;
 
   const fingerprint = fingerprintFromFiles(root, files);
@@ -135,7 +171,9 @@ export function writeTestResultCacheFromContext(context, { result, summary, rela
 }
 
 function isRelatedTestFile(file) {
-  return /(?:^|\/)(?:test|tests)\//.test(file) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
+  return /(?:^|\/)(?:test|tests)\//.test(file) ||
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) ||
+    /_test\.go$/.test(file);
 }
 
 function cacheIdentity(root, { type, command, packagePath }) {
@@ -152,20 +190,114 @@ function cacheIdentity(root, { type, command, packagePath }) {
   };
 }
 
-function collectFingerprintFiles(root, packagePath, relatedFiles) {
+function collectFingerprintFiles(root, packagePath, relatedFiles, project = null) {
   const files = new Set([
     relativePath(root, packagePath),
     ...LOCK_FILES.filter((file) => fs.existsSync(path.join(root, file))),
     ...relatedFiles
   ]);
 
+  if (project?.manifest === "go.work") {
+    for (const module of project.modules.filter((candidate) => candidate.valid)) {
+      const goFiles = goModuleFingerprintFiles(root, module.root);
+      if (!goFiles) return [];
+      for (const file of goFiles) files.add(file);
+      for (const manifest of ["go.mod", "go.sum"]) {
+        const absolute = path.join(module.root, manifest);
+        if (fs.existsSync(absolute)) files.add(relativePath(root, absolute));
+      }
+      if (files.size > MAX_GO_CACHE_FILES) return [];
+    }
+  } else if (path.basename(packagePath) === "go.mod") {
+    const goFiles = goModuleFingerprintFiles(root, root);
+    if (!goFiles) return [];
+    for (const file of goFiles) files.add(file);
+    if (fs.existsSync(path.join(root, "go.sum"))) files.add("go.sum");
+  }
+
   for (const file of relatedFiles) {
     for (const imported of localImports(root, file)) {
       files.add(imported);
     }
+    for (const sibling of siblingGoFiles(root, file)) {
+      files.add(sibling);
+    }
   }
 
   return [...files].sort();
+}
+
+function goModuleFingerprintFiles(root, moduleRoot) {
+  try {
+    const files = new Set();
+    const embeddedPackageDirectories = new Set();
+    const pending = [{ directory: moduleRoot, inTestdata: false }];
+    while (pending.length > 0) {
+      const { directory, inTestdata } = pending.pop();
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const absolute = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          if (GO_IGNORED_DIRECTORIES.has(entry.name)) continue;
+          if (absolute !== moduleRoot && fs.existsSync(path.join(absolute, "go.mod"))) continue;
+          pending.push({
+            directory: absolute,
+            inTestdata: inTestdata || entry.name === "testdata"
+          });
+          continue;
+        }
+        if (!entry.isFile()) continue;
+
+        const extension = path.extname(entry.name).toLowerCase();
+        if (inTestdata || GO_INPUT_EXTENSIONS.has(extension)) {
+          files.add(relativePath(root, absolute));
+        }
+        if (extension === ".go" && hasGoEmbedDirective(absolute)) {
+          embeddedPackageDirectories.add(directory);
+        }
+        if (files.size > MAX_GO_CACHE_FILES) return null;
+      }
+    }
+
+    for (const directory of embeddedPackageDirectories) {
+      if (!collectEmbeddedPackageFiles(root, directory, files)) return null;
+    }
+    return [...files].sort();
+  } catch {
+    return null;
+  }
+}
+
+function hasGoEmbedDirective(file) {
+  return /^\s*\/\/go:embed(?:\s|$)/m.test(fs.readFileSync(file, "utf8"));
+}
+
+function collectEmbeddedPackageFiles(root, packageDirectory, files) {
+  const pending = [packageDirectory];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (GO_IGNORED_DIRECTORIES.has(entry.name)) continue;
+        if (absolute !== packageDirectory && fs.existsSync(path.join(absolute, "go.mod"))) continue;
+        pending.push(absolute);
+      } else if (entry.isFile()) {
+        files.add(relativePath(root, absolute));
+        if (files.size > MAX_GO_CACHE_FILES) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function siblingGoFiles(root, file) {
+  if (!file.endsWith(".go")) return [];
+  const directory = path.dirname(path.join(root, file));
+  if (directory !== root && !isInside(root, directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".go"))
+    .map((entry) => relativePath(root, path.join(directory, entry.name)))
+    .sort();
 }
 
 function fingerprintFromFiles(root, files) {

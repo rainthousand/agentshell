@@ -28,11 +28,11 @@ From the project where you want the agent to work:
 agentshell start --compact
 ```
 
-A successful response reports `"ok": true` and `"status": "ready"`, plus the next
-recommended command. In a JavaScript or TypeScript project with a `package.json`
-test script, you can then exercise compact test output with
-`agentshell verify test --compact`; its runtime depends on the project's test
-suite.
+A successful response reports `"ok": true` and a readiness status, plus the next
+recommended command. AgentShell detects JavaScript or TypeScript projects from
+`package.json` and Go modules from `go.mod`. It uses the configured package test
+script for Node projects and `go test ./...` for Go modules when you run
+`agentshell verify test --compact`; runtime depends on the project's test suite.
 
 AgentShell is an agent-native local CLI and Codex plugin built for:
 
@@ -40,7 +40,8 @@ AgentShell is an agent-native local CLI and Codex plugin built for:
 - **Actionable failures:** structured related files, log references, next actions,
   schemas, and machine-readable errors.
 - **Faster supported repairs:** one-command diagnose/suggest/apply/verify for
-  supported JavaScript and TypeScript failures.
+  supported JavaScript and TypeScript failures, plus compact Go test diagnosis
+  without automatic Go source repair.
 - **Safer edits:** hash-checked change plans, dry runs, verification, and undo
   guidance.
 
@@ -156,7 +157,7 @@ node ../../src/cli.js fix test --fast --compact
 ```
 
 Or link the binary locally and use it inside a target project that has a
-`package.json` test script:
+`package.json` test script or a `go.mod` file:
 
 ```bash
 npm link
@@ -164,6 +165,73 @@ agentshell start --compact
 agentshell fix test --safe --compact
 agentshell fix test --fast --compact
 ```
+
+For a Go project, the supported compact loop is:
+
+```bash
+agentshell start --compact
+agentshell diagnose test --compact
+agentshell verify test --compact
+```
+
+AgentShell discovers `go.mod` or `go.work` from nested directories. A single
+module uses `go test ./...`; a workspace names every valid local module target
+explicitly. Internally, test verification uses `go test -json` and returns a
+bounded summary of failing packages, tests, subtests, build errors, and related
+files. Raw output remains available through `logRef` when the summary is not
+enough.
+
+After a failed run identifies an `_test.go` file, a later verification can reuse
+the package-scoped command (for example, `go test './internal/calc'`) before the
+full module command. Cache fingerprints include `go.mod`, `go.sum`, Go source,
+`testdata`, files referenced by `//go:embed`, and native build inputs such as C,
+headers, assembly, and Objective-C files. In a `go.work` workspace, inputs from
+every valid local module participate. Very large input sets use uncached
+verification.
+
+The Go verification surface also includes:
+
+```bash
+agentshell verify build
+agentshell verify lint
+agentshell verify format
+agentshell verify modules
+agentshell verify test --profile fast
+agentshell verify test --profile race
+agentshell verify test --profile coverage
+agentshell verify benchmark --bench 'BenchmarkEncode'
+agentshell verify generate
+agentshell verify fuzz --fuzz FuzzName --duration 10s --package ./internal/parser
+```
+
+`lint` uses `go vet`; `format` reports `gofmt` differences without rewriting
+source; and `modules` checks integrity and tidy drift without replacing the
+checkout's `go.mod` or `go.sum`. Benchmarking excludes normal tests. Fuzzing
+requires an explicit target, a bounded duration, and one package. Generate is a
+`go generate -n` preview, so AgentShell does not execute generators implicitly.
+
+Repositories with reviewed wrapper commands can add `.agentshell.json`:
+
+```json
+{
+  "version": 1,
+  "go": {
+    "commands": {
+      "test": "make test",
+      "build": "make build",
+      "lint": "golangci-lint run"
+    }
+  }
+}
+```
+
+Repositories may override the built-in `fast`, `race`, and `coverage` profiles
+with the same `commands` shape under `go.profiles`. Invalid configuration is
+reported instead of silently interpreted. V1 command overrides are limited to
+`test`, `build`, and `lint`; the read-only and bounded workflow commands cannot
+be replaced by repository configuration. `golangci-lint` and `goimports` are
+optional doctor checks; AgentShell does not install them. Automatic Go source
+repair is not supported.
 
 The V1.0 managed installer adds `~/.local/bin` to supported shell profiles when
 needed. Until a new shell is opened, or when working without the installer, use
@@ -228,6 +296,16 @@ agentshell read <file> --around <query>
 ```bash
 agentshell verify test
 agentshell verify test --tail N
+agentshell verify build
+agentshell verify lint
+agentshell verify format
+agentshell verify modules
+agentshell verify test --profile fast
+agentshell verify test --profile race
+agentshell verify test --profile coverage
+agentshell verify benchmark --bench 'BenchmarkEncode'
+agentshell verify generate
+agentshell verify fuzz --fuzz FuzzName --duration 10s --package ./internal/parser
 agentshell diagnose test --compact
 agentshell fix test --fast --compact
 agentshell fix test --safe --compact
@@ -413,6 +491,12 @@ Current automatic strategies are intentionally narrow:
 
 Unsupported failures should remain structured refusals with enough context for
 the agent to choose the next command.
+
+Go modules currently support first-class project detection, compact
+`go test ./...` verification, failure diagnosis, related package reuse, and
+cache invalidation. Automatic Go code repair is not supported yet:
+`agentshell change suggest` returns a structured refusal for a Go source target,
+leaving the agent to review and apply a hash-checked change explicitly.
 
 ## Benchmarks
 

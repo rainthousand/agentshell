@@ -32,8 +32,9 @@ function compactManual() {
         command: "agentshell fix test --safe --compact"
       },
       {
-        need: "Verify tests with compact logs",
-        command: "agentshell verify test"
+        need: "Verify tests, builds, lint, formatting, modules, or bounded Go workflows",
+        command: "agentshell verify <test|build|lint|format|modules|benchmark|fuzz|generate>",
+        note: "format, modules, and generate are read-only checks; Go fuzzing requires an explicit target, duration, and package."
       },
       {
         need: "Inspect task state",
@@ -42,6 +43,63 @@ function compactManual() {
       {
         need: "Read focused file context",
         command: "agentshell read <file> --around <query>"
+      },
+      {
+        need: "Search code with bounded structured output",
+        command: "agentshell grep <query> --compact"
+      },
+      {
+        need: "Inspect project structure without noisy generated folders",
+        command: "agentshell tree --compact"
+      },
+      {
+        need: "Inspect changed files by category and risk",
+        command: "agentshell files changed --compact"
+      },
+      {
+        need: "Inspect one file without dumping its contents",
+        command: "agentshell file info <path> --compact"
+      },
+      {
+        need: "Discover test entry points without running tests",
+        command: "agentshell test list --compact"
+      },
+      {
+        need: "Extract failures from a saved log without reading the whole log",
+        command: "agentshell errors from-log <file> --compact"
+      },
+      {
+        need: "Inspect imports without dumping source",
+        command: "agentshell imports <file> --compact"
+      },
+      {
+        need: "Inspect symbols without dumping source",
+        command: "agentshell symbols <file> --compact"
+      },
+      {
+        need: "Find references with bounded grouped output",
+        command: "agentshell refs <symbol> --compact"
+      },
+      {
+        need: "Discover project config entry points",
+        command: "agentshell config list --compact"
+      },
+      {
+        need: "Inspect git changes safely",
+        command: "agentshell git status --compact",
+        fallback: "agentshell git diff --compact"
+      },
+      {
+        need: "Inspect runnable project scripts",
+        command: "agentshell package scripts --compact"
+      },
+      {
+        need: "Inspect one package script before running it",
+        command: "agentshell package script <name> --compact"
+      },
+      {
+        need: "Inspect manifest dependencies without expanding dependency trees",
+        command: "agentshell package deps --compact"
       },
       {
         need: "Validate local Codex plugin",
@@ -256,8 +314,108 @@ function fullManual() {
         command: "agentshell read <file> --around <query>"
       },
       {
+        need: "Search code with bounded results",
+        command: "agentshell grep <query> [--compact] [--limit N] [--per-file N]"
+      },
+      {
+        need: "Inspect a bounded project tree",
+        command: "agentshell tree [--compact] [--depth N] [--limit N]"
+      },
+      {
+        need: "Summarize changed files by category and risk without raw diffs",
+        command: "agentshell files changed [--compact]"
+      },
+      {
+        need: "Inspect one file's size, hash, git metadata, and symbols without dumping content",
+        command: "agentshell file info <path> [--compact]"
+      },
+      {
+        need: "Discover test scripts and test files without running tests",
+        command: "agentshell test list [--compact] [--max-files N]"
+      },
+      {
+        need: "Extract likely errors from a saved log",
+        command: "agentshell errors from-log <file> [--compact]"
+      },
+      {
+        need: "Summarize imports for one JS/TS/Go file",
+        command: "agentshell imports <file> [--compact]"
+      },
+      {
+        need: "Summarize symbols for one JS/TS/Go file",
+        command: "agentshell symbols <file> [--compact] [--max-symbols N]"
+      },
+      {
+        need: "Search references with bounded grouped output",
+        command: "agentshell refs <symbol> [--compact] [--limit N]"
+      },
+      {
+        need: "Discover common project config entry points",
+        command: "agentshell config list [--compact] [--max-configs N]"
+      },
+      {
+        need: "Inspect git working tree state",
+        command: "agentshell git status [--compact] [--max-files N]"
+      },
+      {
+        need: "Summarize current git diff without dumping raw patches",
+        command: "agentshell git diff [--compact] [--staged]"
+      },
+      {
+        need: "Summarize recent commits without patches",
+        command: "agentshell git log [--compact] [--limit N]"
+      },
+      {
+        need: "Inspect branch/upstream/remotes without leaking full remote URLs",
+        command: "agentshell git branch [--compact] [--max-branches N]"
+      },
+      {
+        need: "Inspect package scripts",
+        command: "agentshell package scripts [--compact]"
+      },
+      {
+        need: "Inspect one package script before running it",
+        command: "agentshell package script <name> [--compact]"
+      },
+      {
+        need: "Inspect package dependencies from manifests only",
+        command: "agentshell package deps [--compact]"
+      },
+      {
         need: "Run tests with summary",
         command: "agentshell verify test [--tail N]"
+      },
+      {
+        need: "Check that the project builds",
+        command: "agentshell verify build [--tail N]"
+      },
+      {
+        need: "Run static analysis or lint checks",
+        command: "agentshell verify lint [--tail N]"
+      },
+      {
+        need: "Check formatting without modifying files",
+        command: "agentshell verify format [--tail N]"
+      },
+      {
+        need: "Check module integrity without modifying files",
+        command: "agentshell verify modules [--tail N]"
+      },
+      {
+        need: "Run a bounded Go test profile",
+        command: "agentshell verify test --profile <fast|race|coverage> [--tail N]"
+      },
+      {
+        need: "Run Go benchmarks without normal tests",
+        command: "agentshell verify benchmark [--bench REGEX] [--tail N]"
+      },
+      {
+        need: "Preview Go generators without executing them",
+        command: "agentshell verify generate [--tail N]"
+      },
+      {
+        need: "Run one bounded Go fuzz target",
+        command: "agentshell verify fuzz --fuzz TARGET --duration DURATION --package PACKAGE [--tail N]"
       },
       {
         need: "Read stored verification logs",
@@ -335,6 +493,9 @@ function fullManual() {
       "Do not invent expectedHash values.",
       "If change returns HASH_MISMATCH, re-read the file and rebuild the change JSON.",
       "Use verify output summary and suggestedNextActions before reading raw logs.",
+      "Use agentshell verify format, agentshell verify modules, and agentshell verify generate as read-only checks; they never rewrite source files, module manifests, or generated outputs.",
+      "Use Go fuzz verification only with an explicit target, finite duration, and one local package.",
+      "Diagnose and fix remain test-only workflows: use agentshell diagnose test and agentshell fix test.",
       "Use logRef with agentshell log get only when the verification summary is insufficient.",
       "Use agentshell metrics --compact to measure recent AgentShell output cost.",
       "Use agentshell run next when you only need the next recommended command.",

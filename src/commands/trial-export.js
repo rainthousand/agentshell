@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { pluginStatus } from "./plugin-status.js";
-import { getPackageInfo } from "../core/package-json.js";
+import { getProjectInfo, projectCommand } from "../core/project.js";
 import { appendEvent, readActiveRun, readEvents, readOperations, readRuns } from "../core/store.js";
 import { summarizeRun } from "./run-status.js";
 import { verify } from "./verify.js";
@@ -159,18 +159,18 @@ export function trialStatus(root, options = {}) {
     });
   }
 
-  const packageInfo = getPackageInfo(discovery.projectRoot);
+  const projectInfo = getProjectInfo(discovery.projectRoot);
   const details = evidenceDetails(discovery.projectRoot, now);
   const base = {
     cwd: path.resolve(root),
     projectRoot: discovery.projectRoot,
     suggestedProjectRoot: null,
-    packageName: packageInfo?.name || path.basename(discovery.projectRoot),
+    packageName: projectInfo?.name || path.basename(discovery.projectRoot),
     ...details,
     maximumRunAgeHours: MAXIMUM_RUN_AGE_HOURS
   };
 
-  if (!packageInfo?.scripts?.test) return statusResult("no-test-script", base);
+  if (!projectCommand(projectInfo, "test")) return statusResult("no-test-script", base);
   if ((details.latestVerification?.ok === false && details.latestVerification.recent)
     || (details.runStatus === "failing" && details.hasRecentEvidence)) {
     return statusResult("failed-verification", base);
@@ -184,9 +184,9 @@ export function trialStatus(root, options = {}) {
 export function discoverTrialProject(root, options = {}) {
   const cwd = path.resolve(root);
   const home = path.resolve(options.home || os.homedir());
-  const packageInfo = getPackageInfo(cwd);
-  if (packageInfo && (cwd !== home || packageInfo.scripts?.test)) {
-    return { projectRoot: packageInfo.root, suggestedProjectRoot: null };
+  const projectInfo = getProjectInfo(cwd);
+  if (projectInfo && (cwd !== home || projectCommand(projectInfo, "test"))) {
+    return { projectRoot: projectInfo.root, suggestedProjectRoot: null };
   }
 
   let candidates = [];
@@ -196,10 +196,9 @@ export function discoverTrialProject(root, options = {}) {
       .slice(0, 100)
       .map((entry) => path.join(cwd, entry.name))
       .filter((candidate) => {
-        const candidateInfo = getPackageInfo(candidate);
-        return fs.existsSync(path.join(candidate, "package.json"))
-          && candidateInfo?.root === candidate
-          && Boolean(candidateInfo.scripts?.test);
+        const candidateInfo = getProjectInfo(candidate);
+        return candidateInfo?.root === candidate
+          && Boolean(projectCommand(candidateInfo, "test"));
       });
   } catch {
     candidates = [];
@@ -274,8 +273,8 @@ function evidenceTime(run) {
 
 function statusResult(status, details) {
   const messages = {
-    "wrong-directory": "No Node.js project was found from the current directory.",
-    "no-test-script": "The project has no npm-style test script.",
+    "wrong-directory": "No supported project was found from the current directory.",
+    "no-test-script": "The project has no supported test command.",
     "no-agentshell-events": "No AgentShell command events were recorded for this project.",
     "stale-evidence": "AgentShell evidence exists, but it is older than the export window.",
     "failed-verification": "The most recent AgentShell verification failed.",
@@ -313,7 +312,7 @@ function statusActions(status, details) {
     }] : [{ command: "cd <project-directory>", reason: "Run AgentShell from the project you tested" }];
   }
   if (status === "no-test-script") {
-    return [{ command: "agentshell trial status --project <project-directory>", reason: "Choose a project with a real test script; AgentShell will not modify package.json automatically" }];
+    return [{ command: "agentshell trial status --project <project-directory>", reason: "Choose a project with a real test command; AgentShell will not modify the project manifest automatically" }];
   }
   if (status === "failed-verification") {
     return [{ command: "agentshell fix test --fast --compact", reason: "Repair the failing tests before exporting evidence" }];

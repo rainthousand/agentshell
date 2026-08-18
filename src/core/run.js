@@ -3,10 +3,12 @@ import { spawn } from "node:child_process";
 export function runShell(command, cwd) {
   return new Promise((resolve) => {
     const started = Date.now();
+    const env = { ...process.env };
+    delete env.AGENTSHELL_PACKAGE_ROOT;
     const child = spawn(command, {
       cwd,
       shell: true,
-      env: process.env
+      env
     });
     let stdout = "";
     let stderr = "";

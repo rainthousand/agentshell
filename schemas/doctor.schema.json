@@ -25,7 +25,8 @@
           "additionalProperties": false,
           "required": ["node"],
           "properties": {
-            "node": { "$ref": "#/$defs/node" }
+            "node": { "$ref": "#/$defs/node" },
+            "go": { "$ref": "#/$defs/go" }
           }
         },
         "package": { "$ref": "#/$defs/package" },
@@ -58,13 +59,56 @@
         "ok": { "type": "boolean" }
       }
     },
+    "go": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["available", "version", "error", "tools"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "version": { "type": ["string", "null"] },
+        "error": { "type": ["string", "null"] },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["golangciLint", "goimports"],
+          "properties": {
+            "golangciLint": { "$ref": "#/$defs/goTool" },
+            "goimports": { "$ref": "#/$defs/goTool" }
+          }
+        }
+      }
+    },
+    "goTool": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["available"],
+          "properties": {
+            "available": { "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["available", "version", "path"],
+          "properties": {
+            "available": { "const": true },
+            "version": { "type": ["string", "null"] },
+            "path": { "type": "string" }
+          }
+        }
+      ]
+    },
     "package": {
       "type": "object",
       "additionalProperties": false,
       "required": ["found", "manager", "scripts"],
       "properties": {
         "found": { "type": "boolean" },
-        "manager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", null] },
+        "manager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", "go", null] },
+        "kind": { "enum": ["node", "go"] },
+        "manifest": { "enum": ["package.json", "go.mod", "go.work"] },
         "scripts": {
           "type": "object",
           "additionalProperties": false,
@@ -126,7 +170,7 @@
       "additionalProperties": false,
       "required": ["name", "ok", "severity", "message"],
       "properties": {
-        "name": { "enum": ["node", "package-json", "test-script", "state-dir", "active-run", "git"] },
+        "name": { "enum": ["node", "package-json", "test-script", "go", "state-dir", "active-run", "git"] },
         "ok": { "type": "boolean" },
         "severity": { "enum": ["info", "warning", "error"] },
         "message": { "type": "string" }

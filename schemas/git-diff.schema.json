@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/git-diff.schema.json",
+  "title": "AgentShell Git Diff Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "mode", "summary", "files", "risks", "diffRef", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.git-diff.v1" },
+        "compact": { "type": "boolean" },
+        "mode": { "enum": ["unstaged", "staged"] },
+        "summary": {
+          "type": "object",
+          "required": ["fileCount", "returnedFileCount", "truncatedFiles", "insertions", "deletions", "hasChanges", "stat"],
+          "properties": {
+            "fileCount": { "type": "integer", "minimum": 0 },
+            "returnedFileCount": { "type": "integer", "minimum": 0 },
+            "truncatedFiles": { "type": "boolean" },
+            "insertions": { "type": "integer", "minimum": 0 },
+            "deletions": { "type": "integer", "minimum": 0 },
+            "hasChanges": { "type": "boolean" },
+            "stat": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file" }
+        },
+        "risks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/risk" }
+        },
+        "diffRef": { "type": ["string", "null"] },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["path", "oldPath", "changeType", "insertions", "deletions", "binary", "hunks", "truncatedHunks"],
+      "properties": {
+        "path": { "type": "string" },
+        "oldPath": { "type": ["string", "null"] },
+        "changeType": { "enum": ["added", "modified", "deleted", "renamed", "copied", "typechanged"] },
+        "insertions": { "type": ["integer", "null"], "minimum": 0 },
+        "deletions": { "type": ["integer", "null"], "minimum": 0 },
+        "binary": { "type": "boolean" },
+        "hunks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hunk" }
+        },
+        "truncatedHunks": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "hunk": {
+      "type": "object",
+      "required": ["oldStart", "oldLines", "newStart", "newLines", "functionContext"],
+      "properties": {
+        "oldStart": { "type": "integer", "minimum": 0 },
+        "oldLines": { "type": "integer", "minimum": 0 },
+        "newStart": { "type": "integer", "minimum": 0 },
+        "newLines": { "type": "integer", "minimum": 0 },
+        "functionContext": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["code", "severity", "path", "message"],
+      "properties": {
+        "code": {
+          "enum": ["large-diff", "large-file-change", "lockfile-change", "generated-output", "binary-change", "delete-change"]
+        },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "path": { "type": ["string", "null"] },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

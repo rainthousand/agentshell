@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/tree.schema.json",
+  "title": "AgentShell Tree Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "root", "summary", "directories", "files", "ignored", "truncated", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.tree.v1" },
+        "compact": { "type": "boolean" },
+        "root": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "path"],
+          "properties": {
+            "name": { "type": "string" },
+            "path": { "type": "string" }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["directoryCount", "fileCount", "ignoredCount", "importantDirectories", "entryFiles", "maxDepth"],
+          "properties": {
+            "directoryCount": { "type": "integer", "minimum": 0 },
+            "fileCount": { "type": "integer", "minimum": 0 },
+            "ignoredCount": { "type": "integer", "minimum": 0 },
+            "importantDirectories": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "entryFiles": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "maxDepth": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "directories": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/directory" }
+        },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file" }
+        },
+        "ignored": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ignored" }
+        },
+        "truncated": { "type": "boolean" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "directory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "depth", "important"],
+      "properties": {
+        "path": { "type": "string" },
+        "depth": { "type": "integer", "minimum": 1 },
+        "important": { "type": "boolean" }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "depth", "entry"],
+      "properties": {
+        "path": { "type": "string" },
+        "depth": { "type": "integer", "minimum": 1 },
+        "entry": { "type": "boolean" }
+      }
+    },
+    "ignored": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,24 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getPackageInfo, detectPackageManager, scriptCommand } from "../core/package-json.js";
 import { gitInfo } from "../core/git.js";
+import { getProjectInfo, projectCommand } from "../core/project.js";
 
 const PROTOCOL_VERSION = "agentshell.understand.v1";
 
 export async function understand(root, options = {}) {
-  const packageInfo = getPackageInfo(root);
-  const workspaceRoot = packageInfo?.root || root;
-  const packageManager = packageInfo ? detectPackageManager(workspaceRoot) : null;
+  const project = getProjectInfo(root);
+  const workspaceRoot = project?.root || root;
   const scripts = {};
 
   for (const name of ["test", "lint", "build", "dev"]) {
-    if (packageInfo?.scripts?.[name]) {
-      scripts[name] = scriptCommand(packageManager, name);
-    }
+    const command = projectCommand(project, name);
+    if (command) scripts[name] = command;
   }
 
   const languages = detectLanguages(workspaceRoot);
-  const frameworks = detectFrameworks(packageInfo?.dependencies || {});
+  const frameworks = detectFrameworks(project?.dependencies || {});
   const git = gitInfo(workspaceRoot);
   const suggestedNextActions = [];
 
@@ -34,11 +32,11 @@ export async function understand(root, options = {}) {
     protocolVersion: PROTOCOL_VERSION,
     workspace: {
       root: workspaceRoot,
-      name: packageInfo?.name || path.basename(workspaceRoot)
+      name: project?.name || path.basename(workspaceRoot)
     },
     stack: {
       languages,
-      packageManager,
+      packageManager: project?.manager || null,
       frameworks
     },
     scripts,

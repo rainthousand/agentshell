@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getPackageInfo, detectPackageManager, directTestFileCommand, scriptCommand, scriptCommandWithArgs } from "../core/package-json.js";
+import { getProjectInfo, projectCommand, relatedTestCommand } from "../core/project.js";
+import { parseGoTestJson } from "../core/go-test-json.js";
+import { isGoAdvancedType, planGoVerification } from "../core/go-profiles.js";
+import { goQualityCommand, isGoQualityType, runGoQuality } from "../core/go-quality.js";
 import { fail } from "../core/output.js";
 import { runShell } from "../core/run.js";
 import { appendOperation, appendRunNode, newId, readActiveRun, readLog, writeLog } from "../core/store.js";
@@ -15,72 +18,124 @@ const MAX_LOG_TAIL_LINES = 200;
 const PROTOCOL_VERSION = "agentshell.verify.v1";
 
 export async function verify(root, type, options = {}) {
-  const packageInfo = getPackageInfo(root);
-  if (!packageInfo) return fail("PACKAGE_NOT_FOUND", "No package.json found for verification");
+  const project = getProjectInfo(root);
+  if (!project) return fail("PACKAGE_NOT_FOUND", "No supported project manifest found for verification");
 
-  const packageManager = detectPackageManager(packageInfo.root);
-  const script = packageInfo.scripts[type];
-  if (!script) return fail("SCRIPT_NOT_FOUND", `No ${type} script found in package.json`);
+  if (options.profile && (project.kind !== "go" || type !== "test")) {
+    return fail("GO_PROFILE_UNSUPPORTED", "--profile is supported only by verify test in Go projects");
+  }
 
-  const command = scriptCommand(packageManager, type);
-  const cacheContext = createTestResultCacheContext(packageInfo.root, {
+  const goQuality = project.kind === "go" && isGoQualityType(type);
+  const goPlan = planGoVerification(project, type, options);
+  if (goPlan && !goPlan.ok) return fail(goPlan.code, goPlan.message, goPlan.details);
+  if (isGoAdvancedType(type) && project.kind !== "go") {
+    return fail("GO_WORKFLOW_UNSUPPORTED", `verify ${type} is supported only in Go projects`);
+  }
+  const command = goPlan?.command || (goQuality ? goQualityCommand(type) : projectCommand(project, type));
+  if (!command) {
+    const message = project.kind === "node"
+      ? `No ${type} script found in package.json`
+      : `No ${type} command found in ${project.manifest}`;
+    return fail("SCRIPT_NOT_FOUND", message);
+  }
+
+  if (goQuality) {
+    const verification = await runVerificationCommand(project.root, type, command, options, {
+      cacheContext: null,
+      cacheLookup: { cacheKey: `uncached:go:${type}` },
+      projectKind: project.kind,
+      projectModules: project.modules,
+      qualityProject: project
+    });
+    return verification.output;
+  }
+
+  if (goPlan?.cacheable === false) {
+    const verification = await runVerificationCommand(project.root, type, command, options, {
+      cacheContext: null,
+      cacheLookup: { cacheKey: `uncached:go:${type}` },
+      projectKind: project.kind,
+      projectModules: project.modules
+    });
+    return verification.output;
+  }
+
+  const cacheContext = createTestResultCacheContext(project.root, {
     type,
     command,
-    packagePath: packageInfo.path
+    packagePath: project.path,
+    project
   });
   const cacheLookup = findTestResultCacheFromContext(cacheContext);
   if (cacheLookup.cacheHit) {
-    return cachedVerify(packageInfo.root, type, command, cacheLookup, options);
+    return cachedVerify(project.root, type, command, cacheLookup, options);
   }
 
-  const relatedPlan = relatedTestFilePlan(packageInfo.root, {
+  const relatedPlan = options.profile ? null : relatedTestFilePlan(project.root, {
     type,
     command,
-    packagePath: packageInfo.path,
-    packageManager,
-    script,
+    project,
     relatedFiles: options.relatedFiles || [],
     cacheContext
   });
   if (relatedPlan) {
-    const relatedCacheContext = createTestResultCacheContext(packageInfo.root, {
+    const relatedCacheContext = createTestResultCacheContext(project.root, {
       type,
       command: relatedPlan.command,
-      packagePath: packageInfo.path
+      packagePath: project.path,
+      project
     });
-    const related = await runVerificationCommand(packageInfo.root, type, relatedPlan.command, options, {
-      packagePath: packageInfo.path,
+    const related = await runVerificationCommand(project.root, type, relatedPlan.command, options, {
+      packagePath: project.path,
       cacheContext: relatedCacheContext,
       cacheLookup: findTestResultCacheFromContext(relatedCacheContext),
       verificationMode: "related-test-file",
       fullCommand: command,
       relatedTestFile: relatedPlan.file,
-      relatedTestFileSource: relatedPlan.source
+      relatedTestFileSource: relatedPlan.source,
+      projectKind: project.kind,
+      projectModules: project.modules
     });
     if (!related.output.ok) return related.output;
 
-    const full = await runVerificationCommand(packageInfo.root, type, command, options, {
-      packagePath: packageInfo.path,
+    const full = await runVerificationCommand(project.root, type, command, options, {
+      packagePath: project.path,
       cacheContext,
       cacheLookup,
+      projectKind: project.kind,
+      projectModules: project.modules,
       relatedTestFileVerification: compactRelatedVerification(related.output)
     });
     return full.output;
   }
 
-  const verification = await runVerificationCommand(packageInfo.root, type, command, options, {
-    packagePath: packageInfo.path,
+  const verification = await runVerificationCommand(project.root, type, command, options, {
+    packagePath: project.path,
     cacheContext,
-    cacheLookup
+    cacheLookup,
+    projectKind: project.kind,
+    projectModules: project.modules
   });
   return verification.output;
 }
 
 async function runVerificationCommand(root, type, command, options, metadata) {
   const started = Date.now();
-  const result = await runShell(command, root);
+  const structuredGoTest = metadata.projectKind === "go" && type === "test";
+  const executionCommand = structuredGoTest ? goTestJsonCommand(command) : command;
+  const result = metadata.qualityProject
+    ? await runGoQuality(metadata.qualityProject, type)
+    : await runShell(executionCommand, root);
   const combined = `${result.stdout}\n${result.stderr}`;
-  const relatedFiles = extractRelatedFiles(combined, root);
+  const goTest = structuredGoTest
+    ? parseGoTestJson(combined, { root, modules: metadata.projectModules })
+    : null;
+  const summaryText = goTest?.outputText || combined;
+  const relatedFiles = [...new Set([
+    ...(result.relatedFiles || []),
+    ...(goTest?.relatedFiles || []),
+    ...extractRelatedFiles(summaryText, root)
+  ])].slice(0, 10);
   const ok = result.exitCode === 0;
   const operationId = newId("op");
   const logRef = newId("log");
@@ -99,8 +154,8 @@ async function runVerificationCommand(root, type, command, options, metadata) {
     cacheHit: false,
     cacheKey: metadata.cacheLookup.cacheKey,
     summary: {
-      mainError: ok ? null : extractMainError(combined),
-      failedTests: ok ? 0 : countFailedTests(combined)
+      mainError: ok ? null : (result.summary?.mainError || goTest?.mainError || extractMainError(summaryText)),
+      failedTests: ok ? 0 : (result.summary?.failedTests ?? goTest?.failedTests ?? countFailedTests(summaryText))
     },
     relatedFiles,
     logRef,
@@ -115,15 +170,17 @@ async function runVerificationCommand(root, type, command, options, metadata) {
   addVerificationMetadata(output, metadata);
 
   if (requestedTail) {
-    output.logTail = tailRelevant(combined, requestedTail);
+    output.logTail = tailRelevant(summaryText, requestedTail);
   }
 
-  const cacheWrite = writeTestResultCacheFromContext(metadata.cacheContext, {
-    result,
-    summary: output.summary,
-    relatedFiles,
-    logRef
-  });
+  const cacheWrite = metadata.cacheContext
+    ? writeTestResultCacheFromContext(metadata.cacheContext, {
+        result,
+        summary: output.summary,
+        relatedFiles,
+        logRef
+      })
+    : null;
   if (cacheWrite) output.cacheKey = cacheWrite.cacheKey;
 
   appendOperation(root, {
@@ -171,6 +228,11 @@ async function runVerificationCommand(root, type, command, options, metadata) {
   return { output, result };
 }
 
+function goTestJsonCommand(command) {
+  if (!/^\s*go\s+test(?:\s|$)/.test(command) || /(?:^|\s)-json(?:\s|$)/.test(command)) return command;
+  return command.replace(/^(\s*go\s+test)(?=\s|$)/, "$1 -json");
+}
+
 function relatedTestFilePlan(root, context) {
   if (context.type !== "test") return null;
   const explicitFiles = selectRelatedTestFiles(context.relatedFiles);
@@ -181,8 +243,7 @@ function relatedTestFilePlan(root, context) {
   const file = candidates.find((candidate) => fs.existsSync(path.join(root, candidate)));
   if (!file) return null;
 
-  const directCommand = directTestFileCommand(context.script, file);
-  const command = directCommand || appendableTestCommand(context, file);
+  const command = relatedTestCommand(context.project, file);
   if (!command || command === context.command) return null;
 
   return {
@@ -193,17 +254,14 @@ function relatedTestFilePlan(root, context) {
   };
 }
 
-function appendableTestCommand(context, file) {
-  if (!/^\s*(?:vitest|jest|mocha)(?:\s|$)/.test(context.script)) return null;
-  return scriptCommandWithArgs(context.packageManager, context.type, [file]);
-}
-
 function selectRelatedTestFiles(files) {
   return [...new Set((files || []).filter(isRelatedTestFile))];
 }
 
 function isRelatedTestFile(file) {
-  return /(?:^|\/)(?:test|tests)\//.test(file) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
+  return /(?:^|\/)(?:test|tests)\//.test(file) ||
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) ||
+    /_test\.go$/.test(file);
 }
 
 function addVerificationMetadata(output, metadata) {
@@ -304,7 +362,14 @@ function cachedVerify(root, type, command, cacheLookup, options) {
 
 function extractMainError(text) {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const goError = lines.find((line) => /\.go:\d+(?::\d+)?:\s+.+/.test(line)) ||
+    lines.find((line) => /^--- FAIL:\s+/.test(line)) ||
+    lines.find((line) => /^panic:\s+/i.test(line));
+  if (goError) return goError;
+
   const patterns = [
+    /\bundefined:\s+/i,
+    /\bcannot use\b/i,
     /AssertionError/i,
     /\bExpected\b/i,
     /\bError:/i,
@@ -315,6 +380,9 @@ function extractMainError(text) {
 }
 
 function countFailedTests(text) {
+  const goFailures = [...text.matchAll(/^\s*--- FAIL:\s+/gm)].length;
+  if (goFailures > 0) return goFailures;
+
   const matches = [
     ...text.matchAll(/\b(\d+)\s+(?:failing|failed|failures?)\b/gi),
     ...text.matchAll(/\bnot ok\b/gi)
@@ -340,8 +408,28 @@ function normalizeFileRef(value, root) {
     if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
     file = relative;
   }
-  if (!fs.existsSync(path.join(root, file))) return null;
-  return file;
+  if (fs.existsSync(path.join(root, file))) return file;
+  if (path.dirname(file) !== ".") return null;
+
+  const matches = findFilesByBasename(root, file);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function findFilesByBasename(root, basename) {
+  const matches = [];
+  const ignored = new Set([".git", ".agentshell", "node_modules", "vendor"]);
+  const pending = [root];
+  while (pending.length > 0 && matches.length < 2) {
+    const directory = pending.pop();
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!ignored.has(entry.name)) pending.push(path.join(directory, entry.name));
+      } else if (entry.isFile() && entry.name === basename) {
+        matches.push(path.relative(root, path.join(directory, entry.name)).split(path.sep).join("/"));
+      }
+    }
+  }
+  return matches;
 }
 
 function tailRelevant(text, maxLines) {

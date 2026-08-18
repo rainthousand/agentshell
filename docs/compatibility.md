@@ -8,13 +8,35 @@
   same plugin contract. V1.0 is validated against Codex CLI `0.144.2`; this is
   a tested baseline, not a claimed upstream compatibility guarantee.
 - The AgentShell V1.0 standalone release package and its bundled Codex plugin.
-- Local projects with an npm-compatible `package.json` test script for managed
-  test diagnosis, repair, and verification.
+- Local JavaScript and TypeScript projects with an npm-compatible `package.json`
+  test script for managed test diagnosis, supported repair, and verification.
+- Local Go modules with `go.mod` and local multi-module workspaces with
+  `go.work`. Workspace verification names every valid local module target
+  explicitly; invalid or outside-workspace `use` entries are reported.
+- Go test verification uses `go test -json` internally to summarize package,
+  test, subtest, build, and panic failures while retaining raw output behind a
+  bounded `logRef`.
+- Go cache fingerprints cover `go.mod`, `go.sum`, Go source, `testdata`,
+  `//go:embed` resources, and native build inputs. All valid `go.work` modules
+  participate; oversized input sets run uncached.
+- Go test, build, `go vet` lint, read-only `gofmt` comparison, and read-only
+  module integrity/tidy-drift verification.
+- Fast, race, and coverage test profiles; bounded benchmark and fuzz workflows;
+  and read-only `go generate -n` preview. Fuzz requires an explicit target,
+  finite duration, and one package.
+- Version 1 `.agentshell.json` Go command and built-in-profile overrides for
+  repositories that use reviewed wrappers. Invalid configuration is surfaced
+  rather than silently interpreted.
 
 The packaged standalone CLI is the supported user runtime. End users do not need
 Node.js, Bun, npm, a source checkout, or the developer's home directory to run
 AgentShell. Node.js 20 or newer and Bun 1.2.20 are release-build requirements for
 maintainers, not installation requirements for users.
+
+Go verification requires a working `go` executable on `PATH`. The
+`agentshell doctor` command reports the Go version and blocks Go-module
+readiness when the toolchain is unavailable. `golangci-lint` and `goimports`
+are optional, non-blocking doctor checks; AgentShell does not install them.
 
 ## Not supported in V1.0
 
@@ -23,6 +45,13 @@ maintainers, not installation requirements for users.
 - Codex builds without local plugin support.
 - Remote execution, hosted telemetry, MCP, or shared team services.
 - Automatic repair outside the strategies explicitly reported by AgentShell.
+- Automatic Go source repair. Go diagnosis may identify related test and
+  implementation files, but source edits remain an explicit, reviewed,
+  hash-checked agent action.
+- Unbounded or target-free Go fuzzing, implicit generator execution, mutation by
+  `verify format`, or replacement of repository `go.mod`/`go.sum` files by
+  `verify modules`.
+- Execution of `go.work` modules outside the detected workspace.
 
 ## Acceptance boundary
 

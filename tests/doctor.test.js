@@ -103,6 +103,8 @@ test("doctor reports package metadata when no test script is configured", () => 
     assert.equal(output.workspace.name, "doctor-no-test");
     assert.equal(output.package.found, true);
     assert.equal(output.package.manager, "npm");
+    assert.equal(Object.hasOwn(output.package, "kind"), false);
+    assert.equal(Object.hasOwn(output.package, "manifest"), false);
     assert.deepEqual(output.package.scripts, {
       test: null,
       build: "node build.js",

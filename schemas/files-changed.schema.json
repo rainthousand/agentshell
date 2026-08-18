@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/files-changed.schema.json",
+  "title": "AgentShell Files Changed Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "summary", "files", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.files-changed.v1" },
+        "compact": { "type": "boolean" },
+        "summary": {
+          "type": "object",
+          "required": ["clean", "dirty", "totalFiles", "returnedFiles", "truncated", "staged", "unstaged", "untracked", "categories", "risks"],
+          "properties": {
+            "clean": { "type": "boolean" },
+            "dirty": { "type": "boolean" },
+            "totalFiles": { "type": "integer", "minimum": 0 },
+            "returnedFiles": { "type": "integer", "minimum": 0 },
+            "truncated": { "type": "boolean" },
+            "staged": { "type": "integer", "minimum": 0 },
+            "unstaged": { "type": "integer", "minimum": 0 },
+            "untracked": { "type": "integer", "minimum": 0 },
+            "categories": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 1 }
+            },
+            "risks": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "additionalProperties": false
+        },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file" }
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["path", "status", "staged", "unstaged", "untracked", "category", "risk"],
+      "properties": {
+        "path": { "type": "string" },
+        "status": { "enum": ["added", "modified", "deleted", "renamed", "copied", "unmerged", "untracked", "staged", "changed"] },
+        "staged": { "type": "boolean" },
+        "unstaged": { "type": "boolean" },
+        "untracked": { "type": "boolean" },
+        "category": { "enum": ["test", "docs", "config", "source", "lockfile", "generated", "asset", "other"] },
+        "risk": { "enum": ["high", "medium", "low"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

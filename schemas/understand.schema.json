@@ -64,9 +64,12 @@
       "properties": {
         "languages": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string",
+            "examples": ["javascript", "typescript", "go"]
+          }
         },
-        "packageManager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", null] },
+        "packageManager": { "type": ["string", "null"], "enum": ["npm", "pnpm", "yarn", "bun", "go", null] },
         "frameworks": {
           "type": "array",
           "items": { "type": "string" }

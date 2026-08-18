@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/package-scripts.schema.json",
+  "title": "AgentShell Package Scripts Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "packageManager", "package", "summary", "scripts", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.package-scripts.v1" },
+        "compact": { "type": "boolean" },
+        "packageManager": { "enum": ["npm", "pnpm", "yarn", "bun"] },
+        "package": { "$ref": "#/$defs/package" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "scripts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/script" }
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "private", "path"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": ["string", "null"] },
+        "private": { "type": "boolean" },
+        "path": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalScripts", "returnedScripts", "truncated", "hasTest", "hasBuild", "hasLint", "hasTypecheck", "hasDev", "hasFormat", "riskyCount", "longRunningCount"],
+      "properties": {
+        "totalScripts": { "type": "integer", "minimum": 0 },
+        "returnedScripts": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" },
+        "hasTest": { "type": "boolean" },
+        "hasBuild": { "type": "boolean" },
+        "hasLint": { "type": "boolean" },
+        "hasTypecheck": { "type": "boolean" },
+        "hasDev": { "type": "boolean" },
+        "hasFormat": { "type": "boolean" },
+        "riskyCount": { "type": "integer", "minimum": 0 },
+        "longRunningCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "script": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "command", "category", "risky", "longRunning"],
+      "properties": {
+        "name": { "type": "string" },
+        "command": { "type": "string" },
+        "category": { "enum": ["test", "build", "lint", "typecheck", "dev", "format", "other"] },
+        "risky": { "type": "boolean" },
+        "longRunning": { "type": "boolean" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/errors-from-log.schema.json",
+  "title": "AgentShell Errors From Log Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "source", "summary", "errors", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.errors-from-log.v1" },
+        "compact": { "type": "boolean" },
+        "source": { "$ref": "#/$defs/source" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "errors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/logError" },
+          "maxItems": 20
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["ok", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "error": { "$ref": "#/$defs/error" }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["kind", "path", "sizeBytes", "readBytes", "lineCount", "truncated"],
+      "properties": {
+        "kind": { "enum": ["file", "stdin", "text"] },
+        "path": { "type": ["string", "null"] },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "readBytes": { "type": "integer", "minimum": 0 },
+        "lineCount": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["errorCount", "returnedErrors", "omittedErrors", "truncated"],
+      "properties": {
+        "errorCount": { "type": "integer", "minimum": 0 },
+        "returnedErrors": { "type": "integer", "minimum": 0 },
+        "omittedErrors": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "logError": {
+      "type": "object",
+      "required": ["message", "type", "file", "line", "column", "confidence", "snippet"],
+      "properties": {
+        "message": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "type": {
+          "enum": ["assertion", "node-error", "panic", "tap-fail", "go-test-fail", "go-diagnostic", "stack"]
+        },
+        "file": { "type": ["string", "null"] },
+        "line": { "type": ["integer", "null"], "minimum": 1 },
+        "column": { "type": ["integer", "null"], "minimum": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "snippet": { "type": "string", "maxLength": 280 }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "details", "suggestedNextActions"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": { "type": "object" },
+        "suggestedNextActions": { "type": "array" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

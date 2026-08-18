@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/file-info.schema.json",
+  "title": "AgentShell File Info Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "path", "exists", "sizeBytes", "lineCount", "language", "extension", "generated", "binary", "hash", "git", "code"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.file-info.v1" },
+        "compact": { "type": "boolean" },
+        "path": { "type": "string" },
+        "exists": { "const": true },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "lineCount": { "type": ["integer", "null"], "minimum": 0 },
+        "language": { "type": ["string", "null"] },
+        "extension": { "type": "string" },
+        "generated": { "type": "boolean" },
+        "binary": { "type": "boolean" },
+        "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "git": { "$ref": "#/$defs/git" },
+        "code": {
+          "oneOf": [
+            { "$ref": "#/$defs/codeSummary" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["ok", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "error": { "$ref": "#/$defs/error" }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "git": {
+      "type": "object",
+      "required": ["tracked", "lastCommit"],
+      "properties": {
+        "tracked": { "type": "boolean" },
+        "lastCommit": {
+          "oneOf": [
+            { "$ref": "#/$defs/lastCommit" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "lastCommit": {
+      "type": "object",
+      "required": ["shortHash", "subject", "relativeAge"],
+      "properties": {
+        "shortHash": { "type": "string" },
+        "subject": { "type": "string" },
+        "relativeAge": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "codeSummary": {
+      "type": "object",
+      "required": ["symbols", "exports", "importCount"],
+      "properties": {
+        "symbols": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/symbol" },
+          "maxItems": 20
+        },
+        "exports": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 20
+        },
+        "importCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "symbol": {
+      "type": "object",
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": { "enum": ["function", "type", "variable"] },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "details", "suggestedNextActions"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": { "type": "object" },
+        "suggestedNextActions": { "type": "array" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

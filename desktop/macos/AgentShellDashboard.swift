@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import WebKit
 
-final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate {
+final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, NSPopoverDelegate {
     private var panel: NSPanel!
     private var webView: WKWebView!
     private var statusItem: NSStatusItem!
@@ -12,6 +12,9 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
     private var timeValue: NSTextField!
     private var refreshTimer: Timer?
     private var requestTask: URLSessionDataTask?
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
+    private var resignActiveObserver: NSObjectProtocol?
     private let dashboardURL: URL
     private let showWindowAtLaunch: Bool
 
@@ -33,6 +36,13 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         buildPanel()
         buildPopover()
         buildStatusItem()
+        resignActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: NSApp,
+            queue: .main
+        ) { [weak self] _ in
+            self?.closePopover()
+        }
         refreshMetrics()
         refreshTimer = Timer.scheduledTimer(timeInterval: 5, target: self, selector: #selector(refreshMetrics), userInfo: nil, repeats: true)
         if showWindowAtLaunch { showPanel() }
@@ -41,6 +51,10 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
     func applicationWillTerminate(_ notification: Notification) {
         refreshTimer?.invalidate()
         requestTask?.cancel()
+        removePopoverDismissHandlers()
+        if let resignActiveObserver {
+            NotificationCenter.default.removeObserver(resignActiveObserver)
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -118,6 +132,7 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         popover.contentViewController = controller
         popover.contentSize = content.frame.size
         popover.behavior = .transient
+        popover.delegate = self
         popover.animates = true
     }
 
@@ -171,6 +186,52 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         } else {
             refreshMetrics()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            installPopoverDismissHandlers()
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        removePopoverDismissHandlers()
+    }
+
+    private func closePopover() {
+        guard popover.isShown else { return }
+        popover.performClose(nil)
+    }
+
+    private func installPopoverDismissHandlers() {
+        removePopoverDismissHandlers()
+
+        let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents) { [weak self] event in
+            guard let self else { return event }
+            self.closePopoverIfClickIsOutside(event)
+            return event
+        }
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.closePopover()
+            }
+        }
+    }
+
+    private func removePopoverDismissHandlers() {
+        if let localEventMonitor {
+            NSEvent.removeMonitor(localEventMonitor)
+            self.localEventMonitor = nil
+        }
+        if let globalEventMonitor {
+            NSEvent.removeMonitor(globalEventMonitor)
+            self.globalEventMonitor = nil
+        }
+    }
+
+    private func closePopoverIfClickIsOutside(_ event: NSEvent) {
+        guard popover.isShown else { return }
+        let popoverWindow = popover.contentViewController?.view.window
+        let statusWindow = statusItem.button?.window
+        if event.window !== popoverWindow && event.window !== statusWindow {
+            closePopover()
         }
     }
 

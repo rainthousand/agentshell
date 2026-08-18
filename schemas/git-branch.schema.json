@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/git-branch.schema.json",
+  "title": "AgentShell Git Branch Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "current", "branches", "remotes", "summary", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.git-branch.v1" },
+        "compact": { "type": "boolean" },
+        "current": { "$ref": "#/$defs/current" },
+        "branches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/branch" }
+        },
+        "remotes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/remote" }
+        },
+        "summary": { "$ref": "#/$defs/summary" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "current": {
+      "type": "object",
+      "required": ["name", "detached", "commit", "upstream", "ahead", "behind"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "detached": { "type": "boolean" },
+        "commit": { "type": ["string", "null"] },
+        "upstream": { "type": ["string", "null"] },
+        "ahead": { "type": "integer", "minimum": 0 },
+        "behind": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "branch": {
+      "type": "object",
+      "required": ["name", "current", "commit", "upstream", "ahead", "behind"],
+      "properties": {
+        "name": { "type": "string" },
+        "current": { "type": "boolean" },
+        "commit": { "type": ["string", "null"] },
+        "upstream": { "type": ["string", "null"] },
+        "ahead": { "type": "integer", "minimum": 0 },
+        "behind": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "remote": {
+      "type": "object",
+      "required": ["name", "host", "provider"],
+      "properties": {
+        "name": { "type": "string" },
+        "host": { "type": ["string", "null"] },
+        "provider": { "enum": ["github", "gitlab", "bitbucket", "azure-devops", "git", "local"] }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["localBranchCount", "returnedBranchCount", "truncatedBranches", "remoteCount", "detached", "hasUpstream", "ahead", "behind"],
+      "properties": {
+        "localBranchCount": { "type": "integer", "minimum": 0 },
+        "returnedBranchCount": { "type": "integer", "minimum": 0 },
+        "truncatedBranches": { "type": "boolean" },
+        "remoteCount": { "type": "integer", "minimum": 0 },
+        "detached": { "type": "boolean" },
+        "hasUpstream": { "type": "boolean" },
+        "ahead": { "type": "integer", "minimum": 0 },
+        "behind": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
