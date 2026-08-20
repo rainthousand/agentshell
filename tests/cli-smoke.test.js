@@ -16,7 +16,15 @@ test("help returns command list as JSON", () => {
   assert.equal(output.ok, true);
   assert.ok(output.commands.includes("agentshell --version"));
   assert.ok(output.commands.includes("agentshell understand [--compact]"));
-  assert.ok(output.commands.includes("agentshell grep <query> [--compact] [--limit N] [--per-file N]"));
+  assert.ok(output.commands.includes("agentshell grep <query> [--compact] [--limit N] [--per-file N] [--type <py|go|ts|js|java>] [--context N] [--files-with-matches]"));
+  assert.ok(output.commands.includes("agentshell find file --name <pattern> [--path <dir>] [--limit N] [--compact]"));
+  assert.ok(output.commands.includes("agentshell ls [path] [--compact] [--limit N]"));
+  assert.ok(output.commands.includes("agentshell pwd [--compact]"));
+  assert.ok(output.commands.includes("agentshell du [path] [--compact] [--limit N] [--max-depth N]"));
+  assert.ok(output.commands.includes("agentshell which <command> [--compact]"));
+  assert.ok(output.commands.includes("agentshell ps [--compact] [--limit N] [--all]"));
+  assert.ok(output.commands.includes("agentshell port list [--compact] [--port N] [--limit N]"));
+  assert.ok(output.commands.includes("agentshell kill suggest [--compact] (--pid N|--port N)"));
   assert.ok(output.commands.includes("agentshell tree [--compact] [--depth N] [--limit N]"));
   assert.ok(output.commands.includes("agentshell package scripts [--compact]"));
   assert.ok(output.commands.includes("agentshell package script <name> [--compact]"));
@@ -171,6 +179,29 @@ test("read --around returns context near a query", () => {
   assert.equal(output.file, "src/commands/read.js");
   assert.ok(output.matchedLine > 0);
   assert.match(output.content, /rangeAround/);
+});
+
+test("daily inspection commands are routed through compact structured output", () => {
+  const cases = [
+    [["find", "file", "--name", "package.json", "--limit", "1", "--compact"], "agentshell.find-file.v1"],
+    [["ls", "--limit", "2", "--compact"], "agentshell.ls.v1"],
+    [["pwd", "--compact"], "agentshell.pwd.v1"],
+    [["du", "--limit", "1", "--compact"], "agentshell.du.v1"],
+    [["which", "node", "--compact"], "agentshell.which.v1"],
+    [["ps", "--limit", "1", "--compact"], "agentshell.ps.v1"],
+    [["port", "list", "--limit", "1", "--compact"], "agentshell.port-list.v1"],
+    [["kill", "suggest", "--pid", "999999", "--compact"], "agentshell.kill-suggest.v1"],
+    [["head", "package.json", "--lines", "2", "--compact"], "agentshell.read.v1"],
+    [["tail", "package.json", "--lines", "2", "--compact"], "agentshell.read.v1"]
+  ];
+
+  for (const [args, protocolVersion] of cases) {
+    const result = spawnSync("node", ["src/cli.js", ...args], { cwd: process.cwd(), encoding: "utf8" });
+    assert.equal(result.status, 0, `${args.join(" ")}: ${result.stderr}`);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.ok, true);
+    assert.equal(output.protocolVersion, protocolVersion);
+  }
 });
 
 test("find returns versioned matches", () => {

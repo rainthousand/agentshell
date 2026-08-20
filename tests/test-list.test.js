@@ -73,6 +73,62 @@ test("testList discovers Go modules and _test.go files", async () => {
   assert.ok(result.suggestedNextActions.some((entry) => entry.command === "go test ./..."));
 });
 
+test("testList discovers Python test config, files, and packages", async () => {
+  const root = fixtureDir("agentshell-test-list-python-");
+  fs.writeFileSync(path.join(root, "pyproject.toml"), "[tool.pytest.ini_options]\n");
+  fs.writeFileSync(path.join(root, "requirements-dev.txt"), "pytest\n");
+  touch(path.join(root, "tests", "api.py"));
+  touch(path.join(root, "src", "test_worker.py"));
+  touch(path.join(root, "src", "worker_test.py"));
+  touch(path.join(root, "src", "worker.py"));
+
+  const result = await testList(root, { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.summary.totalScripts, 0);
+  assert.equal(result.summary.totalFiles, 4);
+  assert.equal(result.summary.pythonPackageCount, 1);
+  assert.equal(result.summary.pythonFileCount, 4);
+  assert.equal(result.summary.hasTests, true);
+  assert.deepEqual(result.packages, [{
+    type: "python",
+    name: path.basename(root),
+    path: "pyproject.toml"
+  }]);
+  assert.deepEqual(result.files.map((entry) => entry.path).sort(), [
+    "pyproject.toml",
+    "src/test_worker.py",
+    "src/worker_test.py",
+    "tests/api.py"
+  ]);
+  assert.equal(result.files.find((entry) => entry.path === "pyproject.toml").kind, "python-config");
+  assert.equal(result.files.find((entry) => entry.path === "tests/api.py").kind, "python-directory");
+  assert.ok(result.suggestedNextActions.some((entry) => entry.command === "python -m pytest"));
+});
+
+test("testList discovers Java Maven and Gradle projects with test files", async () => {
+  const root = fixtureDir("agentshell-test-list-java-");
+  fs.writeFileSync(path.join(root, "pom.xml"), "<project />\n");
+  fs.writeFileSync(path.join(root, "build.gradle.kts"), "plugins { java }\n");
+  touch(path.join(root, "src", "test", "java", "com", "example", "ServiceTest.java"));
+  touch(path.join(root, "src", "test", "java", "com", "example", "Integration.java"));
+  touch(path.join(root, "src", "it", "java", "com", "example", "ServiceIT.java"));
+
+  const result = await testList(root, { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.summary.totalFiles, 3);
+  assert.equal(result.summary.javaPackageCount, 3);
+  assert.equal(result.summary.javaFileCount, 3);
+  assert.equal(result.summary.hasTests, true);
+  assert.ok(result.packages.some((entry) => entry.type === "java" && entry.path === "src"));
+  assert.ok(result.packages.some((entry) => entry.type === "maven" && entry.path === "pom.xml"));
+  assert.ok(result.packages.some((entry) => entry.type === "gradle" && entry.path === "build.gradle.kts"));
+  assert.equal(result.files.find((entry) => entry.path.endsWith("Integration.java")).kind, "java-standard");
+  assert.equal(result.files.find((entry) => entry.path.endsWith("ServiceIT.java")).kind, "java-pattern");
+  assert.ok(result.suggestedNextActions.some((entry) => entry.command === "mvn test"));
+});
+
 test("testList handles mixed Node and Go workspaces", async () => {
   const root = fixtureDir("agentshell-test-list-mixed-");
   writeJson(path.join(root, "package.json"), {
@@ -152,9 +208,15 @@ test("test list schema exposes the compact response contract", () => {
   assert.ok(schema.oneOf[0].required.includes("packages"));
   assert.ok(schema.$defs.summary.required.includes("returnedFiles"));
   assert.ok(schema.$defs.summary.required.includes("truncated"));
+  assert.ok(schema.$defs.summary.required.includes("pythonPackageCount"));
+  assert.ok(schema.$defs.summary.required.includes("javaFileCount"));
   assert.ok(schema.$defs.script.required.includes("runCommand"));
   assert.ok(schema.$defs.file.required.includes("kind"));
+  assert.ok(schema.$defs.file.properties.language.enum.includes("python"));
+  assert.ok(schema.$defs.file.properties.kind.enum.includes("java-standard"));
   assert.ok(schema.$defs.package.properties.type.enum.includes("go-workspace"));
+  assert.ok(schema.$defs.package.properties.type.enum.includes("python"));
+  assert.ok(schema.$defs.package.properties.type.enum.includes("gradle"));
 });
 
 function fixtureDir(prefix) {

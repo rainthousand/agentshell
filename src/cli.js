@@ -5,7 +5,15 @@ import path from "node:path";
 
 import { understand } from "./commands/understand.js";
 import { find } from "./commands/find.js";
+import { findFile } from "./commands/find-file.js";
 import { grep } from "./commands/grep.js";
+import { listDirectory } from "./commands/ls.js";
+import { pwd } from "./commands/pwd.js";
+import { du } from "./commands/du.js";
+import { whichCommand } from "./commands/which.js";
+import { ps } from "./commands/ps.js";
+import { portList } from "./commands/port.js";
+import { killSuggest } from "./commands/kill-suggest.js";
 import { projectTree } from "./commands/tree.js";
 import { gitDiff } from "./commands/git-diff.js";
 import { gitStatus } from "./commands/git-status.js";
@@ -17,12 +25,16 @@ import { packageScript } from "./commands/package-script.js";
 import { filesChanged } from "./commands/files-changed.js";
 import { fileInfo } from "./commands/file-info.js";
 import { testList } from "./commands/test-list.js";
+import { testCommand } from "./commands/test-command.js";
 import { errorsFromLog } from "./commands/errors-from-log.js";
+import { errorsFromCommand } from "./commands/errors-from-command.js";
 import { imports } from "./commands/imports.js";
 import { symbols } from "./commands/symbols.js";
 import { refs } from "./commands/refs.js";
 import { configList } from "./commands/config-list.js";
-import { readFileAround, readFileRange } from "./commands/read.js";
+import { changedImpact } from "./commands/changed-impact.js";
+import { projectHealth } from "./commands/project-health.js";
+import { readFileAround, readFileHead, readFileRange, readFileTail } from "./commands/read.js";
 import { verify } from "./commands/verify.js";
 import { change, fillChange, suggestChange } from "./commands/change.js";
 import { undo } from "./commands/undo.js";
@@ -83,16 +95,28 @@ async function main() {
         "agentshell dashboard [--port N] [--menubar|--window|--browser] [--daemon] [--no-open|--status|--stop]",
         "agentshell setup codex [install|update|uninstall|doctor] [--channel stable|beta|--source <package>] [--home <path>] [--dry-run]",
         "agentshell understand [--compact]",
+        "agentshell project health [--compact]",
         "agentshell find <query>",
-        "agentshell grep <query> [--compact] [--limit N] [--per-file N]",
+        "agentshell find file --name <pattern> [--path <dir>] [--limit N] [--compact]",
+        "agentshell grep <query> [--compact] [--limit N] [--per-file N] [--type <py|go|ts|js|java>] [--context N] [--files-with-matches]",
+        "agentshell ls [path] [--compact] [--limit N]",
+        "agentshell pwd [--compact]",
+        "agentshell du [path] [--compact] [--limit N] [--max-depth N]",
+        "agentshell which <command> [--compact]",
+        "agentshell ps [--compact] [--limit N] [--all]",
+        "agentshell port list [--compact] [--port N] [--limit N]",
+        "agentshell kill suggest [--compact] (--pid N|--port N)",
         "agentshell tree [--compact] [--depth N] [--limit N]",
         "agentshell package scripts [--compact]",
         "agentshell package script <name> [--compact]",
         "agentshell package deps [--compact]",
         "agentshell files changed [--compact]",
+        "agentshell changed impact [--compact]",
         "agentshell file info <path> [--compact]",
         "agentshell test list [--compact] [--max-files N]",
+        "agentshell test command [--compact]",
         "agentshell errors from-log <file> [--compact]",
+        "agentshell errors from-command [--compact] -- <command...>",
         "agentshell imports <file> [--compact]",
         "agentshell symbols <file> [--compact] [--max-symbols N]",
         "agentshell refs <symbol> [--compact] [--limit N]",
@@ -103,6 +127,10 @@ async function main() {
         "agentshell git branch [--compact] [--max-branches N]",
         "agentshell read <file> --lines A:B",
         "agentshell read <file> --around <query>",
+        "agentshell read <file> --head N",
+        "agentshell read <file> --tail N",
+        "agentshell head <file> [--lines N] [--compact]",
+        "agentshell tail <file> [--lines N] [--compact]",
         "agentshell verify <test|build|lint|format|modules> [--tail N]",
         "agentshell verify test [--profile fast|race|coverage] [--compact] [--tail N]",
         "agentshell verify <build|lint|format|modules|generate> [--compact] [--tail N]",
@@ -294,7 +322,29 @@ async function main() {
     return;
   }
 
+  if (command === "project") {
+    if (args[1] !== "health") {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell project health [--compact]"));
+      process.exitCode = 2;
+      return;
+    }
+    emit(await projectHealth(process.cwd(), {
+      compact: args.includes("--compact")
+    }));
+    return;
+  }
+
   if (command === "find") {
+    if (args[1] === "file") {
+      const parsed = parseFindFileCliOptions(args.slice(2));
+      if (!parsed.ok) {
+        emit(parsed);
+        process.exitCode = 2;
+        return;
+      }
+      emit(await findFile(process.cwd(), parsed.value.name, parsed.value));
+      return;
+    }
     const query = args.slice(1).join(" ").trim();
     if (!query) {
       emit(fail("INVALID_ARGUMENT", "Missing search query"));
@@ -313,6 +363,92 @@ async function main() {
       return;
     }
     emit(await grep(process.cwd(), parsed.value.query, parsed.value));
+    return;
+  }
+
+  if (command === "ls") {
+    const parsed = parsePathCommandOptions(args.slice(1), "ls");
+    if (!parsed.ok) {
+      emit(parsed);
+      process.exitCode = 2;
+      return;
+    }
+    emit(await listDirectory(process.cwd(), parsed.value.path || ".", parsed.value));
+    return;
+  }
+
+  if (command === "pwd") {
+    if (args.slice(1).some((value) => value !== "--compact")) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell pwd [--compact]"));
+      process.exitCode = 2;
+      return;
+    }
+    emit(await pwd(process.cwd(), { compact: args.includes("--compact") }));
+    return;
+  }
+
+  if (command === "du") {
+    const parsed = parsePathCommandOptions(args.slice(1), "du");
+    if (!parsed.ok) {
+      emit(parsed);
+      process.exitCode = 2;
+      return;
+    }
+    emit(await du(process.cwd(), parsed.value));
+    return;
+  }
+
+  if (command === "which") {
+    const executable = args[1];
+    if (!executable || executable.startsWith("--") || args.slice(2).some((value) => value !== "--compact")) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell which <command> [--compact]"));
+      process.exitCode = 2;
+      return;
+    }
+    emit(await whichCommand(process.cwd(), executable, { compact: args.includes("--compact") }));
+    return;
+  }
+
+  if (command === "ps") {
+    const parsed = parseInspectionOptions(args.slice(1), "ps");
+    if (!parsed.ok) {
+      emit(parsed);
+      process.exitCode = 2;
+      return;
+    }
+    emit(await ps(process.cwd(), parsed.value));
+    return;
+  }
+
+  if (command === "port") {
+    if (args[1] !== "list") {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell port list [--compact] [--port N] [--limit N]"));
+      process.exitCode = 2;
+      return;
+    }
+    const parsed = parseInspectionOptions(args.slice(2), "port");
+    if (!parsed.ok) {
+      emit(parsed);
+      process.exitCode = 2;
+      return;
+    }
+    emit(await portList(process.cwd(), parsed.value));
+    return;
+  }
+
+  if (command === "kill") {
+    if (args[1] !== "suggest") {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell kill suggest [--compact] (--pid N|--port N)"));
+      process.exitCode = 2;
+      return;
+    }
+    const parsed = parseInspectionOptions(args.slice(2), "kill");
+    if (!parsed.ok) {
+      emit(parsed);
+      process.exitCode = 2;
+      return;
+    }
+    emit(await killSuggest(process.cwd(), parsed.value));
     return;
   }
 
@@ -364,6 +500,18 @@ async function main() {
     return;
   }
 
+  if (command === "changed") {
+    if (args[1] !== "impact") {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell changed impact [--compact]"));
+      process.exitCode = 2;
+      return;
+    }
+    emit(await changedImpact(process.cwd(), {
+      compact: args.includes("--compact")
+    }));
+    return;
+  }
+
   if (command === "file") {
     if (args[1] !== "info") {
       emit(fail("INVALID_ARGUMENT", "Usage: agentshell file info <path> [--compact]"));
@@ -377,9 +525,15 @@ async function main() {
   }
 
   if (command === "test") {
-    if (args[1] !== "list") {
-      emit(fail("INVALID_ARGUMENT", "Usage: agentshell test list [--compact] [--max-files N]"));
+    if (!["list", "command"].includes(args[1])) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell test list [--compact] [--max-files N] OR agentshell test command [--compact]"));
       process.exitCode = 2;
+      return;
+    }
+    if (args[1] === "command") {
+      emit(await testCommand(process.cwd(), {
+        compact: args.includes("--compact")
+      }));
       return;
     }
     const parsed = parseTestListOptions(args.slice(2));
@@ -393,9 +547,15 @@ async function main() {
   }
 
   if (command === "errors") {
-    if (args[1] !== "from-log") {
-      emit(fail("INVALID_ARGUMENT", "Usage: agentshell errors from-log <file> [--compact]"));
+    if (!["from-log", "from-command"].includes(args[1])) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell errors from-log <file> [--compact] OR agentshell errors from-command [--compact] -- <command...>"));
       process.exitCode = 2;
+      return;
+    }
+    if (args[1] === "from-command") {
+      emit(await errorsFromCommand(process.cwd(), args.slice(2).filter((value) => value !== "--compact"), {
+        compact: args.includes("--compact")
+      }));
       return;
     }
     emit(await errorsFromLog(process.cwd(), args[2], {
@@ -497,16 +657,38 @@ async function main() {
     const file = args[1];
     const linesFlag = args.indexOf("--lines");
     const aroundFlag = args.indexOf("--around");
+    const headFlag = args.indexOf("--head");
+    const tailFlag = args.indexOf("--tail");
     const lines = linesFlag >= 0 ? args[linesFlag + 1] : undefined;
     const around = aroundFlag >= 0 ? args.slice(aroundFlag + 1).join(" ").trim() : undefined;
-    if (!file || (!lines && !around)) {
-      emit(fail("INVALID_ARGUMENT", "Usage: agentshell read <file> --lines A:B OR agentshell read <file> --around <query>"));
+    const head = headFlag >= 0 ? parsePositiveInteger(args[headFlag + 1]) : null;
+    const tail = tailFlag >= 0 ? parsePositiveInteger(args[tailFlag + 1]) : null;
+    const selectedModes = [Boolean(lines), Boolean(around), head !== null, tail !== null].filter(Boolean).length;
+    if (!file || selectedModes !== 1) {
+      emit(fail("INVALID_ARGUMENT", "Usage: agentshell read <file> (--lines A:B|--around <query>|--head N|--tail N)"));
       process.exitCode = 2;
       return;
     }
-    emit(lines
-      ? await readFileRange(process.cwd(), file, lines)
-      : await readFileAround(process.cwd(), file, around));
+    if (lines) emit(await readFileRange(process.cwd(), file, lines));
+    else if (around) emit(await readFileAround(process.cwd(), file, around));
+    else if (head !== null) emit(await readFileHead(process.cwd(), file, head));
+    else emit(await readFileTail(process.cwd(), file, tail));
+    return;
+  }
+
+  if (command === "head" || command === "tail") {
+    const file = args[1];
+    const linesFlag = args.indexOf("--lines");
+    const count = linesFlag >= 0 ? parsePositiveInteger(args[linesFlag + 1]) : 40;
+    const allowed = new Set([file, "--lines", linesFlag >= 0 ? args[linesFlag + 1] : null, "--compact"]);
+    if (!file || file.startsWith("--") || !count || args.slice(1).some((value) => !allowed.has(value))) {
+      emit(fail("INVALID_ARGUMENT", `Usage: agentshell ${command} <file> [--lines N] [--compact]`));
+      process.exitCode = 2;
+      return;
+    }
+    emit(command === "head"
+      ? await readFileHead(process.cwd(), file, count)
+      : await readFileTail(process.cwd(), file, count));
     return;
   }
 
@@ -813,16 +995,34 @@ function parseGrepOptions(values) {
     }
     if (value === "--limit") {
       const parsed = parsePositiveInteger(values[index + 1]);
-      if (!parsed) return fail("INVALID_ARGUMENT", "Usage: agentshell grep <query> [--compact] [--limit N] [--per-file N]");
+      if (!parsed) return fail("INVALID_ARGUMENT", grepUsage());
       options.maxMatches = parsed;
       index += 1;
       continue;
     }
     if (value === "--per-file") {
       const parsed = parsePositiveInteger(values[index + 1]);
-      if (!parsed) return fail("INVALID_ARGUMENT", "Usage: agentshell grep <query> [--compact] [--limit N] [--per-file N]");
+      if (!parsed) return fail("INVALID_ARGUMENT", grepUsage());
       options.maxMatchesPerFile = parsed;
       index += 1;
+      continue;
+    }
+    if (value === "--type") {
+      const type = values[index + 1];
+      if (!type || type.startsWith("--")) return fail("INVALID_ARGUMENT", grepUsage());
+      options.type = type;
+      index += 1;
+      continue;
+    }
+    if (value === "--context") {
+      const parsed = parseNonNegativeInteger(values[index + 1]);
+      if (parsed === null) return fail("INVALID_ARGUMENT", grepUsage());
+      options.context = parsed;
+      index += 1;
+      continue;
+    }
+    if (value === "--files-with-matches") {
+      options.filesWithMatches = true;
       continue;
     }
     if (value.startsWith("--")) return fail("INVALID_ARGUMENT", `Unknown grep option: ${value}`);
@@ -831,6 +1031,88 @@ function parseGrepOptions(values) {
   const query = queryParts.join(" ").trim();
   if (!query) return fail("INVALID_ARGUMENT", "Missing search query");
   return { ok: true, value: { ...options, query } };
+}
+
+function grepUsage() {
+  return "Usage: agentshell grep <query> [--compact] [--limit N] [--per-file N] [--type <py|go|ts|js|java>] [--context N] [--files-with-matches]";
+}
+
+function parseFindFileCliOptions(values) {
+  const options = { compact: values.includes("--compact") };
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (value === "--compact") continue;
+    if (["--name", "--path"].includes(value)) {
+      const next = values[index + 1];
+      if (!next || next.startsWith("--")) return fail("INVALID_ARGUMENT", "Usage: agentshell find file --name <pattern> [--path <dir>] [--limit N] [--compact]");
+      options[value === "--name" ? "name" : "path"] = next;
+      index += 1;
+      continue;
+    }
+    if (value === "--limit") {
+      const parsed = parsePositiveInteger(values[index + 1]);
+      if (!parsed) return fail("INVALID_ARGUMENT", "Usage: agentshell find file --name <pattern> [--path <dir>] [--limit N] [--compact]");
+      options.limit = parsed;
+      index += 1;
+      continue;
+    }
+    return fail("INVALID_ARGUMENT", `Unknown find file option: ${value}`);
+  }
+  if (!options.name) return fail("INVALID_ARGUMENT", "Usage: agentshell find file --name <pattern> [--path <dir>] [--limit N] [--compact]");
+  return { ok: true, value: options };
+}
+
+function parsePathCommandOptions(values, commandName) {
+  const options = { compact: values.includes("--compact") };
+  let requestedPath = null;
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (value === "--compact") continue;
+    if (value === "--limit" || (value === "--max-depth" && commandName === "du")) {
+      const parsed = parsePositiveInteger(values[index + 1]);
+      if (!parsed) return fail("INVALID_ARGUMENT", `Usage: agentshell ${commandName} [path] [--compact] [--limit N]${commandName === "du" ? " [--max-depth N]" : ""}`);
+      options[value === "--limit" ? "limit" : "maxDepth"] = parsed;
+      index += 1;
+      continue;
+    }
+    if (value.startsWith("--") || requestedPath !== null) {
+      return fail("INVALID_ARGUMENT", `Unknown ${commandName} option: ${value}`);
+    }
+    requestedPath = value;
+  }
+  options.path = requestedPath || ".";
+  return { ok: true, value: options };
+}
+
+function parseInspectionOptions(values, commandName) {
+  const options = { compact: values.includes("--compact") };
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (value === "--compact") continue;
+    if (value === "--all" && commandName === "ps") {
+      options.all = true;
+      continue;
+    }
+    if (["--limit", "--port", "--pid"].includes(value)) {
+      const parsed = parsePositiveInteger(values[index + 1]);
+      const allowed = value === "--limit" || (value === "--port" && ["port", "kill"].includes(commandName)) || (value === "--pid" && commandName === "kill");
+      if (!allowed || !parsed) return fail("INVALID_ARGUMENT", inspectionUsage(commandName));
+      options[value.slice(2)] = parsed;
+      index += 1;
+      continue;
+    }
+    return fail("INVALID_ARGUMENT", `Unknown ${commandName} option: ${value}`);
+  }
+  if (commandName === "kill" && ((options.pid === undefined) === (options.port === undefined))) {
+    return fail("INVALID_ARGUMENT", inspectionUsage(commandName));
+  }
+  return { ok: true, value: options };
+}
+
+function inspectionUsage(commandName) {
+  if (commandName === "ps") return "Usage: agentshell ps [--compact] [--limit N] [--all]";
+  if (commandName === "port") return "Usage: agentshell port list [--compact] [--port N] [--limit N]";
+  return "Usage: agentshell kill suggest [--compact] (--pid N|--port N)";
 }
 
 function parseGitStatusOptions(values) {
@@ -988,6 +1270,12 @@ function parsePositiveInteger(value) {
   if (!value || value.startsWith("--")) return null;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseNonNegativeInteger(value) {
+  if (value === undefined || value === null || String(value).startsWith("--")) return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function parseManualOptions(argv) {

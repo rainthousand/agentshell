@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/project-health.schema.json",
+  "title": "AgentShell Project Health Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "summary", "signals", "risks", "suggestedNextActions"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.project-health.v1" },
+    "compact": { "type": "boolean" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "signals": { "type": "object" },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "suggestedNextActions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": ["status", "hasTestCommand", "primaryTestCommand", "hasCi", "dirty", "changedFiles", "manifestCount", "dependencyCount", "riskCount"],
+      "properties": {
+        "status": { "enum": ["ok", "warning"] },
+        "hasTestCommand": { "type": "boolean" },
+        "primaryTestCommand": { "type": ["string", "null"] },
+        "hasCi": { "type": "boolean" },
+        "dirty": { "type": "boolean" },
+        "changedFiles": { "type": "integer", "minimum": 0 },
+        "manifestCount": { "type": "integer", "minimum": 0 },
+        "dependencyCount": { "type": "integer", "minimum": 0 },
+        "riskCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["type", "severity", "message"],
+      "properties": {
+        "type": { "type": "string" },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "message": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "source": { "type": "string" },
+        "files": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

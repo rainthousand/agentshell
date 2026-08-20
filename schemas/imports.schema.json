@@ -11,7 +11,7 @@
         "protocolVersion": { "const": "agentshell.imports.v1" },
         "compact": { "type": "boolean" },
         "file": { "type": "string" },
-        "language": { "enum": ["javascript", "typescript", "go"] },
+        "language": { "enum": ["javascript", "typescript", "go", "python", "java"] },
         "summary": { "$ref": "#/$defs/summary" },
         "imports": {
           "type": "array",
@@ -65,7 +65,7 @@
           "type": "object",
           "required": ["kind"],
           "properties": {
-            "kind": { "enum": ["runtime", "type", "side-effect", "dynamic", "go"] }
+            "kind": { "enum": ["runtime", "type", "side-effect", "dynamic", "go", "python", "java", "static"] }
           },
           "additionalProperties": false
         },

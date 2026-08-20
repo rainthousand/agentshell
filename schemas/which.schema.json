@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/which.schema.json",
+  "title": "AgentShell Which Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "executable", "version", "summary", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.which.v1" },
+        "compact": { "type": "boolean" },
+        "executable": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "path", "realPath", "symlink"],
+          "properties": {
+            "name": { "type": "string" },
+            "path": { "type": "string" },
+            "realPath": { "type": "string" },
+            "symlink": { "type": "boolean" }
+          }
+        },
+        "version": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attempted", "command", "value", "status", "timedOut"],
+          "properties": {
+            "attempted": { "type": "boolean" },
+            "command": { "type": ["string", "null"] },
+            "value": { "type": ["string", "null"], "maxLength": 240 },
+            "status": { "enum": ["ok", "error", "timeout", "unsupported"] },
+            "timedOut": { "type": "boolean" }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["found", "versionAvailable", "versionStatus"],
+          "properties": {
+            "found": { "const": true },
+            "versionAvailable": { "type": "boolean" },
+            "versionStatus": { "enum": ["ok", "error", "timeout", "unsupported"] }
+          }
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

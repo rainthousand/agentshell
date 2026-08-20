@@ -30,10 +30,12 @@ const CATEGORY_PRIORITY = {
   build: 2,
   quality: 3,
   go: 4,
-  automation: 5,
-  container: 6,
-  ci: 7,
-  agent: 8
+  python: 5,
+  java: 6,
+  automation: 7,
+  container: 8,
+  ci: 9,
+  agent: 10
 };
 
 export async function configList(root, options = {}) {
@@ -60,6 +62,17 @@ function resolveProjectRoot(root) {
     "package.json",
     "go.work",
     "go.mod",
+    "pyproject.toml",
+    "requirements.txt",
+    "setup.py",
+    "setup.cfg",
+    "tox.ini",
+    "pytest.ini",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts",
     "Makefile",
     "Dockerfile",
     "AGENTS.md",
@@ -145,6 +158,21 @@ function classifyConfig(relativePath) {
   if (basename === "go.mod") return config("go-mod", "go", "medium");
   if (basename === "go.work") return config("go-work", "go", "medium");
 
+  if (basename === "pyproject.toml") return config("pyproject", "python", "medium");
+  if (/^requirements.*\.txt$/i.test(basename)) return config("requirements", "python", "medium");
+  if (basename === "setup.py") return config("setup-py", "python", "high");
+  if (basename === "setup.cfg") return config("setup-cfg", "python", "medium");
+  if (basename === "tox.ini") return config("tox", "python", "medium");
+  if (basename === "pytest.ini") return config("pytest", "python", "low");
+  if (basename === "poetry.lock") return config("poetry-lock", "python", "low");
+  if (basename === "Pipfile") return config("pipfile", "python", "medium");
+
+  if (basename === "pom.xml") return config("maven", "java", "medium");
+  if (basename === "build.gradle" || basename === "build.gradle.kts") return config("gradle-build", "java", "medium");
+  if (basename === "settings.gradle" || basename === "settings.gradle.kts") return config("gradle-settings", "java", "medium");
+  if (basename === "gradle.properties") return config("gradle-properties", "java", "medium");
+  if (basename === "mvnw" || basename === "gradlew") return config("build-wrapper", "java", "high");
+
   if (basename === "Makefile" || basename === "makefile" || basename === "GNUmakefile") return config("makefile", "automation", "medium");
   if (/^Dockerfile(?:\..+)?$/.test(basename)) return config("dockerfile", "container", "high");
   if (/^(?:docker-)?compose(?:\.[^.]+)?\.ya?ml$/i.test(basename)) return config("compose", "container", "high");
@@ -220,6 +248,8 @@ function summarize(scan) {
     risks: scan.risks,
     hasNode: Boolean(scan.categories.package || scan.categories.language || scan.configs.some((entry) => entry.type === "package-json")),
     hasGo: Boolean(scan.categories.go),
+    hasPython: Boolean(scan.categories.python),
+    hasJava: Boolean(scan.categories.java),
     hasCi: Boolean(scan.categories.ci),
     hasContainers: Boolean(scan.categories.container),
     hasAgentConfig: Boolean(scan.categories.agent)
@@ -238,6 +268,12 @@ function suggestedNextActions(summary) {
     actions.push({
       command: "agentshell verify test --compact",
       reason: "Run compact Go test verification when Go module or workspace config is present"
+    });
+  }
+  if (summary.hasPython || summary.hasJava) {
+    actions.push({
+      command: "agentshell test list --compact",
+      reason: "Inspect Python or Java test entrypoints after locating project config"
     });
   }
   if (summary.hasCi || summary.hasContainers) {

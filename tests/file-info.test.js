@@ -76,6 +76,52 @@ test("file info summarizes TypeScript and Go symbols", async () => {
   assert.equal(go.code.importCount, 2);
 });
 
+test("file info maps Python and Java and summarizes code without source", async () => {
+  const dir = initRepo();
+  fs.mkdirSync(path.join(dir, "pkg"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "src"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "pkg", "sample.py"), [
+    "import os",
+    "from .helpers import build",
+    "VALUE = 1",
+    "class Service:",
+    "    pass",
+    "async def fetch():",
+    "    return VALUE",
+    "def _helper():",
+    "    return 0"
+  ].join("\n"));
+  fs.writeFileSync(path.join(dir, "src", "Service.java"), [
+    "package demo;",
+    "import java.util.List;",
+    "import static demo.Factory.create;",
+    "public class Service {",
+    "  public static final int LIMIT = 10;",
+    "  private String name;",
+    "  public String name() { return name; }",
+    "}"
+  ].join("\n"));
+
+  const py = await fileInfo(dir, "pkg/sample.py", { compact: true });
+  const java = await fileInfo(dir, "src/Service.java", { compact: true });
+
+  assert.equal(py.language, "python");
+  assert.ok(py.code.symbols.some((symbol) => symbol.kind === "type" && symbol.name === "Service"));
+  assert.ok(py.code.symbols.some((symbol) => symbol.kind === "function" && symbol.name === "fetch"));
+  assert.ok(py.code.symbols.some((symbol) => symbol.kind === "variable" && symbol.name === "VALUE"));
+  assert.deepEqual(py.code.exports, ["VALUE", "Service", "fetch"]);
+  assert.equal(py.code.importCount, 2);
+  assert.ok(!JSON.stringify(py).includes("return VALUE"));
+
+  assert.equal(java.language, "java");
+  assert.ok(java.code.symbols.some((symbol) => symbol.kind === "type" && symbol.name === "Service"));
+  assert.ok(java.code.symbols.some((symbol) => symbol.kind === "function" && symbol.name === "name"));
+  assert.ok(java.code.symbols.some((symbol) => symbol.kind === "variable" && symbol.name === "LIMIT"));
+  assert.deepEqual(java.code.exports, ["Service", "LIMIT", "name"]);
+  assert.equal(java.code.importCount, 2);
+  assert.ok(!JSON.stringify(java).includes("return name"));
+});
+
 test("file info flags binary and generated files", async () => {
   const dir = initRepo();
   fs.mkdirSync(path.join(dir, "dist"), { recursive: true });
@@ -117,6 +163,8 @@ test("file info schema exposes the compact response contract", () => {
   assert.equal(schema.oneOf[0].properties.protocolVersion.const, "agentshell.file-info.v1");
   assert.ok(schema.oneOf[0].required.includes("hash"));
   assert.ok(schema.oneOf[0].required.includes("git"));
+  assert.ok(schema.oneOf[0].properties.language.examples.includes("python"));
+  assert.ok(schema.oneOf[0].properties.language.examples.includes("java"));
   assert.deepEqual(schema.$defs.lastCommit.required, ["shortHash", "subject", "relativeAge"]);
   assert.deepEqual(schema.$defs.codeSummary.required, ["symbols", "exports", "importCount"]);
 });

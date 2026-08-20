@@ -30,9 +30,11 @@ agentshell start --compact
 
 A successful response reports `"ok": true` and a readiness status, plus the next
 recommended command. AgentShell detects JavaScript or TypeScript projects from
-`package.json` and Go modules from `go.mod`. It uses the configured package test
-script for Node projects and `go test ./...` for Go modules when you run
-`agentshell verify test --compact`; runtime depends on the project's test suite.
+`package.json`, Go modules from `go.mod`, Python projects from common Python
+manifests, and Java projects from Maven/Gradle manifests. It uses the configured
+package test script for Node projects and `go test ./...` for Go modules when
+you run `agentshell verify test --compact`; Python and Java support in V1.0 is
+read-only discovery and summarization.
 
 AgentShell is an agent-native local CLI and Codex plugin built for:
 
@@ -40,8 +42,9 @@ AgentShell is an agent-native local CLI and Codex plugin built for:
 - **Actionable failures:** structured related files, log references, next actions,
   schemas, and machine-readable errors.
 - **Faster supported repairs:** one-command diagnose/suggest/apply/verify for
-  supported JavaScript and TypeScript failures, plus compact Go test diagnosis
-  without automatic Go source repair.
+  supported JavaScript and TypeScript failures, compact Go test diagnosis
+  without automatic Go source repair, and Python/Java project summaries for
+  cheaper agent navigation.
 - **Safer edits:** hash-checked change plans, dry runs, verification, and undo
   guidance.
 
@@ -286,9 +289,25 @@ agentshell entry --compact
 agentshell doctor
 agentshell plugin status --compact
 agentshell understand --compact
+agentshell project health --compact
+agentshell changed impact --compact
 agentshell find <query>
+agentshell find file --name '*.go' --compact
+agentshell grep <query> --compact --type go --context 2
+agentshell grep <query> --compact --files-with-matches
+agentshell ls --compact
+agentshell pwd --compact
+agentshell du --compact
+agentshell which go --compact
+agentshell ps --compact
+agentshell port list --compact --port 3000
+agentshell kill suggest --port 3000 --compact
 agentshell read <file> --lines A:B
 agentshell read <file> --around <query>
+agentshell read <file> --head N
+agentshell read <file> --tail N
+agentshell head <file> --lines N --compact
+agentshell tail <file> --lines N --compact
 ```
 
 ### Test and repair
@@ -306,6 +325,8 @@ agentshell verify test --profile coverage
 agentshell verify benchmark --bench 'BenchmarkEncode'
 agentshell verify generate
 agentshell verify fuzz --fuzz FuzzName --duration 10s --package ./internal/parser
+agentshell test command --compact
+agentshell test list --compact
 agentshell diagnose test --compact
 agentshell fix test --fast --compact
 agentshell fix test --safe --compact
@@ -318,6 +339,8 @@ agentshell undo [operationId]
 
 ```bash
 agentshell log get <logRef> --tail N
+agentshell errors from-log <file> --compact
+agentshell errors from-command --compact -- <command...>
 agentshell run next
 agentshell run status --compact
 agentshell run latest --compact
@@ -494,9 +517,11 @@ the agent to choose the next command.
 
 Go modules currently support first-class project detection, compact
 `go test ./...` verification, failure diagnosis, related package reuse, and
-cache invalidation. Automatic Go code repair is not supported yet:
-`agentshell change suggest` returns a structured refusal for a Go source target,
-leaving the agent to review and apply a hash-checked change explicitly.
+cache invalidation. Python and Java projects support compact dependency,
+configuration, test-entry, import, symbol, and file summaries. Automatic
+Go/Python/Java code repair is not supported yet: unsupported source targets
+return structured refusals, leaving the agent to review and apply a
+hash-checked change explicitly.
 
 ## Benchmarks
 

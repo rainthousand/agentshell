@@ -9,6 +9,8 @@ const DEFAULT_COMPACT_FILE_LIMIT = 40;
 const TEST_SCRIPT_NAME = /(^|[-_:])(test|spec|e2e|unit)($|[-_:])/i;
 const TEST_FILE_NAME = /(^|\.)(test|spec)\.[cm]?[jt]sx?$/i;
 const GO_TEST_FILE_NAME = /_test\.go$/;
+const PYTHON_TEST_FILE_NAME = /^(?:test_.*|.*_test)\.py$/i;
+const JAVA_TEST_FILE_NAME = /(?:Test|Tests|IT)\.java$/;
 const TEST_DIRECTORIES = new Set(["tests", "__tests__"]);
 const IGNORED_DIRECTORIES = new Set([
   ".agentshell",
@@ -53,7 +55,22 @@ export async function testList(root, options = {}) {
 export const listTests = testList;
 
 function resolveProjectRoot(root) {
-  const manifest = findUp(root, ["package.json", "go.work", "go.mod"]);
+  const manifest = findUp(root, [
+    "package.json",
+    "go.work",
+    "go.mod",
+    "pyproject.toml",
+    "pytest.ini",
+    "tox.ini",
+    "setup.py",
+    "setup.cfg",
+    "requirements.txt",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts"
+  ]);
   return manifest ? path.dirname(manifest) : path.resolve(root);
 }
 
@@ -82,6 +99,8 @@ function discoverTestFiles(projectRoot, maxFiles) {
     totalFiles: 0,
     nodeFileCount: 0,
     goFileCount: 0,
+    pythonFileCount: 0,
+    javaFileCount: 0,
     files: [],
     truncated: false
   };
@@ -116,6 +135,10 @@ function scanDirectory(directory, relativeDirectory, state, maxFiles) {
     state.totalFiles += 1;
     if (match.language === "go") {
       state.goFileCount += 1;
+    } else if (match.language === "python") {
+      state.pythonFileCount += 1;
+    } else if (match.language === "java") {
+      state.javaFileCount += 1;
     } else {
       state.nodeFileCount += 1;
     }
@@ -137,6 +160,26 @@ function classifyTestFile(relativePath) {
   const basename = parts.at(-1);
   if (GO_TEST_FILE_NAME.test(basename)) {
     return { language: "go", kind: "go-test" };
+  }
+
+  if (isPythonTestConfig(basename)) {
+    return { language: "python", kind: "python-config" };
+  }
+
+  if (PYTHON_TEST_FILE_NAME.test(basename)) {
+    return { language: "python", kind: "python-pattern" };
+  }
+
+  if (parts.some((part) => part === "tests") && /\.py$/i.test(basename)) {
+    return { language: "python", kind: "python-directory" };
+  }
+
+  if (/^src\/test\/java\/.+\.java$/.test(relativePath)) {
+    return { language: "java", kind: "java-standard" };
+  }
+
+  if (JAVA_TEST_FILE_NAME.test(basename)) {
+    return { language: "java", kind: "java-pattern" };
   }
 
   if (TEST_FILE_NAME.test(basename)) {
@@ -197,6 +240,18 @@ function discoverPackages(projectRoot) {
     }
   }
 
+  const pythonPackage = discoverPythonPackage(projectRoot);
+  if (pythonPackage) packages.push(pythonPackage);
+
+  const javaPackage = discoverJavaPackage(projectRoot);
+  if (javaPackage) packages.push(javaPackage);
+
+  const mavenPackage = discoverMavenPackage(projectRoot);
+  if (mavenPackage) packages.push(mavenPackage);
+
+  const gradlePackage = discoverGradlePackage(projectRoot);
+  if (gradlePackage) packages.push(gradlePackage);
+
   return packages;
 }
 
@@ -204,6 +259,8 @@ function summarize(scripts, scan, packages) {
   const nodePackageCount = packages.filter((entry) => entry.type === "node").length;
   const goPackageCount = packages.filter((entry) => entry.type === "go").length;
   const goWorkspaceCount = packages.filter((entry) => entry.type === "go-workspace").length;
+  const pythonPackageCount = packages.filter((entry) => entry.type === "python").length;
+  const javaPackageCount = packages.filter((entry) => ["java", "maven", "gradle"].includes(entry.type)).length;
 
   return {
     totalScripts: scripts.length,
@@ -214,9 +271,17 @@ function summarize(scripts, scan, packages) {
     nodePackageCount,
     goPackageCount,
     goWorkspaceCount,
+    pythonPackageCount,
+    javaPackageCount,
     nodeFileCount: scan.nodeFileCount,
     goFileCount: scan.goFileCount,
-    hasTests: scripts.length > 0 || scan.totalFiles > 0 || goPackageCount > 0
+    pythonFileCount: scan.pythonFileCount,
+    javaFileCount: scan.javaFileCount,
+    hasTests: scripts.length > 0
+      || scan.totalFiles > 0
+      || goPackageCount > 0
+      || pythonPackageCount > 0
+      || javaPackageCount > 0
   };
 }
 
@@ -234,6 +299,30 @@ function suggestedNextActions(summary, scripts, packages) {
     actions.push({
       command: "go test ./...",
       reason: "Run Go tests from the detected module or workspace when ready"
+    });
+  }
+
+  if (packages.some((entry) => entry.type === "python")) {
+    actions.push({
+      command: "python -m pytest",
+      reason: "Run Python tests from the detected Python project or test configuration when ready"
+    });
+  }
+
+  if (packages.some((entry) => entry.type === "maven")) {
+    actions.push({
+      command: "mvn test",
+      reason: "Run Java tests from the detected Maven project when ready"
+    });
+  } else if (packages.some((entry) => entry.type === "gradle")) {
+    actions.push({
+      command: "gradle test",
+      reason: "Run Java tests from the detected Gradle project when ready"
+    });
+  } else if (packages.some((entry) => entry.type === "java")) {
+    actions.push({
+      command: "agentshell tree --compact",
+      reason: "Java test files were detected without a Maven or Gradle entrypoint; inspect layout before running tests"
     });
   }
 
@@ -275,6 +364,7 @@ function entryPriority(relativeDirectory, entry) {
   const relativePath = relativeDirectory ? `${relativeDirectory}/${entry.name}` : entry.name;
   if (entry.isFile() && relativePath === "package.json") return 0;
   if (entry.isFile() && (relativePath === "go.mod" || relativePath === "go.work")) return 1;
+  if (entry.isFile() && isProjectMarker(relativePath)) return 1;
   if (entry.isDirectory() && TEST_DIRECTORIES.has(entry.name)) return 2;
   if (entry.isFile() && classifyTestFile(relativePath)) return 3;
   if (entry.isDirectory()) return 4;
@@ -304,6 +394,80 @@ function nodeLanguage(file) {
 
 function nodeTestExtension(file) {
   return /\.[cm]?[jt]sx?$/i.test(file);
+}
+
+function isPythonTestConfig(basename) {
+  return ["pyproject.toml", "setup.cfg", "tox.ini", "pytest.ini"].includes(basename);
+}
+
+function discoverPythonPackage(projectRoot) {
+  const markers = [
+    "pyproject.toml",
+    "setup.py",
+    "setup.cfg",
+    "tox.ini",
+    "pytest.ini",
+    "poetry.lock",
+    "Pipfile"
+  ];
+  const marker = markers.find((file) => fs.existsSync(path.join(projectRoot, file)))
+    || fs.readdirSync(projectRoot).find((file) => /^requirements.*\.txt$/i.test(file));
+  if (!marker) return null;
+  return {
+    type: "python",
+    name: path.basename(projectRoot),
+    path: marker
+  };
+}
+
+function discoverJavaPackage(projectRoot) {
+  if (!fs.existsSync(path.join(projectRoot, "src", "main", "java"))
+    && !fs.existsSync(path.join(projectRoot, "src", "test", "java"))) {
+    return null;
+  }
+  return {
+    type: "java",
+    name: path.basename(projectRoot),
+    path: "src"
+  };
+}
+
+function discoverMavenPackage(projectRoot) {
+  if (!fs.existsSync(path.join(projectRoot, "pom.xml"))) return null;
+  return {
+    type: "maven",
+    name: path.basename(projectRoot),
+    path: "pom.xml"
+  };
+}
+
+function discoverGradlePackage(projectRoot) {
+  const markers = ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"];
+  const marker = markers.find((file) => fs.existsSync(path.join(projectRoot, file)));
+  if (!marker) return null;
+  return {
+    type: "gradle",
+    name: path.basename(projectRoot),
+    path: marker
+  };
+}
+
+function isProjectMarker(relativePath) {
+  return [
+    "pyproject.toml",
+    "setup.py",
+    "setup.cfg",
+    "tox.ini",
+    "pytest.ini",
+    "poetry.lock",
+    "Pipfile",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts"
+  ].includes(relativePath)
+    || /^requirements.*\.txt$/i.test(relativePath);
 }
 
 function positiveInteger(value, fallback) {

@@ -18,6 +18,8 @@ const LANGUAGE_BY_EXTENSION = new Map([
   [".ts", "typescript"],
   [".tsx", "typescript"],
   [".go", "go"],
+  [".py", "python"],
+  [".java", "java"],
   [".json", "json"],
   [".md", "markdown"],
   [".css", "css"],
@@ -82,6 +84,8 @@ export function summarizeCode(text, language, generated = false) {
   if (!text || generated) return null;
   if (language === "javascript" || language === "typescript") return summarizeJsTs(text);
   if (language === "go") return summarizeGo(text);
+  if (language === "python") return summarizePython(text);
+  if (language === "java") return summarizeJava(text);
   return null;
 }
 
@@ -142,6 +146,60 @@ function summarizeGo(text) {
     symbols: symbols.slice(0, MAX_ITEMS),
     exports: exports.slice(0, MAX_ITEMS),
     importCount: countGoImports(text)
+  };
+}
+
+function summarizePython(text) {
+  const symbols = [];
+  const exports = [];
+
+  for (const line of text.split(/\r?\n/)) {
+    if (/^\s/.test(line)) continue;
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    let match = /^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/.exec(trimmed);
+    if (match) {
+      pushPythonSymbol(symbols, exports, "function", match[1]);
+      continue;
+    }
+
+    match = /^class\s+([A-Za-z_]\w*)\b/.exec(trimmed);
+    if (match) {
+      pushPythonSymbol(symbols, exports, "type", match[1]);
+      continue;
+    }
+
+    match = /^(_?[A-Z][A-Z0-9_]*)\s*[:=]/.exec(trimmed);
+    if (match) pushPythonSymbol(symbols, exports, "variable", match[1]);
+  }
+
+  return {
+    symbols: symbols.slice(0, MAX_ITEMS),
+    exports: exports.slice(0, MAX_ITEMS),
+    importCount: countPythonImports(text)
+  };
+}
+
+function summarizeJava(text) {
+  const symbols = [];
+  const exports = [];
+  const lines = stripJavaComments(text).split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const javaSymbol = matchJavaSummarySymbol(trimmed);
+    if (!javaSymbol) continue;
+    pushUnique(symbols, javaSymbol);
+    if (/\bpublic\b/.test(trimmed)) pushUnique(exports, javaSymbol.name);
+  }
+
+  return {
+    symbols: symbols.slice(0, MAX_ITEMS),
+    exports: exports.slice(0, MAX_ITEMS),
+    importCount: countJavaImports(text)
   };
 }
 
@@ -226,10 +284,42 @@ function isExportedGoName(name) {
   return /^[A-Z]/.test(name);
 }
 
+function pushPythonSymbol(symbols, exports, kind, name) {
+  pushUnique(symbols, { kind, name });
+  if (!name.startsWith("_")) pushUnique(exports, name);
+}
+
 function countGoImports(text) {
   const block = text.match(/^\s*import\s*\(([\s\S]*?)^\s*\)/m);
   if (block) {
     return block[1].split(/\r?\n/).filter((line) => /"[^"]+"/.test(line)).length;
   }
   return (text.match(/^\s*import\s+(?:[._\w]+\s+)?"[^"]+"/gm) || []).length;
+}
+
+function countPythonImports(text) {
+  return (text.match(/^\s*(?:import\s+[A-Za-z_][\w.]*(?:\s+as\s+[A-Za-z_]\w*)?|from\s+[.\w]+\s+import\s+.+)$/gm) || []).length;
+}
+
+function countJavaImports(text) {
+  return (stripJavaComments(text).match(/^\s*import\s+(?:static\s+)?[A-Za-z_][\w]*(?:\.[A-Za-z_*][\w*]*)*\s*;/gm) || []).length;
+}
+
+function matchJavaSummarySymbol(line) {
+  const modifiers = "(?:public|protected|private|static|final|abstract|synchronized|native|strictfp|transient|volatile|sealed|non-sealed)\\s+";
+  let match = new RegExp(`^(?:${modifiers})*(class|interface|enum|record)\\s+([A-Za-z_]\\w*)\\b`).exec(line);
+  if (match) return { kind: "type", name: match[2] };
+
+  if (/^(?:package|import|if|for|while|switch|catch|return|throw|new)\b/.test(line)) return null;
+  match = new RegExp(`^(?:${modifiers})*(?:<[\\w\\s,? extends super&]+>\\s+)?[\\w$<>\\[\\].?,]+\\s+([A-Za-z_]\\w*)\\s*\\([^;]*\\)`).exec(line);
+  if (match) return { kind: "function", name: match[1] };
+
+  match = new RegExp(`^(?:${modifiers})*[\\w$<>\\[\\].?,]+\\s+([A-Za-z_]\\w*)\\s*(?:=|;)`).exec(line);
+  if (match) return { kind: "variable", name: match[1] };
+
+  return null;
+}
+
+function stripJavaComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }

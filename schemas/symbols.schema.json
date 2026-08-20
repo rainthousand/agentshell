@@ -11,7 +11,7 @@
         "protocolVersion": { "const": "agentshell.symbols.v1" },
         "compact": { "type": "boolean" },
         "file": { "type": "string" },
-        "language": { "enum": ["javascript", "typescript", "go"] },
+        "language": { "enum": ["javascript", "typescript", "go", "python", "java"] },
         "summary": {
           "type": "object",
           "required": ["totalSymbols", "returnedSymbols", "omittedSymbols", "truncated", "countsByKind", "exportedSymbols", "limits"],
@@ -95,7 +95,7 @@
       "required": ["kind", "name", "line", "exported", "signature"],
       "properties": {
         "kind": {
-          "enum": ["function", "class", "type", "interface", "enum", "const", "default", "func", "method", "var"]
+          "enum": ["function", "class", "type", "interface", "enum", "const", "default", "func", "method", "var", "record", "field"]
         },
         "name": { "type": "string" },
         "line": { "type": "integer", "minimum": 1 },

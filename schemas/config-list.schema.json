@@ -28,7 +28,7 @@
     "summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["totalConfigs", "returnedConfigs", "truncated", "categories", "risks", "hasNode", "hasGo", "hasCi", "hasContainers", "hasAgentConfig"],
+      "required": ["totalConfigs", "returnedConfigs", "truncated", "categories", "risks", "hasNode", "hasGo", "hasPython", "hasJava", "hasCi", "hasContainers", "hasAgentConfig"],
       "properties": {
         "totalConfigs": { "type": "integer", "minimum": 0 },
         "returnedConfigs": { "type": "integer", "minimum": 0 },
@@ -43,6 +43,8 @@
         },
         "hasNode": { "type": "boolean" },
         "hasGo": { "type": "boolean" },
+        "hasPython": { "type": "boolean" },
+        "hasJava": { "type": "boolean" },
         "hasCi": { "type": "boolean" },
         "hasContainers": { "type": "boolean" },
         "hasAgentConfig": { "type": "boolean" }
@@ -67,6 +69,19 @@
             "biome",
             "go-mod",
             "go-work",
+            "pyproject",
+            "requirements",
+            "setup-py",
+            "setup-cfg",
+            "tox",
+            "pytest",
+            "poetry-lock",
+            "pipfile",
+            "maven",
+            "gradle-build",
+            "gradle-settings",
+            "gradle-properties",
+            "build-wrapper",
             "makefile",
             "dockerfile",
             "compose",
@@ -76,7 +91,7 @@
           ]
         },
         "category": {
-          "enum": ["package", "language", "build", "quality", "go", "automation", "container", "ci", "agent"]
+          "enum": ["package", "language", "build", "quality", "go", "python", "java", "automation", "container", "ci", "agent"]
         },
         "risk": { "enum": ["low", "medium", "high"] },
         "readCommand": { "type": "string" }

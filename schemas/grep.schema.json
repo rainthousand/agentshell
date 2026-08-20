@@ -5,17 +5,21 @@
   "oneOf": [
     {
       "type": "object",
-      "required": ["ok", "protocolVersion", "compact", "query", "summary", "files", "results", "truncated", "suggestedNextActions"],
+      "required": ["ok", "protocolVersion", "compact", "query", "mode", "type", "summary", "groups", "files", "results", "truncated", "suggestedNextActions"],
       "properties": {
         "ok": { "const": true },
         "protocolVersion": { "const": "agentshell.grep.v1" },
         "compact": { "type": "boolean" },
         "query": { "type": "string" },
+        "mode": { "enum": ["matches", "files"] },
+        "type": { "type": ["string", "null"], "enum": ["python", "go", "typescript", "javascript", "java", null] },
         "summary": {
           "type": "object",
-          "required": ["fileCount", "totalMatches", "returnedMatches", "omittedMatches", "ignoredDirs", "limits", "engine"],
+          "required": ["fileCount", "returnedFileCount", "omittedFileCount", "totalMatches", "returnedMatches", "omittedMatches", "ignoredDirs", "limits", "engine"],
           "properties": {
             "fileCount": { "type": "integer", "minimum": 0 },
+            "returnedFileCount": { "type": "integer", "minimum": 0 },
+            "omittedFileCount": { "type": "integer", "minimum": 0 },
             "totalMatches": { "type": "integer", "minimum": 0 },
             "returnedMatches": { "type": "integer", "minimum": 0 },
             "omittedMatches": { "type": "integer", "minimum": 0 },
@@ -25,11 +29,12 @@
             },
             "limits": {
               "type": "object",
-              "required": ["maxMatches", "maxMatchesPerFile", "contextChars"],
+              "required": ["maxMatches", "maxMatchesPerFile", "contextChars", "contextLines"],
               "properties": {
                 "maxMatches": { "type": "integer", "minimum": 1 },
                 "maxMatchesPerFile": { "type": "integer", "minimum": 1 },
-                "contextChars": { "type": "integer", "minimum": 1 }
+                "contextChars": { "type": "integer", "minimum": 1 },
+                "contextLines": { "type": "integer", "minimum": 0, "maximum": 20 }
               },
               "additionalProperties": false
             },
@@ -37,13 +42,28 @@
           },
           "additionalProperties": false
         },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "fileCount", "matches", "returned"],
+            "properties": {
+              "category": { "enum": ["source", "test", "docs", "config", "other"] },
+              "fileCount": { "type": "integer", "minimum": 0 },
+              "matches": { "type": "integer", "minimum": 0 },
+              "returned": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        },
         "files": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["file", "matches", "returned", "omitted", "truncated"],
+            "required": ["file", "category", "matches", "returned", "omitted", "truncated"],
             "properties": {
               "file": { "type": "string" },
+              "category": { "enum": ["source", "test", "docs", "config", "other"] },
               "matches": { "type": "integer", "minimum": 0 },
               "returned": { "type": "integer", "minimum": 0 },
               "omitted": { "type": "integer", "minimum": 0 },
@@ -56,23 +76,27 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["file", "line", "column", "text", "context"],
+            "required": ["file", "category", "line", "column", "text", "context", "before", "after"],
             "properties": {
               "file": { "type": "string" },
+              "category": { "enum": ["source", "test", "docs", "config", "other"] },
               "line": { "type": "integer", "minimum": 1 },
               "column": { "type": "integer", "minimum": 1 },
               "text": { "type": "string" },
-              "context": { "type": "string" }
+              "context": { "type": "string" },
+              "before": { "$ref": "#/$defs/contextLines" },
+              "after": { "$ref": "#/$defs/contextLines" }
             },
             "additionalProperties": false
           }
         },
         "truncated": {
           "type": "object",
-          "required": ["value", "omittedMatches", "reason"],
+          "required": ["value", "omittedMatches", "omittedFiles", "reason"],
           "properties": {
             "value": { "type": "boolean" },
             "omittedMatches": { "type": "integer", "minimum": 0 },
+            "omittedFiles": { "type": "integer", "minimum": 0 },
             "reason": { "type": ["string", "null"] }
           },
           "additionalProperties": false
@@ -85,5 +109,19 @@
       "additionalProperties": false
     },
     { "$ref": "common.schema.json#/$defs/failure" }
-  ]
+  ],
+  "$defs": {
+    "contextLines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["line", "text"],
+        "properties": {
+          "line": { "type": "integer", "minimum": 1 },
+          "text": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
 }

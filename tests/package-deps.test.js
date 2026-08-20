@@ -95,6 +95,81 @@ test("package deps summarizes Go modules and indirect requires", async () => {
   assert.ok(result.suggestedNextActions.some((entry) => entry.command === "agentshell verify modules --compact"));
 });
 
+test("package deps summarizes Python manifests and framework hints", async () => {
+  const root = tempProject();
+  fs.writeFileSync(path.join(root, "pyproject.toml"), [
+    "[project]",
+    "dependencies = [",
+    "  \"fastapi>=0.110\",",
+    "  \"Django==5.0\",",
+    "]",
+    "",
+    "[project.optional-dependencies]",
+    "test = [\"pytest>=8\"]",
+    ""
+  ].join("\n"));
+  fs.writeFileSync(path.join(root, "poetry.lock"), "# fixture\n");
+
+  const result = await packageDeps(root, { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ecosystem, "python");
+  assert.deepEqual(result.summary.manifests, ["pyproject.toml"]);
+  assert.equal(result.summary.pythonDependencyCount, 3);
+  assert.equal(result.summary.javaDependencyCount, 0);
+  assert.deepEqual(result.summary.lockfiles, ["poetry.lock"]);
+  assert.deepEqual(result.dependencies.python.map((entry) => [entry.name, entry.version, entry.type]), [
+    ["django", "==5.0", "production"],
+    ["fastapi", ">=0.110", "production"],
+    ["pytest", ">=8", "optional"]
+  ]);
+  assert.ok(result.frameworks.some((entry) => entry.name === "FastAPI"));
+  assert.ok(result.frameworks.some((entry) => entry.name === "Django"));
+  assert.ok(result.frameworks.some((entry) => entry.name === "Pytest"));
+  assert.ok(result.runtimes.some((entry) => entry.name === "python" && entry.source === "pyproject.toml"));
+  assert.ok(result.suggestedNextActions.some((entry) => entry.command === "python -m pip check"));
+});
+
+test("package deps summarizes Java Maven manifests and wrapper tooling", async () => {
+  const root = tempProject();
+  fs.writeFileSync(path.join(root, "pom.xml"), [
+    "<project>",
+    "  <dependencies>",
+    "    <dependency>",
+    "      <groupId>org.springframework.boot</groupId>",
+    "      <artifactId>spring-boot-starter-web</artifactId>",
+    "      <version>3.3.0</version>",
+    "    </dependency>",
+    "    <dependency>",
+    "      <groupId>org.junit.jupiter</groupId>",
+    "      <artifactId>junit-jupiter-api</artifactId>",
+    "      <version>5.10.0</version>",
+    "      <scope>test</scope>",
+    "    </dependency>",
+    "  </dependencies>",
+    "</project>",
+    ""
+  ].join("\n"));
+  fs.writeFileSync(path.join(root, "mvnw"), "#!/bin/sh\n");
+
+  const result = await packageDeps(root, { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ecosystem, "java");
+  assert.deepEqual(result.summary.manifests, ["pom.xml"]);
+  assert.equal(result.summary.javaDependencyCount, 2);
+  assert.deepEqual(result.summary.toolingFiles, ["mvnw"]);
+  assert.deepEqual(result.dependencies.java.map((entry) => [entry.group, entry.artifact, entry.scope, entry.type]), [
+    ["org.junit.jupiter", "junit-jupiter-api", "test", "maven"],
+    ["org.springframework.boot", "spring-boot-starter-web", "compile", "maven"]
+  ]);
+  assert.ok(result.frameworks.some((entry) => entry.name === "Spring"));
+  assert.ok(result.frameworks.some((entry) => entry.name === "JUnit"));
+  assert.ok(result.runtimes.some((entry) => entry.name === "maven" && entry.source === "pom.xml"));
+  assert.ok(result.runtimes.some((entry) => entry.name === "java" && entry.source === "pom.xml"));
+  assert.ok(result.suggestedNextActions.some((entry) => entry.command === "./mvnw test"));
+});
+
 test("package deps handles mixed projects and dependency-count risks", async () => {
   const root = tempProject();
   const dependencies = {};
@@ -149,7 +224,10 @@ test("package deps returns MANIFEST_NOT_FOUND without supported manifests", asyn
 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "MANIFEST_NOT_FOUND");
-  assert.deepEqual(result.error.details.checked, ["package.json", "go.mod"]);
+  assert.ok(result.error.details.checked.includes("package.json"));
+  assert.ok(result.error.details.checked.includes("go.mod"));
+  assert.ok(result.error.details.checked.includes("pyproject.toml"));
+  assert.ok(result.error.details.checked.includes("pom.xml"));
   assert.equal(result.error.suggestedNextActions[0].command, "agentshell tree --compact");
 });
 

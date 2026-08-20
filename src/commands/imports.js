@@ -18,7 +18,9 @@ const LANGUAGE_BY_EXTENSION = new Map([
   [".cjs", "javascript"],
   [".ts", "typescript"],
   [".tsx", "typescript"],
-  [".go", "go"]
+  [".go", "go"],
+  [".py", "python"],
+  [".java", "java"]
 ]);
 
 const NODE_BUILTINS = new Set([
@@ -91,6 +93,8 @@ export function parseImportsOptions(file, options = {}) {
 export function summarizeImports(text, language) {
   if (language === "javascript" || language === "typescript") return summarizeJsTsImports(text);
   if (language === "go") return summarizeGoImports(text);
+  if (language === "python") return summarizePythonImports(text);
+  if (language === "java") return summarizeJavaImports(text);
   return [];
 }
 
@@ -160,9 +164,60 @@ function goImportEntry(source, alias) {
   }, "go");
 }
 
+function summarizePythonImports(text) {
+  const source = stripPythonComments(text);
+  const entries = [];
+
+  for (const match of source.matchAll(/^\s*import\s+(.+)$/gm)) {
+    for (const part of match[1].split(",")) {
+      const item = part.trim();
+      const aliasMatch = /^([A-Za-z_][\w.]*)(?:\s+as\s+([A-Za-z_]\w*))?$/.exec(item);
+      if (!aliasMatch) continue;
+      entries.push(classifyImport({
+        source: aliasMatch[1],
+        type: { kind: "python" },
+        specifiers: aliasMatch[2] ? [aliasMatch[2]] : []
+      }, "python"));
+    }
+  }
+
+  for (const match of source.matchAll(/^\s*from\s+([.\w]+)\s+import\s+(.+)$/gm)) {
+    const sourceName = match[1];
+    const specifiers = parsePythonSpecifiers(match[2]);
+    entries.push(classifyImport({
+      source: sourceName,
+      type: { kind: "python" },
+      specifiers
+    }, "python"));
+  }
+
+  return dedupeImports(entries);
+}
+
+function summarizeJavaImports(text) {
+  const source = stripJavaComments(text);
+  const entries = [];
+
+  for (const match of source.matchAll(/^\s*import\s+(static\s+)?([A-Za-z_][\w]*(?:\.[A-Za-z_*][\w*]*)*)\s*;/gm)) {
+    entries.push(classifyImport({
+      source: match[2],
+      type: { kind: match[1] ? "static" : "java" },
+      specifiers: []
+    }, "java"));
+  }
+
+  return dedupeImports(entries);
+}
+
 function classifyImport(entry, language) {
   const relative = entry.source.startsWith(".") || entry.source.startsWith("/");
-  const builtin = language === "go" ? isGoBuiltin(entry.source) : isNodeBuiltin(entry.source);
+  const builtin = language === "go"
+    ? isGoBuiltin(entry.source)
+    : language === "python"
+      ? isPythonBuiltin(entry.source)
+      : language === "java"
+        ? isJavaBuiltin(entry.source)
+        : isNodeBuiltin(entry.source);
   return {
     ...entry,
     count: entry.specifiers.length,
@@ -170,6 +225,15 @@ function classifyImport(entry, language) {
     external: !relative && !builtin,
     relative
   };
+}
+
+function parsePythonSpecifiers(clause) {
+  const specifiers = clause
+    .replace(/[()]/g, "")
+    .split(",")
+    .map((part) => cleanSpecifier(part))
+    .filter(Boolean);
+  return [...new Set(specifiers)].slice(0, MAX_SPECIFIERS);
 }
 
 function buildSummary(allEntries, entries) {
@@ -272,12 +336,34 @@ function stripGoComments(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
+function stripPythonComments(text) {
+  return text.replace(/^\s*#.*$/gm, "");
+}
+
+function stripJavaComments(text) {
+  return stripGoComments(text);
+}
+
 function isNodeBuiltin(source) {
   return NODE_BUILTINS.has(source) || NODE_BUILTINS.has(source.replace(/^node:/, ""));
 }
 
 function isGoBuiltin(source) {
   return !source.startsWith(".") && !source.split("/")[0].includes(".");
+}
+
+function isPythonBuiltin(source) {
+  if (source.startsWith(".")) return false;
+  const root = source.split(".")[0];
+  return [
+    "abc", "argparse", "asyncio", "collections", "contextlib", "dataclasses", "datetime",
+    "functools", "itertools", "json", "logging", "math", "os", "pathlib", "re", "sys",
+    "typing", "unittest"
+  ].includes(root);
+}
+
+function isJavaBuiltin(source) {
+  return /^(java|javax)\./.test(source);
 }
 
 function languageFor(extension) {

@@ -89,6 +89,57 @@ test("imports summarizes Go single and block imports", async () => {
   assert.ok(result.imports.some((entry) => entry.source === "example.com/project/register" && entry.type.kind === "side-effect"));
 });
 
+test("imports summarizes Python imports, aliases, and relative from imports", async () => {
+  const root = makeFixture({
+    "pkg/sample.py": [
+      "import os",
+      "import requests as http, pkg.submodule",
+      "from .helpers import build, _private as private_helper",
+      "from ..core import service",
+      "SECRET = 'do not leak'"
+    ].join("\n")
+  });
+
+  const result = await imports(root, "pkg/sample.py", { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.language, "python");
+  assert.equal(result.summary.importCount, 5);
+  assert.equal(result.summary.byKind.python, 5);
+  assert.equal(result.summary.builtinCount, 1);
+  assert.equal(result.summary.externalCount, 2);
+  assert.equal(result.summary.relativeCount, 2);
+  assert.ok(result.imports.some((entry) => entry.source === "requests" && entry.specifiers.includes("http")));
+  assert.ok(result.imports.some((entry) => entry.source === ".helpers" && entry.relative && entry.specifiers.includes("_private:private_helper")));
+  assert.ok(result.imports.some((entry) => entry.source === "..core" && entry.relative && entry.specifiers.includes("service")));
+  assert.ok(!JSON.stringify(result).includes("do not leak"));
+});
+
+test("imports summarizes Java normal and static imports", async () => {
+  const root = makeFixture({
+    "src/Main.java": [
+      "package demo;",
+      "import java.util.List;",
+      "import com.example.Service;",
+      "import static com.example.Service.create;",
+      "class Main {}"
+    ].join("\n")
+  });
+
+  const result = await imports(root, "src/Main.java", { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.language, "java");
+  assert.equal(result.summary.importCount, 3);
+  assert.equal(result.summary.byKind.java, 2);
+  assert.equal(result.summary.byKind.static, 1);
+  assert.equal(result.summary.builtinCount, 1);
+  assert.equal(result.summary.externalCount, 2);
+  assert.ok(result.imports.some((entry) => entry.source === "java.util.List" && entry.builtin));
+  assert.ok(result.imports.some((entry) => entry.source === "com.example.Service" && entry.type.kind === "java"));
+  assert.ok(result.imports.some((entry) => entry.source === "com.example.Service.create" && entry.type.kind === "static"));
+});
+
 test("imports reports missing arg, outside root, missing path, and unsupported file errors", async () => {
   const root = makeFixture({
     "README.md": "# nope\n"
@@ -141,7 +192,7 @@ test("imports schema exposes the compact response contract", () => {
   assert.ok(schema.oneOf[0].required.includes("imports"));
   assert.ok(schema.$defs.summary.required.includes("returnedImports"));
   assert.ok(schema.$defs.summary.required.includes("truncated"));
-  assert.deepEqual(schema.$defs.importEntry.properties.type.properties.kind.enum, ["runtime", "type", "side-effect", "dynamic", "go"]);
+  assert.deepEqual(schema.$defs.importEntry.properties.type.properties.kind.enum, ["runtime", "type", "side-effect", "dynamic", "go", "python", "java", "static"]);
 });
 
 test("summarizeImports returns an empty list for unsupported languages", () => {

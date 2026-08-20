@@ -36,7 +36,7 @@
     "summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["totalScripts", "totalFiles", "returnedFiles", "truncated", "packageCount", "nodePackageCount", "goPackageCount", "goWorkspaceCount", "nodeFileCount", "goFileCount", "hasTests"],
+      "required": ["totalScripts", "totalFiles", "returnedFiles", "truncated", "packageCount", "nodePackageCount", "goPackageCount", "goWorkspaceCount", "pythonPackageCount", "javaPackageCount", "nodeFileCount", "goFileCount", "pythonFileCount", "javaFileCount", "hasTests"],
       "properties": {
         "totalScripts": { "type": "integer", "minimum": 0 },
         "totalFiles": { "type": "integer", "minimum": 0 },
@@ -46,8 +46,12 @@
         "nodePackageCount": { "type": "integer", "minimum": 0 },
         "goPackageCount": { "type": "integer", "minimum": 0 },
         "goWorkspaceCount": { "type": "integer", "minimum": 0 },
+        "pythonPackageCount": { "type": "integer", "minimum": 0 },
+        "javaPackageCount": { "type": "integer", "minimum": 0 },
         "nodeFileCount": { "type": "integer", "minimum": 0 },
         "goFileCount": { "type": "integer", "minimum": 0 },
+        "pythonFileCount": { "type": "integer", "minimum": 0 },
+        "javaFileCount": { "type": "integer", "minimum": 0 },
         "hasTests": { "type": "boolean" }
       }
     },
@@ -69,8 +73,8 @@
       "required": ["path", "language", "kind"],
       "properties": {
         "path": { "type": "string" },
-        "language": { "enum": ["javascript", "typescript", "go"] },
-        "kind": { "enum": ["node-pattern", "node-directory", "go-test"] }
+        "language": { "enum": ["javascript", "typescript", "go", "python", "java"] },
+        "kind": { "enum": ["node-pattern", "node-directory", "go-test", "python-config", "python-pattern", "python-directory", "java-standard", "java-pattern"] }
       }
     },
     "package": {
@@ -78,7 +82,7 @@
       "additionalProperties": false,
       "required": ["type", "name", "path"],
       "properties": {
-        "type": { "enum": ["node", "go", "go-workspace"] },
+        "type": { "enum": ["node", "go", "go-workspace", "python", "java", "maven", "gradle"] },
         "name": { "type": "string" },
         "path": { "type": "string" },
         "packageManager": { "enum": ["npm", "pnpm", "yarn", "bun"] },

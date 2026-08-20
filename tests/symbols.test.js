@@ -87,6 +87,70 @@ test("symbols returns Go funcs, methods, types, consts, vars, and exported marke
   assert.equal(result.symbols.find((entry) => entry.name === "groupedLocal").exported, false);
 });
 
+test("symbols returns Python classes, functions, async functions, constants, and exported markers", async () => {
+  const root = makeFixture({
+    "pkg/sample.py": [
+      "VALUE = 1",
+      "_PRIVATE = 2",
+      "class Service:",
+      "    pass",
+      "def build():",
+      "    return Service()",
+      "async def fetch():",
+      "    return VALUE",
+      "def _helper():",
+      "    return 0"
+    ].join("\n")
+  });
+
+  const result = await symbols(root, "pkg/sample.py", { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.language, "python");
+  assert.equal(result.summary.totalSymbols, 6);
+  assert.equal(result.summary.countsByKind.const, 2);
+  assert.equal(result.summary.countsByKind.class, 1);
+  assert.equal(result.summary.countsByKind.function, 3);
+  assert.equal(result.symbols.find((entry) => entry.name === "VALUE").exported, true);
+  assert.equal(result.symbols.find((entry) => entry.name === "_PRIVATE").exported, false);
+  assert.equal(result.symbols.find((entry) => entry.name === "_helper").exported, false);
+  assert.equal(result.symbols.find((entry) => entry.name === "fetch").signature, "async def fetch():");
+  assert.ok(!JSON.stringify(result).includes("return Service"));
+});
+
+test("symbols returns Java types, methods, fields, and public exported markers", async () => {
+  const root = makeFixture({
+    "src/Service.java": [
+      "package demo;",
+      "public class Service {",
+      "  public static final int LIMIT = 10;",
+      "  private String name;",
+      "  public Service(String name) { this.name = name; }",
+      "  public String name() { return name; }",
+      "  private void reset() {}",
+      "}",
+      "interface Worker {}",
+      "public record Result(String value) {}",
+      "enum Mode { FAST, SLOW }"
+    ].join("\n")
+  });
+
+  const result = await symbols(root, "src/Service.java", { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.language, "java");
+  assert.equal(result.summary.countsByKind.class, 1);
+  assert.equal(result.summary.countsByKind.interface, 1);
+  assert.equal(result.summary.countsByKind.record, 1);
+  assert.equal(result.summary.countsByKind.enum, 1);
+  assert.equal(result.summary.countsByKind.method, 2);
+  assert.equal(result.summary.countsByKind.field, 2);
+  assert.equal(result.symbols.find((entry) => entry.name === "Service").exported, true);
+  assert.equal(result.symbols.find((entry) => entry.name === "Worker").exported, false);
+  assert.equal(result.symbols.find((entry) => entry.name === "name" && entry.kind === "method").exported, true);
+  assert.equal(result.symbols.find((entry) => entry.name === "reset").exported, false);
+});
+
 test("symbols defaults compact output to 80 symbols and reports truncation", async () => {
   const declarations = Array.from({ length: 85 }, (_, index) => `export const value${index} = ${index};`);
   const root = makeFixture({
@@ -126,6 +190,9 @@ test("symbols exposes a parseable JSON schema contract", () => {
   assert.ok(schema.oneOf[0].required.includes("symbols"));
   assert.ok(schema.$defs.symbol.required.includes("exported"));
   assert.ok(schema.$defs.symbol.properties.kind.enum.includes("method"));
+  assert.ok(schema.$defs.symbol.properties.kind.enum.includes("field"));
+  assert.ok(schema.oneOf[0].properties.language.enum.includes("python"));
+  assert.ok(schema.oneOf[0].properties.language.enum.includes("java"));
 });
 
 function makeFixture(files) {

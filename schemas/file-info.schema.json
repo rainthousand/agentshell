@@ -14,7 +14,10 @@
         "exists": { "const": true },
         "sizeBytes": { "type": "integer", "minimum": 0 },
         "lineCount": { "type": ["integer", "null"], "minimum": 0 },
-        "language": { "type": ["string", "null"] },
+        "language": {
+          "type": ["string", "null"],
+          "examples": ["javascript", "typescript", "go", "python", "java"]
+        },
         "extension": { "type": "string" },
         "generated": { "type": "boolean" },
         "binary": { "type": "boolean" },

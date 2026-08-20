@@ -5,7 +5,7 @@
   "oneOf": [
     {
       "type": "object",
-      "required": ["ok", "protocolVersion", "file", "hash", "range", "matchedLine", "totalLines", "content"],
+      "required": ["ok", "protocolVersion", "file", "hash", "range", "matchedLine", "totalLines", "content", "mode", "byteSize", "bounded", "truncated"],
       "properties": {
         "ok": { "const": true },
         "protocolVersion": { "const": "agentshell.read.v1" },
@@ -21,8 +21,20 @@
           "additionalProperties": false
         },
         "matchedLine": { "type": ["integer", "null"] },
-        "totalLines": { "type": "integer", "minimum": 0 },
-        "content": { "type": "string" }
+        "totalLines": { "type": ["integer", "null"], "minimum": 0 },
+        "content": { "type": "string" },
+        "mode": { "enum": ["lines", "around", "head", "tail"] },
+        "byteSize": { "type": "integer", "minimum": 0 },
+        "bounded": { "type": "boolean" },
+        "truncated": {
+          "type": "object",
+          "required": ["value", "reason"],
+          "properties": {
+            "value": { "type": "boolean" },
+            "reason": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

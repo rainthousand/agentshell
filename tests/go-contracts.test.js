@@ -91,5 +91,6 @@ test("Go documentation keeps verification and repair boundaries explicit", () =>
   assert.match(docs, /go test \.\/\.\.\./);
   assert.match(docs, /package-scoped/i);
   assert.match(docs, /cache fingerprints?/i);
-  assert.match(docs, /Automatic Go (?:code|source) repair is not supported yet/i);
+  assert.match(docs, /Automatic\s+Go(?:\/Python\/Java)?\s+(?:code|source) repair is not supported yet/i);
+  assert.match(docs, /Python and Java support in V1\.0 is read-only discovery and summarization/i);
 });

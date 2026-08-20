@@ -46,15 +46,41 @@ function compactManual() {
       },
       {
         need: "Search code with bounded structured output",
-        command: "agentshell grep <query> --compact"
+        command: "agentshell grep <query> --compact [--type <py|go|ts|java>] [--context N] [--files-with-matches]"
+      },
+      {
+        need: "Find files by name without scanning generated directories",
+        command: "agentshell find file --name <pattern> --compact"
+      },
+      {
+        need: "Inspect the current location and important directory entries",
+        command: "agentshell pwd --compact",
+        fallback: "agentshell ls --compact"
+      },
+      {
+        need: "Inspect disk usage, executables, processes, or listening ports compactly",
+        command: "agentshell du --compact",
+        fallback: "agentshell which <command> --compact | agentshell ps --compact | agentshell port list --compact"
+      },
+      {
+        need: "Prepare a reviewed process stop command without executing it",
+        command: "agentshell kill suggest --pid <pid> --compact"
       },
       {
         need: "Inspect project structure without noisy generated folders",
         command: "agentshell tree --compact"
       },
       {
+        need: "Summarize project health before choosing a workflow",
+        command: "agentshell project health --compact"
+      },
+      {
         need: "Inspect changed files by category and risk",
         command: "agentshell files changed --compact"
+      },
+      {
+        need: "Summarize changed-file impact and recommended validation",
+        command: "agentshell changed impact --compact"
       },
       {
         need: "Inspect one file without dumping its contents",
@@ -65,8 +91,16 @@ function compactManual() {
         command: "agentshell test list --compact"
       },
       {
+        need: "Choose the likely test command without running it",
+        command: "agentshell test command --compact"
+      },
+      {
         need: "Extract failures from a saved log without reading the whole log",
         command: "agentshell errors from-log <file> --compact"
+      },
+      {
+        need: "Run a command but return compact error evidence instead of raw logs",
+        command: "agentshell errors from-command --compact -- <command...>"
       },
       {
         need: "Inspect imports without dumping source",

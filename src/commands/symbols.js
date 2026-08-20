@@ -9,6 +9,8 @@ const DEFAULT_MAX_SYMBOLS = 80;
 
 const JS_TS_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"]);
 const GO_EXTENSIONS = new Set([".go"]);
+const PYTHON_EXTENSIONS = new Set([".py"]);
+const JAVA_EXTENSIONS = new Set([".java"]);
 
 export async function symbols(root, file, options = {}) {
   if (!file) {
@@ -23,14 +25,12 @@ export async function symbols(root, file, options = {}) {
   const language = languageForFile(resolved.relative);
   if (!language) {
     return fail("UNSUPPORTED_LANGUAGE", `Unsupported file type: ${file}`, {
-      supportedExtensions: [...JS_TS_EXTENSIONS, ...GO_EXTENSIONS].sort()
+      supportedExtensions: [...JS_TS_EXTENSIONS, ...GO_EXTENSIONS, ...PYTHON_EXTENSIONS, ...JAVA_EXTENSIONS].sort()
     });
   }
 
   const content = fs.readFileSync(resolved.absTarget, "utf8");
-  const allSymbols = language === "go"
-    ? parseGoSymbols(content)
-    : parseJsTsSymbols(content);
+  const allSymbols = parseSymbols(content, language);
   const maxSymbols = compactLimit(options);
   const returnedSymbols = allSymbols.slice(0, maxSymbols);
   const omittedSymbols = Math.max(0, allSymbols.length - returnedSymbols.length);
@@ -69,8 +69,17 @@ export async function symbols(root, file, options = {}) {
 function languageForFile(file) {
   const extension = path.extname(file).toLowerCase();
   if (GO_EXTENSIONS.has(extension)) return "go";
+  if (PYTHON_EXTENSIONS.has(extension)) return "python";
+  if (JAVA_EXTENSIONS.has(extension)) return "java";
   if (JS_TS_EXTENSIONS.has(extension)) return extension.includes("ts") ? "typescript" : "javascript";
   return null;
+}
+
+function parseSymbols(content, language) {
+  if (language === "go") return parseGoSymbols(content);
+  if (language === "python") return parsePythonSymbols(content);
+  if (language === "java") return parseJavaSymbols(content);
+  return parseJsTsSymbols(content);
 }
 
 function compactLimit(options) {
@@ -169,6 +178,82 @@ function parseGoSymbols(content) {
   return symbols;
 }
 
+function parsePythonSymbols(content) {
+  const symbols = [];
+  const lines = content.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || /^\s/.test(line)) continue;
+
+    const matched = matchPythonTopLevel(trimmed);
+    if (matched) {
+      symbols.push({
+        ...matched,
+        line: index + 1,
+        exported: !matched.name.startsWith("_")
+      });
+    }
+  }
+
+  return symbols;
+}
+
+function matchPythonTopLevel(line) {
+  let match = /^(async\s+)?def\s+([A-Za-z_]\w*)\s*\(/.exec(line);
+  if (match) return symbol("function", match[2], line);
+
+  match = /^class\s+([A-Za-z_]\w*)\b/.exec(line);
+  if (match) return symbol("class", match[1], line);
+
+  match = /^(_?[A-Z][A-Z0-9_]*)\s*[:=]/.exec(line);
+  if (match) return symbol("const", match[1], line);
+
+  return null;
+}
+
+function parseJavaSymbols(content) {
+  const symbols = [];
+  const lines = stripJavaComments(content).split(/\r?\n/);
+  const typeNames = new Set();
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const matched = matchJavaSymbol(trimmed, typeNames);
+    if (matched) {
+      if (["class", "interface", "enum", "record"].includes(matched.kind)) {
+        typeNames.add(matched.name);
+      }
+      symbols.push({
+        ...matched,
+        line: index + 1,
+        exported: /\bpublic\b/.test(trimmed)
+      });
+    }
+  }
+
+  return symbols;
+}
+
+function matchJavaSymbol(line, typeNames = new Set()) {
+  const modifiers = "(?:public|protected|private|static|final|abstract|synchronized|native|strictfp|transient|volatile|sealed|non-sealed)\\s+";
+  let match = new RegExp(`^(?:${modifiers})*(class|interface|enum|record)\\s+([A-Za-z_]\\w*)\\b`).exec(line);
+  if (match) return symbol(match[1], match[2], line);
+
+  if (/^(?:package|import|if|for|while|switch|catch|return|throw|new)\b/.test(line)) return null;
+  match = new RegExp(`^(?:${modifiers})*(?:<[\\w\\s,? extends super&]+>\\s+)?[\\w$<>\\[\\].?,]+\\s+([A-Za-z_]\\w*)\\s*\\([^;]*\\)`).exec(line);
+  if (match && !typeNames.has(match[1])) return symbol("method", match[1], line);
+
+  match = new RegExp(`^(?:${modifiers})*[\\w$<>\\[\\].?,]+\\s+([A-Za-z_]\\w*)\\s*(?:=|;)`).exec(line);
+  if (match) return symbol("field", match[1], line);
+
+  return null;
+}
+
 function matchGoTopLevel(line) {
   let match = /^func\s+(?:\(([^)]+)\)\s*)?([A-Za-z_]\w*)\s*\(/.exec(line);
   if (match) {
@@ -210,6 +295,10 @@ function compactSignature(line) {
 
 function isGoExported(name) {
   return /^[A-Z]/.test(name);
+}
+
+function stripJavaComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 function countByKind(symbols) {

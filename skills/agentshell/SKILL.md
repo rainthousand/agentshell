@@ -5,7 +5,7 @@ description: Use AgentShell when a coding task benefits from compact JSON projec
 
 # AgentShell
 
-AgentShell is a structured local CLI for AI coding agents. Its purpose is to reduce terminal noise, command round trips, and token usage during code understanding and failing-test work while keeping next-action task guidance and previewable conservative suggested changes that agents can inspect cheaply. It detects Node projects from `package.json`, Go modules from `go.mod`, and local multi-module workspaces from `go.work`. JavaScript and TypeScript have narrow automatic repair strategies; Go has compact structured verification and diagnosis, but automatic Go source repair is not supported. AgentShell also includes `start --compact`/`entry --compact` for the cheapest combined doctor, compact understand, and run-next summary, full `start`/`entry` for debugging payloads, readiness checks, compact run state and metrics, log references, benchmarks, JSON schemas, adapter instructions, and hash-checked edits with undo.
+AgentShell is a structured local CLI for AI coding agents. Its purpose is to reduce terminal noise, command round trips, and token usage during code understanding and failing-test work while keeping next-action task guidance and previewable conservative suggested changes that agents can inspect cheaply. It detects Node projects from `package.json`, Go modules from `go.mod`, Python projects from common Python manifests, Java projects from Maven/Gradle manifests, and local multi-module Go workspaces from `go.work`. JavaScript and TypeScript have narrow automatic repair strategies; Go has compact structured verification and diagnosis, but automatic Go source repair is not supported. Python and Java support in V1.0 is read-only discovery and summarization. AgentShell also includes `start --compact`/`entry --compact` for the cheapest combined doctor, compact understand, and run-next summary, full `start`/`entry` for debugging payloads, readiness checks, compact run state and metrics, log references, benchmarks, JSON schemas, adapter instructions, and hash-checked edits with undo.
 
 ## Activation Contract
 
@@ -26,26 +26,37 @@ Use AgentShell first for supported actions:
 - `agentshell doctor` to check runtime, project manifest/test command, AgentShell state, and git readiness in compact JSON. Go projects also report Go toolchain readiness and optional, non-blocking `golangci-lint` and `goimports` availability.
 - `agentshell plugin status --compact` to check source manifest, personal marketplace, Codex plugin cache consistency, and the next install action cheaply; use full `agentshell plugin status` when check details are needed.
 - `agentshell understand --compact` for first-pass project inspection; use full `agentshell understand` only when root paths, changed file names, or action reasons are needed.
+- `agentshell project health --compact` for a one-command project health summary across test command, config, dependency, git, and CI signals without running tests.
 - `agentshell find <query>` for compact code search.
-- `agentshell grep <query> --compact` for bounded structured code search when raw `rg`/`grep` would produce noisy output; use `--limit N` and `--per-file N` to cap result volume.
+- `agentshell grep <query> --compact` for bounded structured code search when raw `rg`/`grep` would produce noisy output; use `--limit N`, `--per-file N`, `--type py|go|ts|java`, `--context N`, or `--files-with-matches` to narrow the result.
+- `agentshell find file --name <pattern> --compact` for bounded filename discovery with file category, size, risk, and a suggested focused read.
+- `agentshell ls --compact` and `agentshell pwd --compact` for concise directory and workspace-location context without raw listing noise.
+- `agentshell du --compact` for bounded disk-usage hotspots with generated-directory and token-noise hints.
+- `agentshell which <command> --compact` for executable path and safe version discovery.
+- `agentshell ps --compact` and `agentshell port list --compact [--port N]` for focused development-process and listening-port inspection.
+- `agentshell kill suggest --pid N --compact` or `agentshell kill suggest --port N --compact` to preview a process-stop command and risk without executing it.
 - `agentshell tree --compact` for a bounded project tree that prioritizes important source, test, docs, script, and entry files while ignoring common generated folders.
 - `agentshell files changed --compact` for changed-file category/risk summaries when raw `git status` plus name-only diffs would require multiple noisy commands.
-- `agentshell file info <path> --compact` for one-file size, hash, language, generated/binary, git metadata, and JS/TS/Go symbol summaries without dumping file contents.
-- `agentshell test list --compact` for discovered Node scripts, test files, Go test files, and packages without actually running tests.
+- `agentshell changed impact --compact` for changed-file impact, risk, and recommended validation commands without running tests.
+- `agentshell file info <path> --compact` for one-file size, hash, language, generated/binary, git metadata, and JS/TS/Go/Python/Java symbol summaries without dumping file contents.
+- `agentshell test list --compact` for discovered Node scripts, test files, Go/Python/Java test files, and packages without actually running tests.
+- `agentshell test command --compact` to choose the likely runnable test command across Node, Go, Python, and Java without executing it.
 - `agentshell errors from-log <file> --compact` to extract likely failures, stack locations, and short snippets from saved logs without reading the full log.
-- `agentshell imports <file> --compact` for JS/TS/Go import summaries when dependency shape matters more than full source content.
-- `agentshell symbols <file> --compact` for JS/TS/Go symbol summaries when file structure matters more than implementation bodies.
+- `agentshell errors from-command --compact -- <command...>` to execute a command while returning compact error evidence, exit status, duration, and a `logRef` instead of full stdout/stderr.
+- `agentshell imports <file> --compact` for JS/TS/Go/Python/Java import summaries when dependency shape matters more than full source content.
+- `agentshell symbols <file> --compact` for JS/TS/Go/Python/Java symbol summaries when file structure matters more than implementation bodies.
 - `agentshell refs <symbol> --compact` for bounded grouped reference search when raw `rg` would produce too many lines.
-- `agentshell config list --compact` for common project config entry points such as package, TS/JS, build, lint, Go, Makefile, Docker, CI, Codex, and AgentShell config.
+- `agentshell config list --compact` for common project config entry points such as package, TS/JS, Python, Java, build, lint, Go, Makefile, Docker, CI, Codex, and AgentShell config.
 - `agentshell git status --compact` for structured working-tree state, dirty/clean counts, truncated file lists, and lockfile/generated-output risk hints.
 - `agentshell git diff --compact` or `agentshell git diff --compact --staged` for compact diff stats, changed-file summaries, hunk locations, risk hints, and a `diffRef` for raw diff retrieval only when needed.
 - `agentshell git log --compact` for recent commit history without raw patches; use `--limit N` for a bounded history window.
 - `agentshell git branch --compact` for current branch, upstream, ahead/behind, local branch count, and redacted remote host/provider hints.
 - `agentshell package scripts --compact` for package script names, categories, risky/long-running hints, and verification-oriented next actions without reading the whole manifest.
 - `agentshell package script <name> --compact` to inspect one script's command, category, risk, and run suggestion before executing it.
-- `agentshell package deps --compact` for Node and Go manifest dependency summaries, framework/runtime hints, and lockfile/dependency-count risks without expanding dependency trees.
+- `agentshell package deps --compact` for Node, Go, Python, and Java manifest dependency summaries, framework/runtime hints, and lockfile/dependency-count risks without expanding dependency trees.
 - `agentshell read <file> --lines A:B` for bounded file reads.
 - `agentshell read <file> --around <query>` for context near known text or symbols.
+- `agentshell read <file> --head N` or `agentshell read <file> --tail N` for safe bounded edges of large files; `agentshell head|tail <file> --lines N --compact` are convenient aliases.
 - `agentshell verify test --compact` for compact summarized test output. Go verification runs `go test -json` internally and reports structured package, test, and subtest failures.
 - `agentshell verify test --tail N` when inline log tail is needed.
 - `agentshell verify build`, `agentshell verify lint`, `agentshell verify format`, and `agentshell verify modules` for Go build, `go vet`, read-only `gofmt` comparison, and read-only module integrity/tidy-drift checks.

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/kill-suggest.schema.json",
+  "title": "AgentShell Kill Suggest Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "target", "summary", "processes", "suggestions", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.kill-suggest.v1" },
+        "compact": { "type": "boolean" },
+        "target": { "$ref": "#/$defs/target" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "processes": { "type": "array", "items": { "$ref": "#/$defs/process" } },
+        "suggestions": { "type": "array", "items": { "$ref": "#/$defs/suggestion" } },
+        "suggestedNextActions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "#/$defs/errorResponse" }
+  ],
+  "$defs": {
+    "target": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "enum": ["pid", "port"] },
+        "value": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["matchedProcesses", "suggestionCount", "highestRisk", "executed"],
+      "properties": {
+        "matchedProcesses": { "type": "integer", "minimum": 0 },
+        "suggestionCount": { "type": "integer", "minimum": 0 },
+        "highestRisk": { "enum": ["none", "low", "medium", "high", "critical"] },
+        "executed": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "process": {
+      "type": "object",
+      "required": ["pid", "command", "protocol", "port"],
+      "properties": {
+        "pid": { "type": "integer", "minimum": 1 },
+        "command": { "type": ["string", "null"] },
+        "protocol": { "type": ["string", "null"] },
+        "port": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 }
+      },
+      "additionalProperties": false
+    },
+    "suggestion": {
+      "type": "object",
+      "required": ["pid", "command", "signal", "risk", "reason"],
+      "properties": {
+        "pid": { "type": "integer", "minimum": 1 },
+        "command": { "type": "string", "pattern": "^kill -TERM [1-9][0-9]*$" },
+        "signal": { "const": "SIGTERM" },
+        "risk": { "enum": ["low", "medium", "high", "critical"] },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": { "command": { "type": "string" }, "reason": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "errorResponse": {
+      "type": "object",
+      "required": ["ok", "error"],
+      "properties": { "ok": { "const": false }, "error": { "type": "object" } },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/du.schema.json",
+  "title": "AgentShell Disk Usage Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion", "compact", "root", "summary", "largestDirectories", "largestFiles", "excluded", "truncated", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.du.v1" },
+        "compact": { "type": "boolean" },
+        "root": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "absolutePath"],
+          "properties": {
+            "path": { "type": "string" },
+            "absolutePath": { "type": "string" }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["totalSizeBytes", "totalSize", "fileCount", "directoryCount", "excludedCount", "unreadableCount", "scannedEntries", "maxDepth", "tokenNoiseRisk"],
+          "properties": {
+            "totalSizeBytes": { "type": "integer", "minimum": 0 },
+            "totalSize": { "type": "string" },
+            "fileCount": { "type": "integer", "minimum": 0 },
+            "directoryCount": { "type": "integer", "minimum": 0 },
+            "excludedCount": { "type": "integer", "minimum": 0 },
+            "unreadableCount": { "type": "integer", "minimum": 0 },
+            "scannedEntries": { "type": "integer", "minimum": 0 },
+            "maxDepth": { "type": "integer", "minimum": 1 },
+            "tokenNoiseRisk": { "$ref": "#/$defs/noiseRisk" }
+          }
+        },
+        "largestDirectories": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/sizeEntry" }
+        },
+        "largestFiles": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/sizeEntry" }
+        },
+        "excluded": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/excluded" }
+        },
+        "truncated": { "type": "boolean" },
+        "suggestedNextActions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "noiseRisk": { "enum": ["low", "medium", "high"] },
+    "sizeEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "sizeBytes", "size", "tokenNoiseRisk"],
+      "properties": {
+        "path": { "type": "string" },
+        "kind": { "enum": ["file", "directory"] },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "size": { "type": "string" },
+        "tokenNoiseRisk": { "$ref": "#/$defs/noiseRisk" }
+      }
+    },
+    "excluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason", "generated", "code"],
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "enum": ["generated-noise", "symbolic-link", "max-depth", "unreadable"] },
+        "generated": { "type": "boolean" },
+        "code": { "type": ["string", "null"] }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@
     "ok": { "const": true },
     "protocolVersion": { "const": "agentshell.package-deps.v1" },
     "compact": { "type": "boolean" },
-    "ecosystem": { "enum": ["node", "go", "mixed"] },
+    "ecosystem": { "enum": ["node", "go", "python", "java", "mixed"] },
     "summary": { "$ref": "#/$defs/summary" },
     "dependencies": { "$ref": "#/$defs/dependencies" },
     "frameworks": {
@@ -32,15 +32,17 @@
   "$defs": {
     "summary": {
       "type": "object",
-      "required": ["manifests", "dependencyCount", "nodeDependencyCount", "goDependencyCount", "productionCount", "developmentCount", "peerCount", "optionalCount", "frameworkCount", "runtimeCount", "lockfiles"],
+      "required": ["manifests", "dependencyCount", "nodeDependencyCount", "goDependencyCount", "pythonDependencyCount", "javaDependencyCount", "productionCount", "developmentCount", "peerCount", "optionalCount", "frameworkCount", "runtimeCount", "lockfiles", "toolingFiles"],
       "properties": {
         "manifests": {
           "type": "array",
-          "items": { "enum": ["package.json", "go.mod"] }
+          "items": { "enum": ["package.json", "go.mod", "pyproject.toml", "requirements.txt", "requirements-dev.txt", "setup.cfg", "setup.py", "Pipfile", "pom.xml", "build.gradle", "build.gradle.kts"] }
         },
         "dependencyCount": { "type": "integer", "minimum": 0 },
         "nodeDependencyCount": { "type": "integer", "minimum": 0 },
         "goDependencyCount": { "type": "integer", "minimum": 0 },
+        "pythonDependencyCount": { "type": "integer", "minimum": 0 },
+        "javaDependencyCount": { "type": "integer", "minimum": 0 },
         "productionCount": { "type": "integer", "minimum": 0 },
         "developmentCount": { "type": "integer", "minimum": 0 },
         "peerCount": { "type": "integer", "minimum": 0 },
@@ -50,13 +52,17 @@
         "lockfiles": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "toolingFiles": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       },
       "additionalProperties": false
     },
     "dependencies": {
       "type": "object",
-      "required": ["production", "development", "peer", "optional", "go"],
+      "required": ["production", "development", "peer", "optional", "go", "python", "java"],
       "properties": {
         "production": {
           "type": "array",
@@ -77,6 +83,14 @@
         "go": {
           "type": "array",
           "items": { "$ref": "#/$defs/goDependency" }
+        },
+        "python": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pythonDependency" }
+        },
+        "java": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/javaDependency" }
         }
       },
       "additionalProperties": false
@@ -102,12 +116,34 @@
       },
       "additionalProperties": false
     },
+    "pythonDependency": {
+      "type": "object",
+      "required": ["name", "version", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": ["string", "null"] },
+        "type": { "enum": ["production", "development", "optional"] }
+      },
+      "additionalProperties": false
+    },
+    "javaDependency": {
+      "type": "object",
+      "required": ["group", "artifact", "version", "scope", "type"],
+      "properties": {
+        "group": { "type": "string" },
+        "artifact": { "type": "string" },
+        "version": { "type": ["string", "null"] },
+        "scope": { "type": "string" },
+        "type": { "enum": ["maven", "gradle"] }
+      },
+      "additionalProperties": false
+    },
     "framework": {
       "type": "object",
       "required": ["name", "ecosystem", "package", "version"],
       "properties": {
         "name": { "type": "string" },
-        "ecosystem": { "enum": ["node", "go"] },
+        "ecosystem": { "enum": ["node", "go", "python", "java"] },
         "package": { "type": ["string", "null"] },
         "version": { "type": ["string", "null"] }
       },
@@ -117,9 +153,9 @@
       "type": "object",
       "required": ["name", "version", "source"],
       "properties": {
-        "name": { "enum": ["node", "typescript", "go"] },
+        "name": { "enum": ["node", "typescript", "go", "python", "java", "maven", "gradle"] },
         "version": { "type": ["string", "null"] },
-        "source": { "enum": ["package.json", "go.mod"] }
+        "source": { "enum": ["package.json", "go.mod", "pyproject.toml", "requirements.txt", "requirements-dev.txt", "setup.cfg", "setup.py", "Pipfile", "pom.xml", "build.gradle", "build.gradle.kts"] }
       },
       "additionalProperties": false
     },

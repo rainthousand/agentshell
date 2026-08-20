@@ -80,6 +80,45 @@ test("configList discovers Go, container, CI, and Codex or AgentShell config", a
   assert.ok(result.suggestedNextActions.some((entry) => entry.command === "agentshell files changed --compact"));
 });
 
+test("configList discovers Python and Java config entrypoints without reading contents", async () => {
+  const root = fixtureDir("agentshell-config-list-python-java-");
+  write(path.join(root, "pyproject.toml"), "[tool.pytest.ini_options\n");
+  write(path.join(root, "requirements-dev.txt"), "-r missing.txt\n");
+  write(path.join(root, "setup.py"), "raise RuntimeError('not executed')\n");
+  write(path.join(root, "setup.cfg"), "[metadata]\n");
+  write(path.join(root, "tox.ini"), "[tox]\n");
+  write(path.join(root, "pytest.ini"), "[pytest]\n");
+  write(path.join(root, "poetry.lock"), "");
+  write(path.join(root, "Pipfile"), "[packages]\n");
+  write(path.join(root, "pom.xml"), "<project>\n");
+  write(path.join(root, "build.gradle.kts"), "plugins {\n");
+  write(path.join(root, "settings.gradle"), "rootProject.name = 'demo'\n");
+  write(path.join(root, "gradle.properties"), "org.gradle.jvmargs=-Xmx1g\n");
+  write(path.join(root, "mvnw"), "");
+  write(path.join(root, "gradlew"), "");
+
+  const result = await configList(root, { compact: true });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.summary.totalConfigs, 14);
+  assert.equal(result.summary.hasPython, true);
+  assert.equal(result.summary.hasJava, true);
+  assert.equal(result.summary.categories.python, 8);
+  assert.equal(result.summary.categories.java, 6);
+
+  const byPath = new Map(result.configs.map((entry) => [entry.path, entry]));
+  assert.equal(byPath.get("pyproject.toml").type, "pyproject");
+  assert.equal(byPath.get("requirements-dev.txt").type, "requirements");
+  assert.equal(byPath.get("setup.py").risk, "high");
+  assert.equal(byPath.get("pytest.ini").risk, "low");
+  assert.equal(byPath.get("pom.xml").type, "maven");
+  assert.equal(byPath.get("build.gradle.kts").type, "gradle-build");
+  assert.equal(byPath.get("settings.gradle").type, "gradle-settings");
+  assert.equal(byPath.get("gradlew").type, "build-wrapper");
+  assert.equal(byPath.get("pyproject.toml").readCommand, "agentshell read pyproject.toml --lines 1:80");
+  assert.ok(result.suggestedNextActions.some((entry) => entry.command === "agentshell test list --compact"));
+});
+
 test("configList truncates compact output at 60 by default while preserving totals", async () => {
   const root = fixtureDir("agentshell-config-list-truncated-");
   writeJson(path.join(root, "package.json"), { name: "many-configs" });
@@ -106,8 +145,14 @@ test("config list schema exposes the compact response contract", () => {
   assert.ok(schema.oneOf[0].required.includes("configs"));
   assert.ok(schema.$defs.summary.required.includes("returnedConfigs"));
   assert.ok(schema.$defs.summary.required.includes("truncated"));
+  assert.ok(schema.$defs.summary.required.includes("hasPython"));
+  assert.ok(schema.$defs.summary.required.includes("hasJava"));
   assert.ok(schema.$defs.config.required.includes("readCommand"));
   assert.ok(schema.$defs.config.properties.type.enum.includes("github-actions"));
+  assert.ok(schema.$defs.config.properties.type.enum.includes("pyproject"));
+  assert.ok(schema.$defs.config.properties.type.enum.includes("gradle-build"));
+  assert.ok(schema.$defs.config.properties.category.enum.includes("python"));
+  assert.ok(schema.$defs.config.properties.category.enum.includes("java"));
   assert.ok(schema.$defs.config.properties.type.enum.includes("agent-config"));
 });
 

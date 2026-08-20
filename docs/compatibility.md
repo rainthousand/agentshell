@@ -10,6 +10,10 @@
 - The AgentShell V1.0 standalone release package and its bundled Codex plugin.
 - Local JavaScript and TypeScript projects with an npm-compatible `package.json`
   test script for managed test diagnosis, supported repair, and verification.
+- Local Python and Java projects for compact project inspection: dependency
+  manifests, config entrypoints, test discovery, imports, symbols, file info,
+  and changed-file/reference search. Python and Java commands do not execute
+  tests or apply automatic repairs in V1.0.
 - Local Go modules with `go.mod` and local multi-module workspaces with
   `go.work`. Workspace verification names every valid local module target
   explicitly; invalid or outside-workspace `use` entries are reported.
@@ -48,6 +52,8 @@ are optional, non-blocking doctor checks; AgentShell does not install them.
 - Automatic Go source repair. Go diagnosis may identify related test and
   implementation files, but source edits remain an explicit, reviewed,
   hash-checked agent action.
+- Automatic Python or Java test execution, diagnosis, or source repair. Python
+  and Java support in V1.0 is read-only discovery and summarization.
 - Unbounded or target-free Go fuzzing, implicit generator execution, mutation by
   `verify format`, or replacement of repository `go.mod`/`go.sum` files by
   `verify modules`.

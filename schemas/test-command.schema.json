@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/test-command.schema.json",
+  "title": "AgentShell Test Command Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "summary", "commands", "risks", "suggestedNextActions"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.test-command.v1" },
+    "compact": { "type": "boolean" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "commands": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/command" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "suggestedNextActions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": ["commandCount", "primaryCommand", "hasNode", "hasGo", "hasPython", "hasJava", "hasTestFiles"],
+      "properties": {
+        "commandCount": { "type": "integer", "minimum": 0 },
+        "primaryCommand": { "type": ["string", "null"] },
+        "hasNode": { "type": "boolean" },
+        "hasGo": { "type": "boolean" },
+        "hasPython": { "type": "boolean" },
+        "hasJava": { "type": "boolean" },
+        "hasTestFiles": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "command": {
+      "type": "object",
+      "required": ["command", "ecosystem", "source", "confidence", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "ecosystem": { "enum": ["node", "go", "python", "java"] },
+        "source": { "type": "string" },
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["type", "severity", "message"],
+      "properties": {
+        "type": { "type": "string" },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
