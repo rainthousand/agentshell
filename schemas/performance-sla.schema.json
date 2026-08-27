@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/performance-sla.schema.json",
+  "title": "AgentShell Performance SLA Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "protocolVersion", "source", "thresholds", "summary", "checks"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.performance-sla.v1" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "mode", "description"],
+      "properties": {
+        "protocolVersion": { "type": ["string", "null"] },
+        "mode": { "type": "string" },
+        "description": { "type": ["string", "null"] }
+      }
+    },
+    "thresholds": { "$ref": "#/$defs/thresholds" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gateStatus", "total", "passed", "failed", "unavailable"],
+      "properties": {
+        "gateStatus": { "enum": ["passed", "failed", "unavailable"] },
+        "total": { "const": 4 },
+        "passed": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "failed": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "unavailable": { "type": "integer", "minimum": 0, "maximum": 4 }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/check" }
+    }
+  },
+  "$defs": {
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coldStartP95Ms", "overheadPercent", "compactEstimatedTokens", "cacheHitSpeedupPercent"],
+      "properties": {
+        "coldStartP95Ms": { "type": "number", "minimum": 0 },
+        "overheadPercent": { "type": "number", "minimum": 0 },
+        "compactEstimatedTokens": { "type": "number", "minimum": 0 },
+        "cacheHitSpeedupPercent": { "type": "number", "minimum": 0 }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "required", "target", "operator", "threshold", "value", "unit", "samples", "method", "reason"],
+      "oneOf": [
+        {
+          "properties": {
+            "status": { "const": "pass" },
+            "value": { "type": "number" },
+            "samples": { "type": "integer", "minimum": 1 },
+            "method": { "type": "string" },
+            "reason": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "status": { "const": "fail" },
+            "value": { "type": "number" },
+            "samples": { "type": "integer", "minimum": 1 },
+            "method": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        },
+        {
+          "properties": {
+            "status": { "const": "unavailable" },
+            "value": { "type": "null" },
+            "samples": { "const": 0 },
+            "method": { "type": "null" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "properties": {
+        "id": { "enum": ["inspection-cold-start-p95", "agentshell-overhead", "compact-estimated-tokens", "cache-hit-speedup"] },
+        "status": { "enum": ["pass", "fail", "unavailable"] },
+        "required": { "const": true },
+        "target": { "type": "string" },
+        "operator": { "enum": ["<", "<=", ">"] },
+        "threshold": { "type": "number", "minimum": 0 },
+        "value": { "type": ["number", "null"] },
+        "unit": { "enum": ["ms", "percent", "estimated_tokens"] },
+        "samples": { "type": "integer", "minimum": 0 },
+        "method": { "type": ["string", "null"] },
+        "reason": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

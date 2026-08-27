@@ -31,7 +31,7 @@ export function resolvePackageRoot(options = {}) {
   }
 
   const installed = installedCandidates(options)
-    .map((candidate) => ({ root: validPackageRoot(candidate), modifiedAt: modifiedAt(candidate) }))
+    .map((candidate) => packageCandidate(candidate))
     .filter((candidate) => candidate.root)
     .sort(compareInstalledCandidates);
   if (installed[0]) return installed[0].root;
@@ -43,6 +43,10 @@ function installedCandidates(options) {
   if (Array.isArray(options.installedCandidates)) return options.installedCandidates;
   const home = path.resolve(options.homeDir || os.homedir());
   const codexHome = path.resolve(options.codexHome || path.join(home, ".codex"));
+  const managedPlugin = options.homeDir || !options.codexHome
+    ? path.join(home, "plugins", "agentshell")
+    : null;
+  if (validPackageRoot(managedPlugin)) return [managedPlugin];
   const roots = [
     path.join(codexHome, "plugins", "cache", "personal", "agentshell"),
     path.join(home, ".agents", "plugins", "marketplaces", "personal", "plugins", "agentshell")
@@ -70,11 +74,19 @@ function validPackageRoot(candidate) {
   }
 }
 
-function modifiedAt(candidate) {
-  try { return fs.statSync(path.join(candidate, PLUGIN_MANIFEST)).mtimeMs; } catch { return 0; }
+function packageCandidate(candidate) {
+  const root = validPackageRoot(candidate);
+  if (!root) return { root: null, version: "" };
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, PLUGIN_MANIFEST), "utf8"));
+    return { root, version: String(manifest.version || "") };
+  } catch {
+    return { root, version: "" };
+  }
 }
 
 function compareInstalledCandidates(left, right) {
-  if (right.modifiedAt !== left.modifiedAt) return right.modifiedAt - left.modifiedAt;
+  const versionOrder = right.version.localeCompare(left.version, "en", { numeric: true, sensitivity: "base" });
+  if (versionOrder !== 0) return versionOrder;
   return right.root.localeCompare(left.root, "en", { numeric: true });
 }

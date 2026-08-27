@@ -16,7 +16,12 @@ Tagged releases publish the executable, its SHA-256 checksum, the Codex plugin Z
 
 ## Maintainer build
 
-Maintainers need the pinned release toolchain: Node.js `20.20.2`, Bun `1.2.20`, `codesign`, and network access to the pinned `postject` injector. Real standalone and native release builds fail before producing artifacts when either runtime version differs. The builder uses Node SEA rather than a Bun-native executable so the resulting Mach-O can be signed and executed reliably on current macOS. From the repository root:
+Maintainers need Node.js `>=20 <23` (Node 20 or 22), Bun `>=1.2 <1.4`
+(Bun 1.2 or 1.3), `codesign`, and network access to the pinned `postject`
+injector. Builds outside these supported ranges fail before producing artifacts.
+The builder uses Node SEA rather than a Bun-native executable so the resulting
+Mach-O can be signed and executed reliably on current macOS. From the repository
+root:
 
 ```bash
 npm run build:standalone
@@ -28,7 +33,10 @@ The default artifact is:
 bin/agentshell-darwin-arm64
 ```
 
-This path is ignored by Git. The tag-triggered Release workflow rebuilds it with the pinned toolchain, verifies its signature, checksum, smoke checks, and package lifecycle, then uploads the audited result to the GitHub Release.
+This path is ignored by Git. The tag-triggered GitHub Release workflow uses
+Node.js `20.20.2` and Bun `1.2.20` as its fixed reproducible baseline, verifies
+the signature, checksum, smoke checks, and package lifecycle, then uploads the
+audited result to the GitHub Release.
 
 Choose another output path or inspect the build without compiling:
 
@@ -37,7 +45,13 @@ npm run build:standalone -- --out artifacts/standalone/agentshell
 npm run build:standalone -- --dry-run
 ```
 
-After bundling, SEA injection, and ad-hoc signing, the builder runs the binary from a temporary non-source directory and checks `--version`, `schema list`, and `plugin status --compact`. It emits `agentshell.standalone-build.v1` JSON containing the target, artifact size, SHA-256 digest, smoke results, builder versions, a strict toolchain attestation, and `runtimeDependency: false`. Release packaging verifies that attestation and checks that its binary SHA-256 matches the build report.
+After bundling, SEA injection, and ad-hoc signing, the builder runs the binary
+from a temporary non-source directory and checks `--version`, `schema list`, and
+`plugin status --compact`. It emits `agentshell.standalone-build.v1` JSON
+containing the target, artifact size, SHA-256 digest, smoke results,
+`runtimeDependency: false`, and a toolchain attestation with the actual versions,
+supported ranges, and GitHub Release baseline. Release packaging verifies that
+attestation and checks that its binary SHA-256 matches the build report.
 
 Set `AGENTSHELL_TEST_STANDALONE=1` to include the real signed SEA build in the test suite. Ordinary tests use the dry-run path so repository validation remains deterministic when build tools are unavailable. `--dry-run` and `AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD=1` report the detected toolchain as informational and do not require Bun; they cannot be mistaken for a native release build because the report marks enforcement explicitly.
 

@@ -134,7 +134,7 @@ function createSession(prefix) {
     events,
     run(args, options = {}) {
       const started = Date.now();
-      const result = spawnSync("node", [cli, ...args], {
+      const result = spawnSync(cli, args, {
         cwd: workspace,
         encoding: "utf8"
       });

@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/verify-changed.schema.json",
+  "title": "AgentShell Changed Verification Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "includeDependents", "mode", "summary", "ecosystems", "changedFiles", "plan", "executions", "reasons", "suggestedNextActions"],
+      "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.verify-changed.v1" },
+    "compact": { "type": "boolean" },
+    "includeDependents": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether reliable Go or Node reverse dependents were requested for the verification plan."
+    },
+    "mode": { "enum": ["plan", "execute"] },
+    "summary": {
+      "type": "object",
+      "required": ["clean", "changedFileCount", "returnedChangedFileCount", "planStepCount", "fullFallback", "planTruncated", "dependentsExpanded", "dependencyFallback", "executedStepCount", "failedStepCount"],
+      "properties": {
+        "clean": { "type": "boolean" },
+        "changedFileCount": { "type": "integer", "minimum": 0 },
+        "returnedChangedFileCount": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "planStepCount": { "type": "integer", "minimum": 0, "maximum": 16 },
+        "fullFallback": { "type": "boolean" },
+        "planTruncated": { "type": "boolean" },
+        "dependentsExpanded": { "type": "boolean" },
+        "dependencyFallback": { "type": "boolean" },
+        "executedStepCount": { "type": "integer", "minimum": 0, "maximum": 16 },
+        "failedStepCount": { "type": "integer", "minimum": 0, "maximum": 16 }
+      },
+      "additionalProperties": false
+    },
+    "ecosystems": {
+      "type": "array",
+      "maxItems": 4,
+      "items": { "enum": ["node", "go", "python", "java"] },
+      "uniqueItems": true
+    },
+    "changedFiles": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "type": "string", "maxLength": 1000 }
+    },
+    "plan": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "executions": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/execution" }
+    },
+    "reasons": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 1200 }
+    },
+    "suggestedNextActions": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/action" }
+    }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "step": {
+      "type": "object",
+      "required": ["kind", "ecosystem", "scope", "argv", "reason", "fallback"],
+      "properties": {
+        "kind": { "enum": ["format", "build", "test"] },
+        "ecosystem": { "enum": ["node", "go", "python", "java", "unknown"] },
+        "scope": { "enum": ["changed-files", "packages", "full"] },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 110,
+          "items": { "type": "string", "maxLength": 1000 }
+        },
+        "reason": { "type": "string", "maxLength": 240 },
+        "fallback": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "required": ["step", "kind", "ecosystem", "ok", "exitCode", "durationMs", "timedOut", "outputTruncated", "mainError"],
+      "properties": {
+        "step": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "kind": { "enum": ["format", "build", "test"] },
+        "ecosystem": { "enum": ["node", "go", "python", "java", "unknown"] },
+        "ok": { "type": "boolean" },
+        "exitCode": { "type": "integer" },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "timedOut": { "type": "boolean" },
+        "outputTruncated": { "type": "boolean" },
+        "mainError": { "type": ["string", "null"], "maxLength": 400 }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string", "maxLength": 300 },
+        "reason": { "type": "string", "maxLength": 300 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

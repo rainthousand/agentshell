@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/read-batch.schema.json",
+  "title": "AgentShell Batch Read Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "status", "summary", "results"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.read-batch.v1" },
+        "status": { "enum": ["complete", "partial", "failed"] },
+        "summary": {
+          "type": "object",
+          "required": ["requested", "succeeded", "failed", "contentChars", "contentLimitChars", "workBytes", "workBudgetBytes", "workLimitBytes", "truncatedResults"],
+          "properties": {
+            "requested": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "succeeded": { "type": "integer", "minimum": 0, "maximum": 20 },
+            "failed": { "type": "integer", "minimum": 0, "maximum": 20 },
+            "contentChars": { "type": "integer", "minimum": 0, "maximum": 49152 },
+            "contentLimitChars": { "type": "integer", "minimum": 0, "maximum": 49152 },
+            "workBytes": { "type": "integer", "minimum": 0, "maximum": 4194304 },
+            "workBudgetBytes": { "type": "integer", "minimum": 0, "maximum": 4194304 },
+            "workLimitBytes": { "type": "integer", "minimum": 0, "maximum": 4194304 },
+            "truncatedResults": { "type": "integer", "minimum": 0, "maximum": 20 }
+          },
+          "additionalProperties": false
+        },
+        "results": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/result" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "target": {
+      "type": "object",
+      "required": ["file", "mode", "value"],
+      "properties": {
+        "file": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "mode": { "enum": ["lines", "around", "head", "tail"] },
+        "value": { "type": ["string", "integer"] }
+      },
+      "additionalProperties": false
+    },
+    "result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["index", "target", "ok", "file", "hash", "hashScope", "hashBytes", "hashWindow", "range", "lineNumbering", "matchedLine", "totalLines", "content", "mode", "byteSize", "workBytes", "bounded", "truncated"],
+          "properties": {
+            "index": { "type": "integer", "minimum": 0, "maximum": 19 },
+            "target": { "$ref": "#/$defs/target" },
+            "ok": { "const": true },
+            "file": { "type": "string" },
+            "hash": { "type": "string", "pattern": "^sha256:" },
+            "hashScope": {
+              "description": "Only full hashes may be used as a whole-file expectedHash for edits.",
+              "enum": ["full", "window"]
+            },
+            "hashBytes": { "type": "integer", "minimum": 0, "maximum": 524288 },
+            "hashWindow": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "required": ["start", "end"],
+                  "properties": {
+                    "start": { "type": "integer", "minimum": 0 },
+                    "end": { "type": "integer", "minimum": 0 }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "range": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "required": ["start", "end"],
+                  "properties": {
+                    "start": { "type": "integer", "minimum": 1 },
+                    "end": { "type": "integer", "minimum": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "lineNumbering": {
+              "type": "object",
+              "required": ["scope", "reason"],
+              "properties": {
+                "scope": { "enum": ["absolute", "unknown"] },
+                "reason": { "type": ["string", "null"] }
+              },
+              "additionalProperties": false
+            },
+            "matchedLine": { "type": ["integer", "null"] },
+            "totalLines": { "type": ["integer", "null"], "minimum": 0 },
+            "content": { "type": "string", "maxLength": 12288 },
+            "mode": { "enum": ["lines", "around", "head", "tail"] },
+            "byteSize": { "type": "integer", "minimum": 0 },
+            "workBytes": { "type": "integer", "minimum": 0, "maximum": 524288 },
+            "bounded": { "type": "boolean" },
+            "truncated": {
+              "type": "object",
+              "required": ["value", "reason"],
+              "properties": {
+                "value": { "type": "boolean" },
+                "reason": { "type": ["string", "null"] }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["index", "ok", "error"],
+          "properties": {
+            "index": { "type": "integer", "minimum": 0, "maximum": 19 },
+            "target": { "$ref": "#/$defs/target" },
+            "ok": { "const": false },
+            "error": {
+              "type": "object",
+              "required": ["code", "message"],
+              "properties": {
+                "code": { "type": "string" },
+                "message": { "type": "string", "maxLength": 512 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

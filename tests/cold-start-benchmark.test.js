@@ -26,9 +26,10 @@ test("cold start benchmark reports external wall time and internal profile timin
   assert.equal(output.ok, true);
   assert.equal(output.protocolVersion, "agentshell.cold-start-benchmark.v1");
   assert.equal(output.runs, 2);
-  assert.equal(output.commands.length, 4);
-  assert.equal(output.summary.commandCount, 4);
-  assert.equal(output.summary.totalCommandInvocations, 8);
+  assert.equal(output.commands.length, 5);
+  assert.equal(output.summary.commandCount, 5);
+  assert.equal(output.summary.totalCommandInvocations, 10);
+  assert.ok(output.commands.some((command) => command.id === "pwd-compact"));
   assert.ok(output.commands.some((command) => command.id === "plugin-validate-compact"));
   assert.ok(output.commands.some((command) => command.id === "start-compact"));
 
@@ -67,8 +68,8 @@ test("cold start benchmark can render markdown and write reports", () => {
 
   assert.deepEqual(artifactReport, stdoutReport);
   assert.match(markdown, /^# AgentShell Cold-Start Benchmark/);
-  assert.match(markdown, /Commands measured: 4/);
-  assert.match(markdown, /Total command invocations: 4/);
+  assert.match(markdown, /Commands measured: 5/);
+  assert.match(markdown, /Total command invocations: 5/);
   assert.match(markdown, /\| Command \| Avg wall time \| Avg profile total \| Avg process overhead \| Avg stdout chars \| Avg tokens \|/);
   assert.match(markdown, /\| plugin-validate-compact \| \d+ms \| 7ms \| \d+ms \|/);
 });
@@ -87,6 +88,7 @@ function createMockCliFixture() {
     "const profile = { totalMs: 7, measuredMs: 5, unmeasuredMs: 2, phases: [{ name: 'mock', durationMs: 5 }] };",
     "if (args[0] === '--help') output({ ok: true, commands: ['agentshell start [--compact]'] });",
     "else if (args[0] === 'manual') output({ ok: true, name: 'AgentShell', text: 'x'.repeat(20) });",
+    "else if (args.join(' ') === 'pwd --compact') output({ ok: true, protocolVersion: 'agentshell.pwd.v1', compact: true });",
     "else if (args.join(' ') === 'plugin validate --compact --profile') output({ ok: true, protocolVersion: 'agentshell.plugin-validate.v1', profile });",
     "else if (args.join(' ') === 'start --compact --profile') output({ ok: true, protocolVersion: 'agentshell.start.v1', profile });",
     "else { console.error(`unexpected command: ${args.join(' ')}`); process.exit(2); }",

@@ -3,27 +3,49 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { readEvents, readOperations } from "./store.js";
+import {
+  aggregateVerifiedSavings,
+  collectVerifiedSavingsContributions,
+  mergeVerifiedSavingsContributions
+} from "./verified-savings.js";
+import {
+  readVerifiedSavingsLedger,
+  updateVerifiedSavingsLedger,
+  withVerifiedSavingsLedgerLock
+} from "./verified-savings-ledger.js";
+
 const SNAPSHOT_VERSION = 1;
 const FRESHNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const DEFAULT_QUARANTINE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_TEMP_RETENTION_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_SNAPSHOTS = 1024;
+const COMPACT_TOP_COMMANDS = 3;
+const COMPACT_TREND_POINTS = 3;
 
 export function writeDashboardSnapshot(root, report, options = {}) {
   if (report?.protocolVersion !== "agentshell.metrics.v2" || report.scope !== "workspace") {
     throw new Error("Dashboard snapshots require workspace metrics v2");
   }
-  const directory = snapshotDirectory(options);
-  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const file = path.join(directory, `${workspaceId(root)}.json`);
-  const snapshot = {
-    version: SNAPSHOT_VERSION,
-    updatedAt: new Date(options.now ?? Date.now()).toISOString(),
-    report: sanitizeReport(report)
-  };
-  writeJsonAtomic(file, snapshot);
-  return file;
+  return withVerifiedSavingsLedgerLock(options, () => {
+    const directory = snapshotDirectory(options);
+    fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const file = path.join(directory, `${workspaceId(root)}.json`);
+    const snapshot = {
+      version: SNAPSHOT_VERSION,
+      updatedAt: new Date(options.now ?? Date.now()).toISOString(),
+      report: sanitizeReport(report),
+      verifiedSavingsContributions: snapshotSavingsContributions(root, report)
+    };
+    updateVerifiedSavingsLedger(snapshot.verifiedSavingsContributions, { ...options, ledgerLockHeld: true });
+    try {
+      const current = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (dateValue(current.updatedAt) > dateValue(snapshot.updatedAt)) return file;
+    } catch {}
+    writeJsonAtomic(file, snapshot);
+    return file;
+  });
 }
 
 export function readGlobalDashboardSnapshot(options = {}) {
@@ -31,6 +53,13 @@ export function readGlobalDashboardSnapshot(options = {}) {
 }
 
 export function readDashboardSnapshotAggregate(options = {}) {
+  return withVerifiedSavingsLedgerLock(options, () => readDashboardSnapshotAggregateUnlocked({
+    ...options,
+    ledgerLockHeld: true
+  }));
+}
+
+function readDashboardSnapshotAggregateUnlocked(options) {
   const directory = snapshotDirectory(options);
   const now = options.now ?? Date.now();
   const policy = snapshotPolicy(options);
@@ -40,6 +69,7 @@ export function readDashboardSnapshotAggregate(options = {}) {
   cleanupTemporaryFiles(directory, entries, now, policy, diagnostics);
   cleanupQuarantine(directory, now, policy, diagnostics);
   const snapshots = [];
+  const migrationContributions = [];
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
     diagnostics.discovered += 1;
@@ -50,6 +80,7 @@ export function readDashboardSnapshotAggregate(options = {}) {
         quarantineSnapshot(file, directory, now, diagnostics);
         continue;
       }
+      migrationContributions.push(value.verifiedSavingsContributions);
       const updatedMs = dateValue(value.updatedAt);
       if (now - updatedMs > policy.retentionMs) {
         removeFile(file, diagnostics, "retired");
@@ -63,6 +94,8 @@ export function readDashboardSnapshotAggregate(options = {}) {
     }
   }
 
+  updateVerifiedSavingsLedger(mergeVerifiedSavingsContributions(migrationContributions), options);
+
   snapshots.sort((a, b) => b.updatedMs - a.updatedMs);
   for (const snapshot of snapshots.splice(policy.maxSnapshots)) {
     removeFile(snapshot.file, diagnostics, "pruned");
@@ -74,15 +107,16 @@ export function readDashboardSnapshotAggregate(options = {}) {
   }
   diagnostics.retained = snapshots.length;
   return {
-    report: mergeSnapshots(snapshots.map((snapshot) => snapshot.value), now),
+    report: mergeSnapshots(snapshots.map((snapshot) => snapshot.value), now, options),
     diagnostics
   };
 }
 
-export function mergeSnapshots(snapshots, now = Date.now()) {
+export function mergeSnapshots(snapshots, now = Date.now(), options = {}) {
   const reports = snapshots.map((snapshot) => snapshot.report);
   const dashboards = reports.map((report) => report.dashboard);
   const totals = sumObjects(reports.map((report) => report.totals));
+  const tokenAccounting = sumTokenAccounting(reports);
   const dashboardTotals = sumDashboardTotals(dashboards.map((dashboard) => dashboard.totals));
   const coverage = sumCoverage(dashboards.map((dashboard) => dashboard.coverage));
   dashboardTotals.successRate = coverage.evaluatedManagedRuns > 0
@@ -97,7 +131,7 @@ export function mergeSnapshots(snapshots, now = Date.now()) {
   };
   const trend = dashboards.flatMap((dashboard) => dashboard.trend || [])
     .sort((a, b) => dateValue(a.finishedAt) - dateValue(b.finishedAt))
-    .slice(-12);
+    .slice(-COMPACT_TREND_POINTS);
   const latestTask = dashboards.map((dashboard) => dashboard.latestTask).filter(Boolean)
     .sort((a, b) => dateValue(a.finishedAt) - dateValue(b.finishedAt)).at(-1) || null;
   const topCommands = mergeTopCommands(reports);
@@ -105,6 +139,19 @@ export function mergeSnapshots(snapshots, now = Date.now()) {
   const verifiedChars = totals.verifyRawOutputChars || 0;
   const exactEvents = coverage.exactAttributedEvents;
   const legacyEvents = Math.max(0, coverage.attributableEvents - exactEvents);
+  const snapshotVerifiedSavings = aggregateVerifiedSavings(
+    mergeVerifiedSavingsContributions(snapshots.map((snapshot) => snapshot.verifiedSavingsContributions)),
+    { now, timeZone: options.timeZone }
+  );
+  const verifiedSavings = readVerifiedSavingsLedger(options) || snapshotVerifiedSavings;
+  coverage.verifiedTokenSavingsAvailable ||= verifiedSavings.availability.contextTokens;
+  coverage.verifiedTimeSavingsAvailable ||= verifiedSavings.availability.time;
+  if (verifiedSavings.availability.contextTokens) {
+    dashboardTotals.estimatedContextAvoidedTokens = verifiedSavings.allTime.contextTokens;
+  }
+  if (verifiedSavings.availability.time) {
+    dashboardTotals.estimatedTimeSavedMs = verifiedSavings.allTime.timeMs;
+  }
 
   return {
     ok: true,
@@ -123,6 +170,7 @@ export function mergeSnapshots(snapshots, now = Date.now()) {
       charsSavedVsRawVerify: savedChars,
       percentSavedVsRawVerify: Math.round((savedChars / verifiedChars) * 100)
     } : null,
+    tokenAccounting,
     topCommands,
     latestRun: null,
     measurement: {
@@ -144,6 +192,7 @@ export function mergeSnapshots(snapshots, now = Date.now()) {
       health: latestTask ? (latestTask.status === "passed" ? "ready" : "attention") : "idle",
       freshness,
       coverage,
+      verifiedSavings,
       totals: dashboardTotals,
       latestTask,
       trend
@@ -158,6 +207,15 @@ export function mergeSnapshots(snapshots, now = Date.now()) {
   };
 }
 
+function snapshotSavingsContributions(root, report) {
+  const cutoff = dateValue(report?.window?.cutoff);
+  const afterCutoff = (entry) => cutoff === 0 || dateValue(entry?.createdAt) >= cutoff;
+  return collectVerifiedSavingsContributions([{
+    events: readEvents(root).filter(afterCutoff),
+    operations: readOperations(root).filter(afterCutoff)
+  }], { hashKeys: true });
+}
+
 function sanitizeReport(report) {
   return {
     ok: true,
@@ -168,6 +226,7 @@ function sanitizeReport(report) {
     window: report.window,
     totals: report.totals,
     savings: report.savings,
+    tokenAccounting: report.tokenAccounting,
     topCommands: report.topCommands || [],
     latestRun: null,
     measurement: report.measurement,
@@ -183,6 +242,87 @@ function sumObjects(values) {
     verifyRawOutputChars: sum(values, "verifyRawOutputChars"),
     verifyRawEstimatedTokens: sum(values, "verifyRawEstimatedTokens")
   };
+}
+
+function sumTokenAccounting(reports) {
+  const total = reports.length;
+  const values = reports.map((report) => report.tokenAccounting || null);
+  const raw = values.map((value) => value?.rawCommandBaseline);
+  const actual = reports.map((report, index) => (
+    values[index]?.agentShellActualOutput || backwardActualOutput(report)
+  ));
+  const saved = values.map((value) => value?.verifiedContextSaved);
+  return {
+    rawCommandBaseline: aggregateAccountingEntry(
+      raw,
+      "attributed-verification-output",
+      total
+    ),
+    agentShellActualOutput: aggregateAccountingEntry(
+      actual,
+      "observed-agentshell-events",
+      total
+    ),
+    verifiedContextSaved: {
+      ...aggregateAccountingEntry(
+        saved,
+        "raw-baseline-minus-attributed-agentshell-output",
+        total
+      ),
+      percent: availableEntries(saved).length > 0
+        ? weightedSavingsPercent(values.filter(Boolean))
+        : null
+    },
+    modelTokens: {
+      availability: "unavailable",
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null
+    }
+  };
+}
+
+function aggregateAccountingEntry(values, scope, workspaceCount) {
+  const available = availableEntries(values);
+  const availableWorkspaceCount = available.length;
+  return {
+    availability: availabilityFor(availableWorkspaceCount, workspaceCount),
+    scope,
+    outputChars: availableWorkspaceCount > 0 ? nullableSum(available, "outputChars") : null,
+    estimatedTokens: availableWorkspaceCount > 0 ? nullableSum(available, "estimatedTokens") : null,
+    workspaceCount,
+    availableWorkspaceCount
+  };
+}
+
+function availableEntries(values) {
+  return values.filter((value) => value?.availability === "available" || value?.availability === "partial");
+}
+
+function availabilityFor(availableCount, totalCount) {
+  if (availableCount === 0) return "unavailable";
+  return availableCount === totalCount ? "available" : "partial";
+}
+
+function backwardActualOutput(report) {
+  const outputChars = report?.totals?.agentShellOutputChars;
+  const estimatedTokens = report?.totals?.agentShellEstimatedTokens;
+  if (!Number.isFinite(outputChars) || !Number.isFinite(estimatedTokens)) return null;
+  return {
+    availability: "available",
+    outputChars,
+    estimatedTokens
+  };
+}
+
+function weightedSavingsPercent(values) {
+  const baseline = values.reduce((total, value) => (
+    total + (value.rawCommandBaseline?.outputChars || 0)
+  ), 0);
+  const saved = values.reduce((total, value) => (
+    total + (value.verifiedContextSaved?.outputChars || 0)
+  ), 0);
+  return baseline > 0 ? Math.round((saved / baseline) * 100) : null;
 }
 
 function sumDashboardTotals(values) {
@@ -218,6 +358,12 @@ function sumCoverage(values) {
   const exactAttributedEvents = sum(values, "exactAttributedEvents");
   return {
     observedToolCalls: sum(values, "observedToolCalls"),
+    agentShellCommandHits: sum(values, "agentShellCommandHits"),
+    externalCommandCount: null,
+    fallbackCommandCount: null,
+    commandCoveragePercent: null,
+    fallbackRatePercent: null,
+    externalCommandTelemetryAvailable: false,
     managedRuns: sum(values, "managedRuns"),
     evaluatedManagedRuns: sum(values, "evaluatedManagedRuns"),
     activeManagedRuns: sum(values, "activeManagedRuns"),
@@ -241,7 +387,8 @@ function mergeTopCommands(reports) {
     current.estimatedTokens += item.estimatedTokens || 0;
     commands.set(item.command, current);
   }
-  return [...commands.values()].sort((a, b) => b.count - a.count || b.outputChars - a.outputChars).slice(0, 5);
+  return [...commands.values()].sort((a, b) => b.count - a.count || b.outputChars - a.outputChars)
+    .slice(0, COMPACT_TOP_COMMANDS);
 }
 
 function nullableSum(values, key) {

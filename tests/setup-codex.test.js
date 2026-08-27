@@ -220,14 +220,130 @@ test("setupCodex doctor reports plugin, policy, native CLI, and Codex checks", a
   assert.equal(result.checks.plugin, true);
   assert.equal(result.checks.policy, true);
   assert.equal(result.checks.nativeCli, true);
+  assert.equal(result.checks.cliExecution, true);
   assert.equal(result.checks.commandPath, true);
   assert.equal(result.checks.codex, true);
+  assert.equal(result.checks.releaseIntegrity, true);
 
   result = await setupCodex("doctor", { ...fixture, runCommand: async () => ({ ok: false, status: 127 }) });
   assert.equal(result.ok, false);
   assert.equal(result.checks.codex, false);
   assert.equal("stdout" in result.codex, false);
   assert.equal("stderr" in result.codex, false);
+});
+
+test("setupCodex update refreshes cache and rollback restores the previous installation", async () => {
+  const fixture = makeFixture();
+  const cache = path.join(fixture.home, ".codex", "plugins", "cache", "personal", "agentshell");
+  const calls = [];
+  let staleCacheSeen = false;
+  const runner = async (command, args, options) => {
+    calls.push({ command, args, options });
+    if (command === "codex" && args[0] === "plugin") staleCacheSeen ||= fs.existsSync(cache);
+    return { ok: true, status: 0 };
+  };
+
+  assert.equal((await setupCodex("install", { ...fixture, runCommand: runner })).ok, true);
+  fs.mkdirSync(cache, { recursive: true });
+  fs.writeFileSync(path.join(cache, "stale"), "old cache");
+  fs.writeFileSync(path.join(fixture.source, "bin", `agentshell-${fixture.platform}-${fixture.arch}`), "new-native", { mode: 0o755 });
+  fs.writeFileSync(path.join(fixture.source, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "agentshell", version: "1.1.0" }));
+
+  const updated = await setupCodex("update", { ...fixture, runCommand: runner });
+  assert.equal(updated.ok, true);
+  assert.equal(updated.cache.status, "refreshed");
+  assert.equal(staleCacheSeen, false);
+  assert.equal(fs.readFileSync(path.join(fixture.home, ".local", "bin", "agentshell"), "utf8"), "new-native");
+  assert.equal(updated.rollback.available, true);
+
+  const restored = await setupCodex("rollback", { ...fixture, runCommand: runner });
+  assert.equal(restored.ok, true);
+  assert.equal(restored.rollback.status, "restored");
+  assert.equal(fs.readFileSync(path.join(fixture.home, ".local", "bin", "agentshell"), "utf8"), "native-cli");
+  const manifest = JSON.parse(fs.readFileSync(path.join(fixture.home, "plugins", "agentshell", ".codex-plugin", "plugin.json"), "utf8"));
+  assert.equal(manifest.version, "1.0.0");
+});
+
+test("setupCodex rollback removes a first install and is idempotent", async () => {
+  const fixture = makeFixture();
+  const runner = successfulRunner([]);
+  assert.equal((await setupCodex("install", { ...fixture, runCommand: runner })).ok, true);
+
+  const restored = await setupCodex("rollback", { ...fixture, runCommand: runner });
+  assert.equal(restored.ok, true);
+  assert.equal(restored.rollback.status, "restored");
+  assert.equal(fs.existsSync(path.join(fixture.home, ".local", "bin", "agentshell")), false);
+  assert.equal(fs.existsSync(path.join(fixture.home, "plugins", "agentshell")), false);
+
+  const repeated = await setupCodex("rollback", { ...fixture, runCommand: runner });
+  assert.equal(repeated.ok, true);
+  assert.equal(repeated.rollback.status, "not-available");
+});
+
+test("setupCodex preserves rollback recovery files when post-restore health checks fail", async () => {
+  const fixture = makeFixture();
+  const installedCli = path.join(fixture.home, ".local", "bin", "agentshell");
+  assert.equal((await setupCodex("install", { ...fixture, runCommand: successfulRunner([]) })).ok, true);
+  fs.writeFileSync(path.join(fixture.source, "bin", `agentshell-${fixture.platform}-${fixture.arch}`), "new-native", { mode: 0o755 });
+  assert.equal((await setupCodex("update", { ...fixture, runCommand: successfulRunner([]) })).ok, true);
+
+  const result = await setupCodex("rollback", {
+    ...fixture,
+    runCommand: async (command) => ({ ok: command !== installedCli, status: command === installedCli ? 1 : 0 })
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "ROLLBACK_HEALTH_CHECK_FAILED");
+  assert.equal(result.rollback.status, "restored-needs-attention");
+  assert.equal(result.rollback.available, true);
+  assert.equal(fs.existsSync(result.rollback.recovery.transaction), true);
+  assert.equal(fs.existsSync(result.rollback.recovery.backupDirectory), true);
+  assert.match(result.error.message, new RegExp(escapeRegExp(result.rollback.recovery.backupDirectory)));
+});
+
+test("setupCodex failed update restores and reactivates the previous plugin", async () => {
+  const fixture = makeFixture();
+  const calls = [];
+  const installedCli = path.join(fixture.home, ".local", "bin", "agentshell");
+  const runner = async (command, args) => {
+    calls.push([command, ...args]);
+    if (command === installedCli && fs.readFileSync(installedCli, "utf8") === "broken-native") {
+      return { ok: false, status: 1 };
+    }
+    return { ok: true, status: 0 };
+  };
+  assert.equal((await setupCodex("install", { ...fixture, runCommand: runner })).ok, true);
+  fs.writeFileSync(path.join(fixture.source, "bin", `agentshell-${fixture.platform}-${fixture.arch}`), "broken-native", { mode: 0o755 });
+  fs.writeFileSync(path.join(fixture.source, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "agentshell", version: "2.0.0" }));
+
+  const result = await setupCodex("update", { ...fixture, runCommand: runner });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "NATIVE_CLI_INVALID");
+  assert.equal(result.rollback.status, "restored");
+  assert.equal(fs.readFileSync(installedCli, "utf8"), "native-cli");
+  const manifest = JSON.parse(fs.readFileSync(path.join(fixture.home, "plugins", "agentshell", ".codex-plugin", "plugin.json"), "utf8"));
+  assert.equal(manifest.version, "1.0.0");
+  assert.equal(calls.filter(([command, subcommand]) => command === "codex" && subcommand === "plugin").length, 3);
+});
+
+test("setupCodex rejects a rollback transaction that references an unmanaged file", async () => {
+  const fixture = makeFixture();
+  const runner = successfulRunner([]);
+  assert.equal((await setupCodex("install", { ...fixture, runCommand: runner })).ok, true);
+  const transactionFile = path.join(fixture.home, ".agentshell", "setup-rollback.json");
+  const transaction = JSON.parse(fs.readFileSync(transactionFile, "utf8"));
+  const victim = path.join(fixture.home, "user-file.txt");
+  fs.writeFileSync(victim, "preserve me");
+  transaction.files.victim = { path: victim, exists: false };
+  fs.writeFileSync(transactionFile, JSON.stringify(transaction));
+
+  const result = await setupCodex("rollback", { ...fixture, runCommand: runner });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "ROLLBACK_TRANSACTION_INVALID");
+  assert.equal(fs.readFileSync(victim, "utf8"), "preserve me");
+  assert.equal(fs.existsSync(path.join(fixture.home, "plugins", "agentshell")), true);
 });
 
 test("setupCodex keeps PATH profile changes idempotent and preserves user content on uninstall", async () => {
@@ -402,7 +518,7 @@ test("setupCodex preserves installation state when Dashboard service bootout fai
 });
 
 test("setupCodex returns a compact error for unsupported actions", async () => {
-  const result = await setupCodex("rollback", {});
+  const result = await setupCodex("explode", {});
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_ACTION");
 });
@@ -434,6 +550,10 @@ function launchctlCalls(calls) {
 
 function hash(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function releaseFetch({ archive, checksum }) {

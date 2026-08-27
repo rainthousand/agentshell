@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/verify-go.schema.json",
+  "title": "AgentShell Focused Go Verify Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "command", "selection", "exitCode", "signal", "durationMs", "timedOut", "truncated", "logRef", "summary", "suggestedNextActions"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.verify-go.v1" },
+        "compact": { "const": true },
+        "command": {
+          "type": "object",
+          "required": ["executable", "args", "shellInterpolation"],
+          "properties": {
+            "executable": { "const": "go" },
+            "args": { "type": "array", "maxItems": 80, "items": { "type": "string", "maxLength": 512 } },
+            "shellInterpolation": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "selection": {
+          "type": "object",
+          "required": ["packages", "run", "tags", "count", "timeout", "preset"],
+          "properties": {
+            "packages": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "string", "maxLength": 512 } },
+            "run": { "type": ["string", "null"], "maxLength": 256 },
+            "tags": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 64 } },
+            "count": { "type": ["integer", "null"], "minimum": 0, "maximum": 1000 },
+            "timeout": { "type": ["string", "null"] },
+            "preset": { "enum": ["mockey", null] }
+          },
+          "additionalProperties": false
+        },
+        "exitCode": { "type": "integer" },
+        "signal": { "type": ["string", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "timedOut": { "type": "boolean" },
+        "truncated": { "type": "boolean" },
+        "logRef": { "type": "string", "pattern": "^log_" },
+        "summary": {
+          "type": "object",
+          "required": ["status", "mainError", "failedTests", "failedTestNames", "relatedFiles", "preview", "capturedBytes", "observedBytes", "outputLimitBytes"],
+          "properties": {
+            "status": { "enum": ["passed", "failed", "timeout"] },
+            "mainError": { "type": ["string", "null"], "maxLength": 240 },
+            "failedTests": { "type": "integer", "minimum": 0 },
+            "failedTestNames": { "type": "array", "maxItems": 8, "items": { "type": "string" } },
+            "relatedFiles": { "type": "array", "maxItems": 8, "items": { "type": "string" } },
+            "preview": { "type": ["string", "null"], "maxLength": 900 },
+            "capturedBytes": { "type": "integer", "minimum": 0 },
+            "observedBytes": { "type": "integer", "minimum": 0 },
+            "outputLimitBytes": { "type": "integer", "minimum": 256, "maximum": 4194304 }
+          },
+          "additionalProperties": false
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ]
+}

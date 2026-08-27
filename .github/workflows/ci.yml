@@ -29,10 +29,37 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Prepare test-only standalone launcher
         run: node scripts/prepare-test-standalone.js
-      - name: Test runtime compatibility
+      - name: Test fast runtime compatibility
         env:
           AGENTSHELL_TEST_STANDALONE_LAUNCHER: "1"
         run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.2
+      - name: Prepare test-only standalone launcher
+        run: node scripts/prepare-test-standalone.js
+      - name: Run integration tests once
+        env:
+          AGENTSHELL_TEST_STANDALONE_LAUNCHER: "1"
+        run: npm run test:integration
+
+  benchmark-tests:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.2
+      - name: Run benchmark contracts outside the compatibility matrix
+        run: npm run test:benchmark
 
   quality-gates:
     runs-on: ubuntu-latest
@@ -67,10 +94,18 @@ jobs:
           NODE
       - name: Validate Codex plugin source
         run: npm run plugin:validate:source
+      - name: Validate compact semantic quality
+        run: npm run quality:compact-semantic
+      - name: Enforce AgentShell skill context budget
+        run: npm run quality:skill
+      - name: Validate performance SLA contract
+        run: npm run performance:sla:gate
       - name: Run product readiness gates
         run: npm run product:readiness -- --heavy --dry-run --compact
       - name: Validate release metadata
         run: npm run release:gate
+      - name: Run release contract tests once
+        run: npm run test:release
 
   delivery-smoke:
     name: macOS delivery package

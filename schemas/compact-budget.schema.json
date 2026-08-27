@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/compact-budget.schema.json",
+  "title": "AgentShell Compact Output Budget Contract",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "summary", "limits", "checks", "oversizedPaths"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.compact-contract-audit.v1" },
+    "compact": { "const": true },
+    "summary": { "$ref": "#/$defs/auditSummary" },
+    "limits": { "$ref": "#/$defs/limits" },
+    "checks": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "oversizedPaths": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/namedViolation" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "limits": {
+      "type": "object",
+      "required": ["maxChars", "maxEstimatedTokens", "maxArrayItems", "maxStringChars"],
+      "properties": {
+        "maxChars": { "type": "integer", "minimum": 768 },
+        "maxEstimatedTokens": { "type": "integer", "minimum": 192 },
+        "maxArrayItems": { "type": "integer", "minimum": 1 },
+        "maxStringChars": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "measurement": {
+      "type": "object",
+      "required": ["chars", "estimatedTokens"],
+      "properties": {
+        "chars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "omitted": {
+      "type": "object",
+      "required": ["arrays", "items", "strings", "chars", "fields"],
+      "properties": {
+        "arrays": { "type": "integer", "minimum": 0 },
+        "items": { "type": "integer", "minimum": 0 },
+        "strings": { "type": "integer", "minimum": 0 },
+        "chars": { "type": "integer", "minimum": 0 },
+        "fields": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "compactBudget": {
+      "type": "object",
+      "required": ["version", "limits", "original", "output", "truncated", "omitted", "oversizedPaths", "oversizedPathCount"],
+      "properties": {
+        "version": { "const": 1 },
+        "limits": { "$ref": "#/$defs/limits" },
+        "original": { "$ref": "#/$defs/measurement" },
+        "output": { "$ref": "#/$defs/measurement" },
+        "truncated": { "type": "boolean" },
+        "omitted": { "$ref": "#/$defs/omitted" },
+        "oversizedPaths": { "type": "array", "maxItems": 20, "items": { "type": "string" } },
+        "oversizedPathCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "violation": {
+      "type": "object",
+      "required": ["path", "kind", "actual", "limit"],
+      "properties": {
+        "path": { "type": "string" },
+        "kind": { "enum": ["string", "array", "chars", "estimatedTokens"] },
+        "actual": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "namedViolation": {
+      "type": "object",
+      "required": ["command", "path", "kind", "actual", "limit"],
+      "properties": {
+        "command": { "type": "string" },
+        "path": { "type": "string" },
+        "kind": { "enum": ["string", "array", "chars", "estimatedTokens"] },
+        "actual": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": ["name", "ok", "chars", "estimatedTokens", "oversizedPaths", "contractIssues"],
+      "properties": {
+        "name": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "chars": { "type": "integer", "minimum": 0 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "oversizedPaths": { "type": "array", "items": { "$ref": "#/$defs/violation" } },
+        "contractIssues": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "auditSummary": {
+      "type": "object",
+      "required": ["checked", "passed", "failed", "oversizedPathCount", "contractIssueCount"],
+      "properties": {
+        "checked": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "oversizedPathCount": { "type": "integer", "minimum": 0 },
+        "contractIssueCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

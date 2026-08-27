@@ -1,4 +1,5 @@
 import { clearActiveRun, readActiveRun, readRuns } from "../core/store.js";
+import { operationIdsForRun, verificationOperationIdsForRun } from "../core/attribution.js";
 
 const RUN_STATUS_PROTOCOL_VERSION = "agentshell.run-status.v1";
 const RUN_NEXT_PROTOCOL_VERSION = "agentshell.run-next.v1";
@@ -79,6 +80,7 @@ function compactRun(run) {
     status: run.status,
     startedAt: run.startedAt,
     updatedAt: run.updatedAt,
+    operationIds: operationIdsForRun(run),
     nodes: run.nodes,
     commandStats: run.commandStats
   };
@@ -93,6 +95,8 @@ export function summarizeRun(run) {
 
   return {
     runId: run.id,
+    operationIds: operationIdsForRun(run),
+    verificationOperationIds: verificationOperationIdsForRun(run),
     status: run.status,
     commandCount: run.commandStats.length,
     nodeCount: run.nodes.length,
@@ -100,16 +104,19 @@ export function summarizeRun(run) {
     estimatedTokens: Math.ceil(outputChars / 4),
     durationMs,
     diagnosis: diagnosis ? {
+      operationId: diagnosis.operationId || null,
       verificationOk: diagnosis.verificationOk,
       logRef: diagnosis.logRef,
       confidence: diagnosis.fixPlan?.confidence || null,
       targetFile: diagnosis.fixPlan?.target?.file || null
     } : null,
     latestChange: change ? {
+      operationId: change.operationId || null,
       ok: change.ok,
       changedFiles: change.changedFiles || []
     } : null,
     latestVerify: verify ? {
+      operationId: verify.operationId || null,
       ok: verify.ok,
       logRef: verify.logRef,
       summary: verify.summary

@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/exec.schema.json",
+  "title": "AgentShell Generic Exec Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "command", "profile", "exitCode", "signal", "durationMs", "timedOut", "truncated", "logRef", "summary", "evidence", "highNoiseSummary", "privacy", "suggestedNextActions"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "const": "agentshell.exec.v1" },
+        "compact": { "const": true },
+        "command": {
+          "type": "object",
+          "required": ["executable", "argumentCount", "shellInterpolation", "explicitShellExecutable"],
+          "properties": {
+            "executable": { "type": "string", "minLength": 1, "maxLength": 255 },
+            "argumentCount": { "type": "integer", "minimum": 0 },
+            "shellInterpolation": { "const": false },
+            "explicitShellExecutable": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "profile": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["id", "category", "family", "appliedDefaults", "risk"],
+              "properties": {
+                "id": { "type": "string" },
+                "category": { "type": "string" },
+                "family": { "enum": ["general", "go"] },
+                "appliedDefaults": {
+                  "type": "array",
+                  "items": { "type": "array", "items": { "type": "string" } }
+                },
+                "risk": { "$ref": "#/$defs/risk" }
+              },
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        },
+        "exitCode": { "type": "integer" },
+        "signal": { "type": ["string", "null"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "timedOut": { "type": "boolean" },
+        "truncated": { "type": "boolean" },
+        "logRef": { "type": "string", "pattern": "^log_" },
+        "summary": {
+          "type": "object",
+          "required": ["status", "headline", "preview", "errorCount", "returnedEvidence", "capturedBytes", "observedBytes", "outputLimitBytes"],
+          "properties": {
+            "status": { "enum": ["passed", "failed", "timeout"] },
+            "headline": { "type": "string", "maxLength": 440 },
+            "preview": { "type": ["string", "null"], "maxLength": 900 },
+            "errorCount": { "type": "integer", "minimum": 0 },
+            "returnedEvidence": { "type": "integer", "minimum": 0, "maximum": 5 },
+            "capturedBytes": { "type": "integer", "minimum": 0 },
+            "observedBytes": { "type": "integer", "minimum": 0 },
+            "outputLimitBytes": { "type": "integer", "minimum": 256, "maximum": 4194304 }
+          },
+          "additionalProperties": false
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "highNoiseSummary": {
+          "oneOf": [
+            { "$ref": "high-noise-profile-summary.schema.json" },
+            { "type": "null" }
+          ]
+        },
+        "privacy": { "$ref": "#/$defs/privacy" },
+        "suggestedNextActions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": ["message", "type", "file", "line", "column", "confidence"],
+      "properties": {
+        "message": { "type": "string", "maxLength": 180 },
+        "type": { "type": "string" },
+        "file": { "type": ["string", "null"] },
+        "line": { "type": ["integer", "null"], "minimum": 1 },
+        "column": { "type": ["integer", "null"], "minimum": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["shellInterpolation", "commandArgumentsReturned", "environmentReturned", "rawOutputInline", "logsStoredLocally", "commonSecretsRedacted", "capturedOutputByteLimit"],
+      "properties": {
+        "shellInterpolation": { "const": false },
+        "commandArgumentsReturned": { "const": false },
+        "environmentReturned": { "const": false },
+        "rawOutputInline": { "const": false },
+        "logsStoredLocally": { "const": true },
+        "commonSecretsRedacted": { "const": true },
+        "capturedOutputByteLimit": { "type": "integer", "minimum": 256, "maximum": 4194304 }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["level", "mutatesWorkspace", "network", "interactive"],
+      "properties": {
+        "level": { "enum": ["low", "medium", "high"] },
+        "mutatesWorkspace": { "type": "boolean" },
+        "network": { "type": "boolean" },
+        "interactive": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

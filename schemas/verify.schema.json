@@ -18,6 +18,11 @@
         "durationMs": { "type": "integer", "minimum": 0 },
         "cacheHit": { "type": "boolean" },
         "cacheKey": { "type": "string" },
+        "cacheCreatedAt": { "type": ["string", "null"], "format": "date-time" },
+        "cacheInputDigest": { "type": ["string", "null"] },
+        "cacheInputFileCount": { "type": "integer", "minimum": 0 },
+        "cacheReason": { "type": "string" },
+        "cacheStored": { "type": "boolean" },
         "cacheSourceLogRef": { "type": "string" },
         "verificationMode": { "enum": ["full", "related-test-file"] },
         "relatedTestFile": { "type": "string" },
@@ -60,6 +65,42 @@
         },
         "logRef": { "type": "string" },
         "logTail": { "type": "string" },
+        "suggestedNextActions": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "action", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.verify-cache.v1" },
+        "action": { "enum": ["explain", "clear"] },
+        "cacheHit": { "type": "boolean" },
+        "cacheKey": { "type": "string" },
+        "cacheCreatedAt": { "type": ["string", "null"], "format": "date-time" },
+        "cacheInputDigest": { "type": ["string", "null"] },
+        "cacheInputFileCount": { "type": "integer", "minimum": 0 },
+        "cacheReason": { "type": "string" },
+        "entryCount": { "type": "integer", "minimum": 0 },
+        "identity": {
+          "type": "object",
+          "required": ["version", "type", "command", "packageFile", "identityKey"],
+          "properties": {
+            "version": { "type": "integer" },
+            "type": { "type": "string" },
+            "command": { "type": "string" },
+            "packageFile": { "type": "string" },
+            "identityKey": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "removedEntries": { "type": "integer", "minimum": 0 },
+        "remainingEntries": { "type": "integer", "minimum": 0 },
+        "cacheFile": { "type": "string" },
         "suggestedNextActions": {
           "type": "array",
           "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }

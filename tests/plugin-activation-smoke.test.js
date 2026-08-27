@@ -6,6 +6,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { runPluginActivationSmoke } from "../scripts/plugin-activation-smoke.js";
+import { installedPluginSmoke } from "../src/core/plugin-content-hash.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 const guidance = `
@@ -99,6 +100,43 @@ test("activation smoke CLI emits one compact JSON document", () => {
   assert.equal(output.ok, true);
   assert.equal(output.compact, true);
   assert.equal(result.stdout.trim().split("\n").length, 1);
+});
+
+test("installed plugin smoke executes the cached command and validates cached skill guidance", () => {
+  const installed = makePluginFixture(guidance + "\nagentshell grep <query> --compact\n");
+  const bin = path.join(installed, "bin", "agentshell");
+  fs.mkdirSync(path.dirname(bin), { recursive: true });
+  fs.mkdirSync(path.join(installed, ".codex-plugin"), { recursive: true });
+  fs.mkdirSync(path.join(installed, "src"), { recursive: true });
+  fs.writeFileSync(path.join(installed, ".codex-plugin", "plugin.json"), '{"name":"agentshell","version":"fixture"}\n');
+  fs.writeFileSync(path.join(installed, "src", "cli.js"), "// fixture\n");
+  fs.writeFileSync(bin, '#!/usr/bin/env node\nconsole.log(JSON.stringify({ok:true,protocolVersion:"agentshell.manual.v1"}));\n');
+  fs.chmodSync(bin, 0o755);
+
+  const report = installedPluginSmoke(installed);
+
+  assert.equal(report.ok, true);
+  assert.equal(report.command.protocolVersion, "agentshell.manual.v1");
+  assert.equal(report.skill.guidance.startCompact, true);
+  assert.equal(report.skill.guidance.compactSearch, true);
+});
+
+test("installed plugin smoke rejects a stale cached skill even when the command works", () => {
+  const installed = makePluginFixture("agentshell start --compact\nagentshell verify test --compact\n");
+  const bin = path.join(installed, "bin", "agentshell");
+  fs.mkdirSync(path.dirname(bin), { recursive: true });
+  fs.mkdirSync(path.join(installed, ".codex-plugin"), { recursive: true });
+  fs.mkdirSync(path.join(installed, "src"), { recursive: true });
+  fs.writeFileSync(path.join(installed, ".codex-plugin", "plugin.json"), '{"name":"agentshell","version":"fixture"}\n');
+  fs.writeFileSync(path.join(installed, "src", "cli.js"), "// fixture\n");
+  fs.writeFileSync(bin, '#!/usr/bin/env node\nconsole.log(JSON.stringify({ok:true,protocolVersion:"agentshell.manual.v1"}));\n');
+  fs.chmodSync(bin, 0o755);
+
+  const report = installedPluginSmoke(installed);
+
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.skill.missing, ["compactSearch"]);
+  assert.equal(report.command.ok, true);
 });
 
 function makePluginFixture(skill) {

@@ -1,7 +1,48 @@
-#!/usr/bin/env node
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+#!/bin/sh
+set -eu
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-process.env.AGENTSHELL_PACKAGE_ROOT ||= path.resolve(here, "..");
-await import(path.join(here, "..", "src", "cli.js"));
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+export AGENTSHELL_PACKAGE_ROOT=${AGENTSHELL_PACKAGE_ROOT:-$ROOT}
+BUNDLED="$ROOT/bin/agentshell-darwin-arm64"
+INSTALLED="${HOME}/.local/bin/agentshell"
+
+if [ -x "$BUNDLED" ]; then
+  exec "$BUNDLED" "$@"
+fi
+
+if [ -x "$INSTALLED" ] && [ ! "$INSTALLED" -ef "$0" ]; then
+  exec "$INSTALLED" "$@"
+fi
+
+# Source checkouts keep a zero-build developer fallback.
+if command -v node >/dev/null 2>&1; then
+  exec node "$ROOT/src/cli.js" "$@"
+fi
+
+if [ "$(uname -s)" != "Darwin" ] || [ "$(uname -m)" != "arm64" ]; then
+  printf '%s\n' 'AgentShell needs Node.js 20+ on this platform.' >&2
+  exit 69
+fi
+if ! command -v curl >/dev/null 2>&1 || ! command -v shasum >/dev/null 2>&1; then
+  printf '%s\n' 'AgentShell needs curl and shasum for its one-time native CLI setup.' >&2
+  exit 69
+fi
+
+BASE_URL=${AGENTSHELL_NATIVE_RELEASE_BASE_URL:-https://github.com/rainthousand/agentshell/releases/latest/download}
+CACHE_DIR="${HOME}/.local/share/agentshell/bin"
+TARGET="$CACHE_DIR/agentshell-darwin-arm64"
+TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/agentshell-bootstrap.XXXXXX")
+trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
+
+mkdir -p "$CACHE_DIR"
+curl -fsSL --retry 2 "$BASE_URL/agentshell-darwin-arm64.sha256" -o "$TMP_DIR/agentshell.sha256"
+curl -fsSL --retry 2 "$BASE_URL/agentshell-darwin-arm64" -o "$TMP_DIR/agentshell"
+EXPECTED=$(awk 'NR == 1 { print $1 }' "$TMP_DIR/agentshell.sha256")
+ACTUAL=$(shasum -a 256 "$TMP_DIR/agentshell" | awk '{ print $1 }')
+if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$ACTUAL" ]; then
+  printf '%s\n' 'AgentShell native CLI checksum verification failed.' >&2
+  exit 70
+fi
+chmod 0755 "$TMP_DIR/agentshell"
+mv "$TMP_DIR/agentshell" "$TARGET"
+exec "$TARGET" "$@"

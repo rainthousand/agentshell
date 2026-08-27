@@ -18,7 +18,7 @@ test("benchmark compares raw test output with compact verify output", () => {
     }
   }, null, 2));
   fs.writeFileSync(path.join(dir, "test", "noisy.js"), [
-    "for (let i = 0; i < 80; i += 1) console.log(`noise ${i}`)",
+    "for (let i = 0; i < 200; i += 1) console.log(`noise ${i}`)",
     "console.error('Expected benchmark failure')",
     "process.exit(1)",
     ""
@@ -35,7 +35,7 @@ test("benchmark compares raw test output with compact verify output", () => {
   assert.equal(output.protocolVersion, "agentshell.benchmark.v1");
   assert.equal(output.raw.exitCode, 1);
   assert.equal(output.agentshell.exitCode, 1);
-  assert.ok(output.raw.chars > output.agentshell.chars);
+  assert.ok(output.raw.chars > output.agentshell.chars, JSON.stringify(output, null, 2));
   assert.ok(output.reduction.percentSaved > 0);
   assert.match(output.agentshell.logRef, /^log_/);
 

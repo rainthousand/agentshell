@@ -13,6 +13,11 @@
     "runId": { "type": ["string", "null"] },
     "status": { "enum": ["passed", "failing", "previewed"] },
     "diagnosis": { "type": ["object", "null"] },
+    "operationIds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
     "suggestion": { "type": ["object", "null"] },
     "finalVerification": { "type": ["object", "null"] },
     "runSummary": { "type": ["object", "null"] },

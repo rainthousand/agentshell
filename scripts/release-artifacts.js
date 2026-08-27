@@ -20,7 +20,8 @@ export const RELEASE_SIZE_BUDGETS = Object.freeze({
 export function buildReleaseArtifacts(options = {}) {
   const projectRoot = path.resolve(options.projectRoot || root);
   const outDir = path.resolve(options.outDir || path.join(projectRoot, "artifacts", "release"));
-  const skipNativeBuild = options.skipNativeBuild ?? process.env.AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD === "1";
+  const environment = options.environment || process.env;
+  const skipNativeBuild = options.skipNativeBuild ?? environment.AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD === "1";
   const runner = options.runner || spawnSync;
   const platform = options.platform || process.platform;
   const arch = options.arch || process.arch;
@@ -43,6 +44,11 @@ export function buildReleaseArtifacts(options = {}) {
       "Standalone build"
     );
     assertStandaloneBuildReport(standaloneBuildReport);
+  } else if (platform === "darwin" && arch === "arm64" && skipNativeBuild) {
+    standaloneBuildReport = loadNativeBuildAttestation({
+      attestation: options.nativeBuildAttestation || environment.AGENTSHELL_NATIVE_BUILD_ATTESTATION,
+      projectRoot
+    });
   }
   const packageReport = parseRequiredReport(
     run(runner, projectRoot, "node", ["scripts/share-package.js", "--out-dir", outDir, "--name", "agentshell-codex-plugin", "--zip"]).stdout,
@@ -63,6 +69,9 @@ export function buildReleaseArtifacts(options = {}) {
   if (standaloneBuildReport?.sha256 && standaloneBuildReport.sha256 !== sourceSha256) {
     throw new Error("Standalone build report SHA-256 does not match the binary selected for release.");
   }
+  if (skipNativeBuild && standaloneBuildReport) {
+    Object.assign(toolchain, standaloneBuildReport.toolchain);
+  }
   const packageBytes = directoryBytes(deliveryDir);
   const compressionRatio = packageBytes === 0 ? null : zipBytes / packageBytes;
   const zipToStandaloneRatio = standaloneBytes === 0 ? null : zipBytes / standaloneBytes;
@@ -73,7 +82,7 @@ export function buildReleaseArtifacts(options = {}) {
     platform,
     arch,
     toolchain,
-    zip,
+    zip: relativeArtifactPath(outDir, zip),
     bytes: zipBytes,
     zipBytes,
     packageBytes,
@@ -86,19 +95,40 @@ export function buildReleaseArtifacts(options = {}) {
       archiveVerified: packageReport.zip?.verification?.ok === true
     },
     sizeBudgets,
-    lifecycle,
+    lifecycle: {
+      ...lifecycle,
+      packageDir: relativeArtifactPath(outDir, deliveryDir)
+    },
     standalone: {
-      path: standalone,
+      path: relativeArtifactPath(outDir, standalone),
       bytes: standaloneBytes,
       sha256: standaloneChecksum,
       sourceSha256,
       rebuilt: platform === "darwin" && arch === "arm64" && !skipNativeBuild,
-      buildReport: standaloneBuildReport,
+      buildReport: sanitizeStandaloneBuildReport(standaloneBuildReport, projectRoot),
       builder: standaloneBuildReport?.builder ?? null
     }
   };
   fs.writeFileSync(path.join(outDir, "release-report.json"), `${JSON.stringify(report, null, 2)}\n`);
   assertReleaseSizeBudgets(sizeBudgets);
+  return report;
+}
+
+export function loadNativeBuildAttestation(options = {}) {
+  const source = options.attestation;
+  if (!source) {
+    throw new Error(
+      "Skipping the native release build requires AGENTSHELL_NATIVE_BUILD_ATTESTATION " +
+      "or nativeBuildAttestation with a completed standalone build report."
+    );
+  }
+  const report = typeof source === "string"
+    ? readAttestationFile(source, options.projectRoot)
+    : source;
+  assertStandaloneBuildReport(report);
+  if (report.target && report.target !== "darwin-arm64") {
+    throw new Error(`Native build attestation target must be darwin-arm64, received ${report.target}.`);
+  }
   return report;
 }
 
@@ -133,7 +163,11 @@ export function assertStandaloneBuildReport(report) {
   assertReleaseToolchain(reported);
   const attested = evaluateReleaseToolchain(report?.toolchain?.actual);
   if (report?.toolchain?.enforcement !== "strict" || report?.toolchain?.ok !== true || !attested.ok) {
-    throw new Error("Standalone build report is missing a compliant release toolchain attestation.");
+    throw new Error("Standalone build report is missing a compatible release toolchain attestation.");
+  }
+  if (reported.actual.nodeVersion !== attested.actual.nodeVersion
+    || reported.actual.bunVersion !== attested.actual.bunVersion) {
+    throw new Error("Standalone builder metadata does not match its toolchain attestation.");
   }
   return report;
 }
@@ -207,6 +241,35 @@ function parseRequiredReport(stdout, label) {
   const report = parseJsonOutput(stdout);
   if (report?.ok !== true) throw new Error(report?.error?.message || `${label} did not return a successful JSON report`);
   return report;
+}
+
+function readAttestationFile(file, projectRoot) {
+  const resolved = path.resolve(projectRoot || root, file);
+  try {
+    return JSON.parse(fs.readFileSync(resolved, "utf8"));
+  } catch (error) {
+    throw new Error(`Could not read native build attestation ${file}: ${error.message}`);
+  }
+}
+
+function relativeArtifactPath(base, target) {
+  const relative = path.relative(base, target);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`Release report path is outside the artifact directory: ${target}`);
+  }
+  return relative.split(path.sep).join("/");
+}
+
+function sanitizeStandaloneBuildReport(report, projectRoot) {
+  if (!report) return null;
+  const sanitized = structuredClone(report);
+  if (typeof sanitized.output === "string") {
+    const resolved = path.resolve(projectRoot, sanitized.output);
+    const relative = path.relative(projectRoot, resolved);
+    sanitized.output = (relative.startsWith("..") || path.isAbsolute(relative) ? path.basename(resolved) : relative)
+      .split(path.sep).join("/");
+  }
+  return sanitized;
 }
 
 function sizeBudgetResult(actualBytes, limitBytes) {

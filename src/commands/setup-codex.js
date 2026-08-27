@@ -4,7 +4,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { doctor, installOrUpdate, rollback as rollbackPlugin, uninstall } from "../../scripts/plugin-lifecycle.js";
+import {
+  doctor,
+  installOrUpdate,
+  refreshCache,
+  rollback as rollbackPlugin,
+  uninstall
+} from "../../scripts/plugin-lifecycle.js";
 import { installAgentPolicy } from "../../scripts/install-agent-policy.js";
 import {
   inspectDashboardService,
@@ -24,7 +30,7 @@ import { metrics } from "./metrics.js";
 
 export const SETUP_CODEX_PROTOCOL_VERSION = "agentshell.setup-codex.v1";
 
-const ACTIONS = new Set(["install", "update", "uninstall", "doctor"]);
+const ACTIONS = new Set(["install", "update", "uninstall", "doctor", "rollback"]);
 const PATH_BLOCK = [
   "# >>> AgentShell managed PATH >>>",
   'case ":$PATH:" in',
@@ -38,7 +44,7 @@ const PATH_BLOCK_SHA256 = sha256Content(PATH_BLOCK);
 export async function setupCodex(action, options = {}) {
   if (!ACTIONS.has(action)) {
     return report(false, action, options, {
-      error: { code: "INVALID_ACTION", message: "Action must be install, update, uninstall, or doctor." }
+      error: { code: "INVALID_ACTION", message: "Action must be install, update, uninstall, doctor, or rollback." }
     });
   }
 
@@ -89,6 +95,7 @@ export async function setupCodex(action, options = {}) {
     const paths = setupPaths({ ...options, source });
     const context = { ...options, source, sourceMode, channel, release, paths };
     if (action === "doctor") return await diagnose(context);
+    if (action === "rollback") return await restorePrevious(context);
     if (action === "uninstall") return await remove(context);
     return await install(action, context);
   } catch (error) {
@@ -118,6 +125,9 @@ async function install(action, context) {
     });
   }
 
+  if (!dryRun) invalidateSetupRollback(paths);
+  const rollbackSnapshot = dryRun ? null : createSetupRollback(paths, action);
+
   const lifecycle = installOrUpdate({
     home: paths.home,
     source: paths.source,
@@ -125,6 +135,7 @@ async function install(action, context) {
     allowUserServiceMigration: context.home === undefined
   });
   if (!lifecycle.ok) {
+    discardSetupRollback(rollbackSnapshot);
     return report(false, action, context, {
       plugin: compactLifecycle(lifecycle),
       error: { code: "PLUGIN_INSTALL_FAILED", message: lifecycle.error || "Plugin installation failed." }
@@ -149,13 +160,20 @@ async function install(action, context) {
     });
   }
 
+  const cache = refreshCache({ home: paths.home });
   const codex = await execute(context, "codex", ["plugin", "add", "agentshell@personal"]);
   if (!codex.ok) {
-    const rolledBack = rollbackPlugin({ home: paths.home, source: paths.source });
+    const recovery = await rollbackAndReactivate(context);
+    const rolledBack = recovery.plugin;
+    discardSetupRollback(rollbackSnapshot);
     return report(false, action, context, {
       plugin: compactLifecycle(rolledBack),
       codex,
-      rollback: { ok: Boolean(rolledBack.ok), status: rolledBack.rolledBack ? "restored" : "not-available" },
+      cache,
+      rollback: {
+        ok: recovery.ok,
+        status: rolledBack.rolledBack ? recovery.activation.ok ? "restored" : "restored-cache-pending" : "not-available"
+      },
       error: { code: "CODEX_PLUGIN_ADD_FAILED", message: "Codex could not activate the AgentShell plugin." }
     });
   }
@@ -172,14 +190,16 @@ async function install(action, context) {
     if (!validation.ok) {
       restoreManagedCli(paths, previous);
       restoreFileSnapshot(paths.policy, previousPolicy);
-      const rolledBack = rollbackPlugin({ home: paths.home, source: paths.source });
+      const recovery = await rollbackAndReactivate(context);
+      const rolledBack = recovery.plugin;
+      discardSetupRollback(rollbackSnapshot);
       return report(false, action, context, {
         plugin: compactLifecycle(rolledBack),
         codex,
         policy: compactPolicy(policy),
         nativeCli: { ok: false, status: "validation-failed", path: paths.installedCli },
         validation,
-        rollback: { ok: Boolean(rolledBack.ok), status: rolledBack.rolledBack ? "restored" : "not-available" },
+        rollback: { ok: recovery.ok, status: rolledBack.rolledBack ? recovery.activation.ok ? "restored" : "restored-cache-pending" : "not-available" },
         error: { code: "NATIVE_CLI_INVALID", message: "Installed AgentShell CLI failed its version check." }
       });
     }
@@ -194,7 +214,9 @@ async function install(action, context) {
       rollbackCommandPath(commandPath);
       restoreManagedCli(paths, previous);
       restoreFileSnapshot(paths.policy, previousPolicy);
-      const rolledBack = rollbackPlugin({ home: paths.home, source: paths.source });
+      const recovery = await rollbackAndReactivate(context);
+      const rolledBack = recovery.plugin;
+      discardSetupRollback(rollbackSnapshot);
       return report(false, action, context, {
         plugin: compactLifecycle(rolledBack),
         codex,
@@ -203,7 +225,7 @@ async function install(action, context) {
         commandPath: compactCommandPath(commandPath),
         dashboardService: compactDashboardService(dashboardService),
         validation,
-        rollback: { ok: Boolean(rolledBack.ok), status: rolledBack.rolledBack ? "restored" : "not-available" },
+        rollback: { ok: recovery.ok, status: rolledBack.rolledBack ? recovery.activation.ok ? "restored" : "restored-cache-pending" : "not-available" },
         error: { code: "DASHBOARD_SERVICE_FAILED", message: "The managed macOS Dashboard service could not be installed safely." }
       });
     }
@@ -217,6 +239,7 @@ async function install(action, context) {
       channel: context.channel,
       release: context.release
     });
+    const setupRollback = commitSetupRollback(paths, rollbackSnapshot);
     return report(true, action, context, {
       plugin: compactLifecycle(lifecycle),
       codex,
@@ -225,7 +248,9 @@ async function install(action, context) {
       commandPath: compactCommandPath(commandPath),
       dashboardService: compactDashboardService(dashboardService),
       dashboardSnapshots,
-      validation
+      validation,
+      cache,
+      rollback: setupRollback
     });
   } catch (error) {
     if (dashboardService?.record) {
@@ -234,9 +259,19 @@ async function install(action, context) {
     rollbackCommandPath(commandPath);
     restoreManagedCli(paths, previous);
     restoreFileSnapshot(paths.policy, previousPolicy);
-    rollbackPlugin({ home: paths.home, source: paths.source });
+    await rollbackAndReactivate(context);
+    discardSetupRollback(rollbackSnapshot);
     throw error;
   }
+}
+
+async function rollbackAndReactivate(context) {
+  const plugin = rollbackPlugin({ home: context.paths.home, source: context.paths.source });
+  if (!plugin.rolledBack || !fs.existsSync(context.paths.pluginTarget)) {
+    return { ok: Boolean(plugin.ok), plugin, activation: { ok: true, status: null, skipped: true } };
+  }
+  const activation = await execute(context, "codex", ["plugin", "add", "agentshell@personal"]);
+  return { ok: Boolean(plugin.ok && activation.ok), plugin, activation };
 }
 
 async function refreshDashboardSnapshots(paths) {
@@ -288,6 +323,7 @@ async function remove(context) {
   }
 
   if (!dryRun && status !== "preserved-modified") fs.rmSync(paths.record, { force: true });
+  if (!dryRun && lifecycle.ok) invalidateSetupRollback(paths);
   return report(lifecycle.ok, "uninstall", context, {
     plugin: compactLifecycle(lifecycle),
     nativeCli: { ok: true, status, path: paths.installedCli },
@@ -302,6 +338,9 @@ async function diagnose(context) {
   const record = readRecord(paths.record);
   const native = managedCliState(paths, record);
   const codex = await execute(context, "codex", ["--version"]);
+  const cliExecution = native.matches && executable(paths.installedCli)
+    ? await execute(context, paths.installedCli, ["--version"])
+    : { ok: false, status: null };
   const commandPath = inspectCommandPath(paths, context, record);
   const dashboardService = await inspectDashboardService(
     paths,
@@ -312,8 +351,10 @@ async function diagnose(context) {
     plugin: Boolean(lifecycle.checks?.pluginFiles && lifecycle.checks?.marketplaceEntry),
     policy: Boolean(lifecycle.checks?.policy),
     nativeCli: native.matches && executable(paths.installedCli),
+    cliExecution: cliExecution.ok,
     commandPath: commandPath.ok,
     codex: codex.ok,
+    releaseIntegrity: record?.release?.source !== "github-release" || record.release.checksumVerified === true,
     ...(dashboardService.status === "skipped" ? {} : { dashboardService: dashboardService.ok })
   };
   return report(Object.values(checks).every(Boolean), "doctor", context, {
@@ -327,9 +368,120 @@ async function diagnose(context) {
     commandPath: compactCommandPath(commandPath),
     dashboardService: compactDashboardService(dashboardService),
     codex,
+    cliExecution,
     release: record?.release || context.release,
-    channel: record?.channel || context.channel
+    channel: record?.channel || context.channel,
+    integrity: {
+      installedSha256: native.exists ? sha256(paths.installedCli) : null,
+      recordedSha256: record?.sha256 || null,
+      matches: native.matches,
+      releaseChecksumVerified: record?.release?.source === "github-release"
+        ? record.release.checksumVerified === true
+        : null
+    },
+    rollback: inspectSetupRollback(paths)
   });
+}
+
+async function restorePrevious(context) {
+  const { paths, dryRun = false } = context;
+  const transaction = readRecord(paths.setupRollback);
+  if (!transaction) {
+    return report(true, "rollback", context, {
+      rollback: { ok: true, status: "not-available", available: false },
+      error: null
+    });
+  }
+  try {
+    validateSetupRollback(paths, transaction);
+  } catch (error) {
+    return report(false, "rollback", context, {
+      rollback: { ok: false, status: "invalid", available: false },
+      error: { code: "ROLLBACK_TRANSACTION_INVALID", message: error instanceof Error ? error.message : String(error) }
+    });
+  }
+  if (dryRun) {
+    return report(true, "rollback", context, {
+      rollback: { ok: true, status: "would-restore", available: true, fromAction: transaction.action }
+    });
+  }
+
+  const currentRecord = readRecord(paths.record);
+  const dashboardRemoved = await removeDashboardService(
+    paths,
+    currentRecord?.dashboardService,
+    dashboardServiceOptions(context, false)
+  );
+  if (!dashboardRemoved.ok) {
+    return report(false, "rollback", context, {
+      rollback: { ok: false, status: "blocked", available: true },
+      dashboardService: compactDashboardService(dashboardRemoved),
+      error: { code: "ROLLBACK_SERVICE_STOP_FAILED", message: "The current Dashboard service could not be stopped safely." }
+    });
+  }
+
+  const plugin = rollbackPlugin({ home: paths.home, source: paths.source });
+  if (!plugin.ok) {
+    return report(false, "rollback", context, {
+      rollback: { ok: false, status: "plugin-restore-failed", available: true },
+      plugin: compactLifecycle(plugin),
+      error: { code: "ROLLBACK_PLUGIN_FAILED", message: plugin.error || "The previous plugin could not be restored." }
+    });
+  }
+
+  try {
+    restoreSetupFiles(paths, transaction);
+    const restoredRecord = readRecord(paths.record);
+    const previousCliExisted = transaction.files?.installedCli?.exists === true;
+    const codex = previousCliExisted
+      ? await execute(context, "codex", ["plugin", "add", "agentshell@personal"])
+      : { ok: true, status: null, skipped: true };
+    const validation = previousCliExisted
+      ? await execute(context, paths.installedCli, ["--version"])
+      : { ok: !isFile(paths.installedCli), status: null, skipped: true };
+    const dashboardService = restoredRecord?.dashboardService
+      ? await installDashboardService(paths, {
+        ...dashboardServiceOptions(context, false),
+        record: restoredRecord.dashboardService
+      })
+      : { ok: true, status: "not-managed" };
+    const healthy = plugin.ok && codex.ok && validation.ok && dashboardService.ok;
+    if (healthy) {
+      fs.rmSync(transaction.directory, { recursive: true, force: true });
+      fs.rmSync(paths.setupRollback, { force: true });
+    }
+    return report(healthy, "rollback", context, {
+      plugin: compactLifecycle(plugin),
+      codex,
+      validation,
+      dashboardService: compactDashboardService(dashboardService),
+      rollback: {
+        ok: healthy,
+        status: healthy ? "restored" : "restored-needs-attention",
+        available: !healthy,
+        fromAction: transaction.action,
+        ...(!healthy ? {
+          recovery: {
+            transaction: paths.setupRollback,
+            backupDirectory: transaction.directory
+          }
+        } : {})
+      },
+      release: restoredRecord?.release || context.release,
+      channel: restoredRecord?.channel || context.channel,
+      ...(healthy ? {} : {
+        error: {
+          code: "ROLLBACK_HEALTH_CHECK_FAILED",
+          message: `Previous files were restored, but one or more health checks failed. Recovery files remain at ${transaction.directory}.`
+        }
+      })
+    });
+  } catch (error) {
+    return report(false, "rollback", context, {
+      rollback: { ok: false, status: "restore-failed", available: true },
+      error: { code: "ROLLBACK_RESTORE_FAILED", message: error instanceof Error ? error.message : String(error) }
+    });
+  }
 }
 
 function setupPaths(options) {
@@ -346,8 +498,138 @@ function setupPaths(options) {
     installedCli: path.join(home, ".local", "bin", "agentshell"),
     pluginTarget: path.join(home, "plugins", "agentshell"),
     policy: path.join(home, ".codex", "AGENTS.md"),
-    record: path.join(home, ".agentshell", "standalone-install.json")
+    record: path.join(home, ".agentshell", "standalone-install.json"),
+    setupBackups: path.join(home, ".agentshell", "setup-backups"),
+    setupRollback: path.join(home, ".agentshell", "setup-rollback.json")
   };
+}
+
+function createSetupRollback(paths, action) {
+  const directory = path.join(paths.setupBackups, `setup-${Date.now()}-${process.pid}`);
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const previousRecord = readRecord(paths.record);
+  const candidates = {
+    installedCli: paths.installedCli,
+    policy: paths.policy,
+    record: paths.record,
+    zprofile: path.join(paths.home, ".zprofile"),
+    bashProfile: path.join(paths.home, ".bash_profile"),
+    profile: path.join(paths.home, ".profile"),
+    dashboardPlist: previousRecord?.dashboardService?.path === managedDashboardPlist(paths)
+      ? managedDashboardPlist(paths)
+      : null
+  };
+  const files = {};
+  for (const [name, file] of Object.entries(candidates)) {
+    if (!file) continue;
+    files[name] = snapshotSetupFile(file, directory, name);
+  }
+  return {
+    protocolVersion: SETUP_CODEX_PROTOCOL_VERSION,
+    action,
+    createdAt: new Date().toISOString(),
+    directory,
+    files
+  };
+}
+
+function snapshotSetupFile(file, directory, name) {
+  if (!isFile(file)) return { path: file, exists: false };
+  const backup = path.join(directory, name);
+  fs.copyFileSync(file, backup);
+  const mode = fs.statSync(file).mode;
+  fs.chmodSync(backup, mode);
+  return { path: file, exists: true, backup, mode };
+}
+
+function commitSetupRollback(paths, transaction) {
+  if (!transaction) return { ok: true, status: "not-created", available: false };
+  const previous = readRecord(paths.setupRollback);
+  writeRecord({ record: paths.setupRollback }, transaction);
+  if (safeSetupBackupDirectory(paths, previous?.directory) && previous.directory !== transaction.directory) {
+    fs.rmSync(previous.directory, { recursive: true, force: true });
+  }
+  return { ok: true, status: "available", available: true, fromAction: transaction.action };
+}
+
+function inspectSetupRollback(paths) {
+  const transaction = readRecord(paths.setupRollback);
+  let available = false;
+  try {
+    validateSetupRollback(paths, transaction);
+    available = true;
+  } catch {
+    available = false;
+  }
+  return {
+    ok: true,
+    status: available ? "available" : "not-available",
+    available,
+    ...(available ? { fromAction: transaction.action, createdAt: transaction.createdAt } : {})
+  };
+}
+
+function discardSetupRollback(transaction) {
+  if (transaction?.directory) fs.rmSync(transaction.directory, { recursive: true, force: true });
+}
+
+function invalidateSetupRollback(paths) {
+  const previous = readRecord(paths.setupRollback);
+  if (safeSetupBackupDirectory(paths, previous?.directory)) {
+    fs.rmSync(previous.directory, { recursive: true, force: true });
+  }
+  fs.rmSync(paths.setupRollback, { force: true });
+}
+
+function restoreSetupFiles(paths, transaction) {
+  validateSetupRollback(paths, transaction);
+  for (const entry of Object.values(transaction.files || {})) {
+    if (!entry?.path) continue;
+    if (!entry.exists) {
+      fs.rmSync(entry.path, { force: true });
+      continue;
+    }
+    if (!entry.backup || !isFile(entry.backup)) throw new Error(`Rollback backup is missing for ${entry.path}.`);
+    fs.mkdirSync(path.dirname(entry.path), { recursive: true });
+    const temporary = `${entry.path}.${process.pid}.rollback.tmp`;
+    fs.copyFileSync(entry.backup, temporary);
+    if (entry.mode) fs.chmodSync(temporary, entry.mode);
+    fs.renameSync(temporary, entry.path);
+  }
+}
+
+function validateSetupRollback(paths, transaction) {
+  if (!transaction || !safeSetupBackupDirectory(paths, transaction.directory) || !fs.statSync(transaction.directory).isDirectory()) {
+    throw new Error("The setup rollback snapshot is missing or unmanaged.");
+  }
+  const allowed = new Set([
+    paths.installedCli,
+    paths.policy,
+    paths.record,
+    path.join(paths.home, ".zprofile"),
+    path.join(paths.home, ".bash_profile"),
+    path.join(paths.home, ".profile"),
+    managedDashboardPlist(paths)
+  ].map((file) => path.resolve(file)));
+  for (const entry of Object.values(transaction.files || {})) {
+    if (!entry?.path || !allowed.has(path.resolve(entry.path))) throw new Error("The setup rollback snapshot references an unmanaged file.");
+    if (entry.exists && (!entry.backup || !safeChild(transaction.directory, entry.backup) || !isFile(entry.backup))) {
+      throw new Error(`Rollback backup is missing for ${entry.path}.`);
+    }
+  }
+}
+
+function safeSetupBackupDirectory(paths, directory) {
+  return Boolean(directory && safeChild(paths.setupBackups, directory));
+}
+
+function managedDashboardPlist(paths) {
+  return path.join(paths.home, "Library", "LaunchAgents", "com.agentshell.dashboard.plist");
+}
+
+function safeChild(parent, candidate) {
+  const root = `${path.resolve(parent)}${path.sep}`;
+  return path.resolve(candidate).startsWith(root);
 }
 
 function dashboardServiceOptions(context, dryRun) {

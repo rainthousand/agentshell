@@ -5,6 +5,7 @@ import { summarizeRun } from "./run-status.js";
 import { fail } from "../core/output.js";
 import { readActiveRun } from "../core/store.js";
 import { createProfile } from "../core/profile.js";
+import { operationIdsForVerification, stableOperationIds } from "../core/attribution.js";
 
 const PROTOCOL_VERSION = "agentshell.fix.v1";
 
@@ -54,7 +55,7 @@ export async function fix(root, type, options = {}) {
       });
 
   if (!suggestion.ok) {
-    return fail("FIX_SUGGESTION_UNAVAILABLE", "Diagnosis completed, but no safe automatic fix was available", {
+    const failure = fail("FIX_SUGGESTION_UNAVAILABLE", "Diagnosis completed, but no safe automatic fix was available", {
       runId: diagnosis.runId,
       diagnosis: compactDiagnosis(diagnosis),
       suggestionError: suggestion.error,
@@ -65,6 +66,11 @@ export async function fix(root, type, options = {}) {
         : "agentshell log get <logRef> --tail 120",
       reason: "Fill the generated template manually or inspect logs"
     }]);
+    return {
+      ...failure,
+      runId: diagnosis.runId,
+      diagnosis: compactDiagnosis(diagnosis)
+    };
   }
 
   if (policy.dryRun) {
@@ -133,13 +139,17 @@ function compactFixOutput(output) {
     ...policyField(output),
     runId: output.runId,
     status: output.status,
+    operationIds: stableOperationIds([
+      ...operationIdsForVerification(output.diagnosis?.verification),
+      output.finalVerification?.operationId
+    ]),
     target: compactTarget(output),
-    preview: output.dryRun ? compactPreview(output.suggestion) : null,
+    ...(output.dryRun ? { preview: compactPreview(output.suggestion) } : {}),
     changedFiles: output.suggestion?.applied?.changedFiles || [],
     verification: compactFinalVerification(output),
     rollbackCommand: output.runSummary?.rollbackCommand || null,
-    nextBestAction: output.runSummary?.nextBestAction || null,
-    profile: output.profile || null,
+    ...(output.runSummary?.nextBestAction ? { nextBestAction: output.runSummary.nextBestAction } : {}),
+    ...(output.profile ? { profile: output.profile } : {}),
     suggestedNextActions: output.suggestedNextActions
   };
 }
@@ -196,11 +206,11 @@ function compactPreview(suggestion) {
 }
 
 function compactFinalVerification(output) {
+  if (output.dryRun) return null;
   const verification = output.finalVerification || output.diagnosis?.verification || null;
   if (!verification) return null;
   return {
     ok: verification.ok ?? output.diagnosis?.verificationOk ?? null,
-    operationId: verification.operationId || null,
     summary: verification.summary || null,
     logRef: verification.logRef || null,
     durationMs: verification.durationMs || null,
@@ -218,8 +228,19 @@ function compactDiagnosis(diagnosis) {
     status: diagnosis.status,
     verificationOk: diagnosis.verificationOk,
     logRef: diagnosis.verification?.logRef,
+    verification: compactAttributionVerification(diagnosis.verification),
     fixPlan: diagnosis.fixPlan,
     changeTemplate: diagnosis.changeTemplate
+  };
+}
+
+function compactAttributionVerification(verification) {
+  if (!verification?.operationId) return null;
+  return {
+    operationId: verification.operationId,
+    relatedTestFileVerification: verification.relatedTestFileVerification?.operationId
+      ? { operationId: verification.relatedTestFileVerification.operationId }
+      : null
   };
 }
 

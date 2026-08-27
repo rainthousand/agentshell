@@ -52,6 +52,10 @@ test("help returns command list as JSON", () => {
   assert.ok(output.commands.includes("agentshell start [--compact] [--profile]"));
   assert.ok(output.commands.includes("agentshell entry [--compact] [--profile]"));
   assert.ok(output.commands.includes("agentshell fix test [--fast|--safe|--dry-run] [--compact] [--profile]"));
+  assert.ok(output.commands.includes("agentshell verify cache <explain|clear> [--compact]"));
+  assert.ok(output.commands.includes("agentshell coverage [status] [--compact] [--limit N]"));
+  assert.ok(output.commands.includes("agentshell update [--channel stable|beta|--source <package>] [--home <path>] [--dry-run]"));
+  assert.ok(output.commands.includes("agentshell rollback [--home <path>] [--dry-run]"));
 });
 
 test("support export dry-run is available from the product CLI", () => {
@@ -85,6 +89,26 @@ test("setup codex exposes explicit stable and beta release channels", () => {
   });
   assert.equal(conflict.status, 2);
   assert.equal(JSON.parse(conflict.stdout).error.code, "INVALID_ARGUMENT");
+});
+
+test("top-level update and rollback expose self-maintenance without a checkout workflow", () => {
+  const update = spawnSync("node", ["src/cli.js", "update", "--channel", "beta", "--dry-run"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  assert.equal(update.status, 0, update.stderr);
+  const updateOutput = JSON.parse(update.stdout);
+  assert.equal(updateOutput.action, "update");
+  assert.equal(updateOutput.channel, "beta");
+
+  const rollback = spawnSync("node", ["src/cli.js", "rollback", "--dry-run"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  assert.ok([0, 1].includes(rollback.status), rollback.stderr);
+  const rollbackOutput = JSON.parse(rollback.stdout);
+  assert.equal(rollbackOutput.protocolVersion, "agentshell.setup-codex.v1");
+  assert.equal(rollbackOutput.action, "rollback");
 });
 
 test("version returns a machine-readable product version", () => {
@@ -404,8 +428,9 @@ test("doctor reports local AgentShell readiness", () => {
   assert.equal(output.workspace.name, "agentshell");
   assert.equal(output.runtime.node.ok, true);
   assert.equal(output.package.found, true);
-  assert.equal(output.package.scripts.test, "node --test tests/*.test.js");
+  assert.equal(output.package.scripts.test, "node scripts/run-test-tier.js fast");
   assert.equal(output.state.writable, true);
+  assert.equal(output.installation.protocolVersion, "agentshell.setup-codex.v1");
   assert.equal(typeof output.activeRun.present, "boolean");
   assert.ok(["in_progress", "failing", "passed", null].includes(output.activeRun.status));
   assert.ok(output.checks.some((check) => check.name === "state-dir" && check.ok));
@@ -420,9 +445,9 @@ test("plugin status reports local plugin install consistency", () => {
   const cacheRoot = path.join(home, ".codex", "plugins", "cache", "personal", "agentshell");
   const version = "0.24.0+codex.fixture";
   const cli = path.join(process.cwd(), "src", "cli.js");
-  writePluginManifest(repo, version);
+  writePluginActivationFixture(repo, version);
   writeMarketplace(home);
-  writePluginManifest(path.join(cacheRoot, version), version);
+  fs.cpSync(repo, path.join(cacheRoot, version), { recursive: true });
 
   const result = spawnSync("node", [
     cli,
@@ -509,7 +534,9 @@ test("plugin status reports local plugin install consistency", () => {
     "agentshell"
   );
   writeMarketplace(metadataMismatchHome);
-  writePluginManifest(path.join(metadataMismatchCacheRoot, version), version, {
+  const metadataMismatchCache = path.join(metadataMismatchCacheRoot, version);
+  fs.cpSync(repo, metadataMismatchCache, { recursive: true });
+  writePluginManifest(metadataMismatchCache, version, {
     authorName: "Someone Else",
     developerName: "Different Labs"
   });
@@ -528,7 +555,7 @@ test("plugin status reports local plugin install consistency", () => {
   assert.equal(metadataMismatch.status, 1, metadataMismatch.stderr);
   const metadataMismatchOutput = JSON.parse(metadataMismatch.stdout);
   assert.equal(metadataMismatchOutput.ok, false);
-  assert.equal(metadataMismatchOutput.summary.failed, 1);
+  assert.equal(metadataMismatchOutput.summary.failed, 2);
   const mismatchCheck = metadataMismatchOutput.checks.find(
     (check) => check.name === "codex plugin cache manifest matches source manifest"
   );
@@ -553,13 +580,7 @@ test("plugin validate reports source and installed plugin health", () => {
   const cli = path.join(process.cwd(), "src", "cli.js");
   writePluginValidateFixture(repo, version);
   writeMarketplace(home);
-  writePluginManifest(path.join(cacheRoot, version), version);
-  fs.mkdirSync(path.join(cacheRoot, version, "bin"), { recursive: true });
-  for (const bin of ["agentshell", "agentshell-mcp"]) {
-    const file = path.join(cacheRoot, version, "bin", bin);
-    fs.writeFileSync(file, "#!/usr/bin/env node\n");
-    fs.chmodSync(file, 0o755);
-  }
+  fs.cpSync(repo, path.join(cacheRoot, version), { recursive: true });
 
   const sourceOnly = spawnSync("node", [
     cli,
@@ -596,7 +617,7 @@ test("plugin validate reports source and installed plugin health", () => {
     cwd: repo,
     encoding: "utf8"
   });
-  assert.equal(installed.status, 0, installed.stderr);
+  assert.equal(installed.status, 0, `${installed.stderr}\n${installed.stdout}`);
   const installedOutput = JSON.parse(installed.stdout);
   assert.equal(installedOutput.ok, true);
   assert.equal(installedOutput.mode, "installed");
@@ -1006,6 +1027,29 @@ function writePluginManifest(root, version, metadata = {}) {
   }, null, 2)}\n`);
 }
 
+function writePluginActivationFixture(root, version) {
+  writePluginManifest(root, version);
+  const skill = path.join(root, "skills", "agentshell", "SKILL.md");
+  fs.mkdirSync(path.dirname(skill), { recursive: true });
+  fs.writeFileSync(skill, [
+    "agentshell start --compact",
+    "agentshell verify test",
+    "agentshell grep <query> --compact"
+  ].join("\n"));
+  const cli = path.join(root, "src", "cli.js");
+  fs.mkdirSync(path.dirname(cli), { recursive: true });
+  fs.writeFileSync(cli, "// fixture\n");
+  for (const bin of ["agentshell", "agentshell-mcp"]) {
+    const target = path.join(root, "bin", bin);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const body = bin === "agentshell"
+      ? '#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ok:true,protocolVersion:"agentshell.manual.v1"}) + "\\n");\n'
+      : "#!/usr/bin/env node\n";
+    fs.writeFileSync(target, body);
+    fs.chmodSync(target, 0o755);
+  }
+}
+
 function writePluginValidateFixture(root, version) {
   writePluginManifest(root, version, {
     authorName: "Alvin",
@@ -1052,6 +1096,12 @@ function writePluginValidateFixture(root, version) {
     schemaCommand,
     'const SCHEMAS = ["plugin-status", "plugin-validate", "plugin-release-local", "plugin-smoke", "strategy-coverage-matrix"];\n'
   );
+  fs.mkdirSync(path.join(root, "src", "core"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "src", "core", "command-registry.js"),
+    'export const SCHEMA_NAMES = ["plugin-status", "plugin-validate", "plugin-release-local", "plugin-smoke", "strategy-coverage-matrix"];\n'
+  );
+  fs.writeFileSync(path.join(root, "src", "cli.js"), "// fixture CLI entrypoint\n");
   writeMinimalStrategyCoverageFixture(root);
   for (const doc of [
     "docs/protocol.md",
@@ -1066,7 +1116,10 @@ function writePluginValidateFixture(root, version) {
   for (const bin of ["bin/agentshell", "bin/agentshell-mcp"]) {
     const target = path.join(root, bin);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, "#!/usr/bin/env node\n");
+    const body = bin === "bin/agentshell"
+      ? '#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ok:true,protocolVersion:"agentshell.manual.v1"}) + "\\n");\n'
+      : "#!/usr/bin/env node\n";
+    fs.writeFileSync(target, body);
     fs.chmodSync(target, 0o755);
   }
 }
@@ -1100,7 +1153,12 @@ function writeMinimalStrategyCoverageFixture(root) {
 
   const skill = path.join(root, "skills", "agentshell", "SKILL.md");
   fs.mkdirSync(path.dirname(skill), { recursive: true });
-  fs.writeFileSync(skill, "missing-object-property\n");
+  fs.writeFileSync(skill, [
+    "missing-object-property",
+    "agentshell start --compact",
+    "agentshell verify test",
+    "agentshell grep <query> --compact"
+  ].join("\n"));
 
   const manual = path.join(root, "src", "commands", "manual.js");
   fs.writeFileSync(manual, "missing-object-property\n");

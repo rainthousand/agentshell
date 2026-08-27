@@ -131,14 +131,19 @@ Lifecycle commands are symmetric and rollback-aware:
 ```bash
 agentshell setup codex update --channel stable
 agentshell setup codex doctor
+agentshell setup codex rollback
 agentshell setup codex uninstall
 agentshell support export --out agentshell-support.zip
 ```
 
-Install and update stage a complete copy before swapping it into place, retain up
-to three backups, and restore the previous installation automatically when later
-validation fails. Share packages include double-clickable update, check, and
-uninstall commands.
+Install and update download the selected GitHub Release when no local `--source`
+is supplied, verify its published SHA-256 checksum, stage a complete copy, clear
+the generated Codex plugin cache, and validate the installed CLI before
+committing. If activation or validation fails, the previous plugin, CLI, policy,
+shell PATH configuration, installation record, and Dashboard service are
+restored. `setup codex rollback` explicitly returns to the state before the most
+recent successful install or update. None of these operations requires a source
+checkout, Node.js, or npm when invoked through the standalone CLI.
 
 If the installer stops, read the "Next:" lines at the bottom of the output;
 they point to the command or setup step to retry.
@@ -235,6 +240,27 @@ reported instead of silently interpreted. V1 command overrides are limited to
 be replaced by repository configuration. `golangci-lint` and `goimports` are
 optional doctor checks; AgentShell does not install them. Automatic Go source
 repair is not supported.
+
+Common Go commands outside the managed verification loop are recognized by the
+bounded generic executor:
+
+```bash
+agentshell exec --compact -- go list ./...
+agentshell exec --compact -- go env GOMOD
+agentshell exec --compact -- go mod graph
+agentshell exec --compact -- go tool pprof cpu.pprof
+agentshell exec --compact -- govulncheck ./...
+agentshell exec --compact -- staticcheck ./...
+agentshell exec --compact -- golangci-lint run
+```
+
+Profiles cover `go run`, `go list`, `go env`, `go get`, `go install`, `go mod
+download|graph|why`, `go tool cover|pprof`, `govulncheck`, `staticcheck`,
+`golangci-lint run`, `dlv`, `mockgen`, and `wire`. Each result includes explicit
+workspace-mutation, network, and interactive risk. `pprof` defaults to bounded
+text `top` output. Commands that change dependencies, generate code, install
+binaries, or run arbitrary target programs remain explicit and are never hidden
+follow-up actions. See [Go command profiles](docs/go-command-profiles.md).
 
 The V1.0 managed installer adds `~/.local/bin` to supported shell profiles when
 needed. Until a new shell is opened, or when working without the installer, use
@@ -365,9 +391,12 @@ script, stale evidence, or a failed verification before asking a user to retry.
 ### Local Dashboard
 
 Run `agentshell dashboard` on macOS to open the native AgentShell menu-bar utility.
-The status item shows compact verified savings such as `AS 79K`; clicking it shows
-the full `Verified savings` and cache-backed `Time saved` values. It refreshes every
-five seconds, does not appear in the Dock, and does not open a window by default.
+The status item shows today's compact verified savings such as `AS 12K`; clicking
+it shows today's verified context and cache-backed time savings with a quiet
+all-time total. The optional detailed panel adds the last seven local calendar
+days. Values reset at local midnight, retain zero-value days, and deduplicate exact
+operation IDs across workspace snapshots. It refreshes every five seconds, does
+not appear in the Dock, and does not open a window by default.
 The local read-only service binds to `127.0.0.1` and never uploads file contents or
 command output. Metrics v2 labels measured, estimated, unavailable,
 exact-attribution, and legacy-fallback values explicitly.
@@ -405,6 +434,19 @@ include the next repair command when something is blocked:
 - Missing or stale Codex plugin cache: `codex plugin add agentshell@personal`
 - Full local refresh when several checks fail: `npm run plugin:release-local`
 
+## Test Tiers
+
+`npm test` runs the fast pull-request tier. Heavier suites are isolated so they
+do not multiply across every compatibility runner:
+
+```bash
+npm run test:fast
+npm run test:integration
+npm run test:release
+npm run test:benchmark
+npm run test:all
+```
+
 ## Product Readiness
 
 Before handing a checkout to another developer, run the lightweight product gate:
@@ -417,10 +459,57 @@ npm run product:readiness -- --heavy --dry-run
 
 It checks the external trial surface: quickstart, PM status page, workflow docs,
 Codex plugin docs, adapter trial suite, manual topics, package scripts, and JSON
-schema registry. Heavy mode adds benchmark CI, cache/cold-start checks, strategy
+schema registry. It also requires the compact semantic corpus, operation
+attribution, privacy-safe command coverage, and performance SLA contracts.
+Heavy mode adds benchmark CI, cache/cold-start checks, strategy
 coverage, Codex plugin trial scoring, and strategy intake. Use
 [Product Boundary](docs/product-boundary.md) as the freeze/scope contract for
 V1.0. MCP remains deferred and non-blocking for this phase.
+
+## Command Coverage
+
+AgentShell can measure whether supported structured commands are actually being
+used instead of raw CLI fallbacks:
+
+```bash
+agentshell coverage --compact
+agentshell coverage observe --source codex -- rg some-query src
+npm run coverage:adapter:ingest -- --input adapter-events.json --source codex
+```
+
+AgentShell events are counted automatically. External commands require an
+explicit adapter observation so the denominator is real; until then, coverage
+rates are reported as unavailable rather than guessed. Observations remain local
+and store only the executable family, category, replacement eligibility, and
+source. Adapter batches are idempotent and deduplicated by a one-way event hash.
+Arguments, paths, raw event IDs, stdout, and stderr are never stored.
+
+## Generic Noisy Commands
+
+Use the bounded generic executor when AgentShell does not yet have a dedicated
+command:
+
+```bash
+agentshell exec --compact -- docker logs api
+agentshell exec --timeout-ms 60000 --compact -- terraform plan
+agentshell log delta logs/dev.log --compact
+```
+
+`exec` never invokes a shell implicitly. It applies bounded, no-color defaults
+for Docker, kubectl, make, Cargo, .NET, Terraform, Maven, Gradle, ruff, mypy,
+and supported Go tooling,
+then returns key failures, locations, duration, exit status, and a local `logRef`
+instead of raw output. `log delta` persists a path-free cursor and returns only
+new bytes, status transitions, and errors; it handles truncation and rotation and
+supports `--reset`.
+
+Compact semantic quality and deterministic SLA contract gates are available as:
+
+```bash
+npm run quality:compact-semantic
+npm run performance:sla:gate
+npm run performance:sla:probe
+```
 
 The current Core release is `1.0.0`. The source is published in the public
 [AgentShell GitHub repository](https://github.com/rainthousand/agentshell). Local release
@@ -655,6 +744,32 @@ node ../../src/cli.js fix test --safe --compact
 ```
 
 Always use the current hash returned by `agentshell read`.
+
+## Adaptive coverage and local runtime
+
+`agentshell coverage candidates --limit 10` turns privacy-safe unsupported-command observations into a ranked profile and fixture backlog. It never stores command arguments, paths, or output.
+
+`agentshell runtime start` enables an optional local Unix-socket cache for read-only project metadata. It is deliberately opt-in until end-to-end CLI benchmarks show a repeatable gain; inspect or stop it with `agentshell runtime status --compact` and `agentshell runtime stop`.
+
+Compact semantic quality is gated across JavaScript/TypeScript, Go, Python, and Java with error recall, location accuracy, decision consistency, necessary-information retention, extra-read risk, and measured Token reduction.
+
+## Multi-repository and change-aware workflows
+
+AgentShell now treats common development sequences as first-class compact workflows:
+
+```bash
+agentshell workspace guard --root ../service-a --root ../service-b --compact
+agentshell workspace audit --root ../service-a --root ../service-b --compact
+agentshell compare-search SharedSymbol --root ../legacy-php --root ../new-go --compact
+agentshell verify go --packages ./internal/... --run '^TestCheckout$' --mockey --compact
+agentshell verify changed --include-dependents --compact
+agentshell boundary check --deny restricted --compact
+agentshell read batch --target src/a.js:1:80 --target src/b.js@around=handler --compact
+agentshell go locate generated --kind pb --compact
+agentshell job start --timeout-ms 600000 -- npm test
+```
+
+`workspace guard`, `workspace audit`, and `compare-search` require explicit roots and return aligned, bounded results without exposing absolute workspace paths. `verify changed` is plan-only by default; `--include-dependents` expands reliable Go and Node reverse dependencies, and `--execute` is still required to run the reviewed plan. Batch reads preserve partial results under a global output budget. Go location queries stay offline and avoid recursive module-cache scans. Background jobs persist private state and rotating logs under the workspace, with cursor-based output retrieval. Boundary rules are generic prefix/glob policies and never modify files. See [workspace workflows](docs/workspace-workflows.md), [workspace audit](docs/workspace-audit.md), [batch read](docs/read-batch.md), [focused Go verification](docs/go-focused-verify.md), [Go location](docs/go-locate.md), [job management](docs/job-management.md), and [change-aware workflows](docs/change-aware-workflows.md).
 
 ## More
 

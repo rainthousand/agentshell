@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/runtime.schema.json",
+  "title": "AgentShell Local Runtime Protocol",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/success" },
+    { "$ref": "#/$defs/failure" }
+  ],
+  "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["protocolVersion", "schemaVersion", "requestId", "action"],
+      "properties": {
+        "protocolVersion": { "const": "agentshell.runtime.v1" },
+        "schemaVersion": { "const": 1 },
+        "requestId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "action": { "enum": ["ping", "metadata.get", "cache.invalidate", "stop"] },
+        "root": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "action": { "enum": ["metadata.get", "cache.invalidate"] } } },
+          "then": { "required": ["root"] },
+          "else": { "not": { "required": ["root"] } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "success": {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "schemaVersion", "requestId"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.runtime.v1" },
+        "schemaVersion": { "const": 1 },
+        "requestId": { "type": ["string", "null"] },
+        "source": { "enum": ["daemon", "fallback"] },
+        "root": { "type": "string" },
+        "rootFingerprint": { "type": "string", "pattern": "^sha256:" },
+        "cache": { "$ref": "#/$defs/cache" },
+        "metadata": { "type": ["object", "null"] },
+        "runtime": { "type": "object" },
+        "stats": { "type": "object" },
+        "state": { "type": ["object", "null"] },
+        "running": { "type": "boolean" },
+        "stopping": { "type": "boolean" },
+        "stopped": { "type": "boolean" },
+        "invalidated": { "type": "boolean" },
+        "fallbackReason": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "failure": {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "schemaVersion", "requestId", "error", "fallback"],
+      "properties": {
+        "ok": { "const": false },
+        "protocolVersion": { "const": "agentshell.runtime.v1" },
+        "schemaVersion": { "const": 1 },
+        "requestId": { "type": ["string", "null"] },
+        "error": {
+          "type": "object",
+          "required": ["code", "message", "details"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" },
+            "details": { "type": "object" }
+          },
+          "additionalProperties": false
+        },
+        "fallback": {
+          "type": "object",
+          "required": ["allowed", "mode"],
+          "properties": {
+            "allowed": { "const": true },
+            "mode": { "const": "local-read" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "cache": {
+      "type": "object",
+      "required": ["hit", "ttlMs", "expiresAt"],
+      "properties": {
+        "hit": { "type": "boolean" },
+        "ttlMs": { "type": "integer", "minimum": 0 },
+        "expiresAt": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

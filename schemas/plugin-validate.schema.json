@@ -130,12 +130,14 @@
     "pluginStatusSummary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ok", "protocolVersion", "summary", "cachePath"],
+      "required": ["ok", "protocolVersion", "summary", "cachePath", "integrity", "activation"],
       "properties": {
         "ok": { "type": "boolean" },
         "protocolVersion": { "const": "agentshell.plugin-status.v1" },
         "summary": { "$ref": "#/$defs/summary" },
-        "cachePath": { "type": ["string", "null"] }
+        "cachePath": { "type": ["string", "null"] },
+        "integrity": { "$ref": "plugin-status.schema.json#/$defs/integrity" },
+        "activation": { "$ref": "plugin-status.schema.json#/$defs/activation" }
       }
     },
     "nextAction": {

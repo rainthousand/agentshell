@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/workspace-guard.schema.json",
+  "title": "AgentShell Workspace Guard Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "summary", "repositories", "privacy", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.workspace-guard.v1" },
+        "compact": { "type": "boolean" },
+        "summary": {
+          "type": "object",
+          "required": ["repositoryCount", "cleanRepositories", "dirtyRepositories", "changedFiles", "untrackedFiles", "aheadCommits", "behindCommits", "trackingRepositories", "branchesAligned", "truncated"],
+          "properties": {
+            "repositoryCount": { "type": "integer", "minimum": 2 },
+            "cleanRepositories": { "type": "integer", "minimum": 0 },
+            "dirtyRepositories": { "type": "integer", "minimum": 0 },
+            "changedFiles": { "type": "integer", "minimum": 0 },
+            "untrackedFiles": { "type": "integer", "minimum": 0 },
+            "aheadCommits": { "type": "integer", "minimum": 0 },
+            "behindCommits": { "type": "integer", "minimum": 0 },
+            "trackingRepositories": { "type": "integer", "minimum": 0 },
+            "branchesAligned": { "type": "boolean" },
+            "truncated": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "repositories": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["rootId", "name", "branch", "status"],
+            "properties": {
+              "rootId": { "type": "string", "pattern": "^root-[1-9][0-9]*$" },
+              "name": { "type": "string", "minLength": 1 },
+              "branch": {
+                "type": "object",
+                "required": ["current", "detached", "upstream", "ahead", "behind", "trackingAvailable"],
+                "properties": {
+                  "current": { "type": ["string", "null"] },
+                  "detached": { "type": "boolean" },
+                  "upstream": { "type": ["string", "null"] },
+                  "ahead": { "type": ["integer", "null"], "minimum": 0 },
+                  "behind": { "type": ["integer", "null"], "minimum": 0 },
+                  "trackingAvailable": { "type": "boolean" }
+                },
+                "additionalProperties": false
+              },
+              "status": {
+                "type": "object",
+                "required": ["dirty", "clean", "changedFiles", "untrackedFiles", "truncated"],
+                "properties": {
+                  "dirty": { "type": "boolean" },
+                  "clean": { "type": "boolean" },
+                  "changedFiles": { "type": "integer", "minimum": 0 },
+                  "untrackedFiles": { "type": "integer", "minimum": 0 },
+                  "truncated": { "type": "boolean" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "required": ["workspacePathsExposed", "fileNamesExposed", "commandOutputExposed", "networkUpload"],
+          "properties": {
+            "workspacePathsExposed": { "const": false },
+            "fileNamesExposed": { "const": false },
+            "commandOutputExposed": { "const": false },
+            "networkUpload": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ]
+}

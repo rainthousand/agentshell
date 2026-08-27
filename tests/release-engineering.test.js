@@ -83,15 +83,26 @@ test("release artifacts include a verifiable SHA256 checksum", {
     || process.arch !== "arm64"
     || !fs.existsSync(path.resolve("bin", "agentshell-darwin-arm64"))
 }, () => {
-  const report = run("scripts/release-artifacts.js", {
-    AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1"
-  });
-  const zip = path.resolve(report.zip);
+  const binary = path.resolve("bin", "agentshell-darwin-arm64");
+  const attestationFile = path.join(os.tmpdir(), `agentshell-build-attestation-${process.pid}.json`);
+  fs.writeFileSync(attestationFile, `${JSON.stringify(buildAttestation(binary), null, 2)}\n`);
+  let report;
+  try {
+    report = run("scripts/release-artifacts.js", {
+      AGENTSHELL_SKIP_NATIVE_RELEASE_BUILD: "1",
+      AGENTSHELL_NATIVE_BUILD_ATTESTATION: attestationFile,
+      AGENTSHELL_TEST_ALLOW_UNTRACKED_RELEASE_SOURCE: "1"
+    });
+  } finally {
+    fs.rmSync(attestationFile, { force: true });
+  }
+  const releaseDirectory = path.resolve("artifacts", "release");
+  const zip = path.join(releaseDirectory, report.zip);
   const actual = crypto.createHash("sha256").update(fs.readFileSync(zip)).digest("hex");
   assert.equal(actual, report.sha256);
   assert.match(fs.readFileSync(`${zip}.sha256`, "utf8"), new RegExp(`^${actual}`));
 
-  const standalone = path.resolve(report.standalone.path);
+  const standalone = path.join(releaseDirectory, report.standalone.path);
   const standaloneActual = crypto.createHash("sha256").update(fs.readFileSync(standalone)).digest("hex");
   assert.equal(path.basename(standalone), "agentshell-darwin-arm64");
   assert.equal(standaloneActual, report.standalone.sha256);
@@ -99,7 +110,7 @@ test("release artifacts include a verifiable SHA256 checksum", {
   assert.notEqual(fs.statSync(standalone).mode & 0o111, 0);
   assert.equal(fs.existsSync(path.join(path.dirname(zip), "release-report.json")), true);
   assert.equal(report.lifecycle.protocolVersion, "agentshell.package-lifecycle-smoke.v1");
-  assert.equal(report.lifecycle.packageDir, path.join(path.dirname(zip), "agentshell-codex-plugin"));
+  assert.equal(report.lifecycle.packageDir, "agentshell-codex-plugin");
   assert.equal(report.lifecycle.summary.finalState, "uninstalled");
   assert.equal(report.lifecycle.summary.passed, 4);
   assert.equal(report.zipBytes, fs.statSync(zip).size);
@@ -110,6 +121,24 @@ test("release artifacts include a verifiable SHA256 checksum", {
   assert.equal(report.compression.level, 9);
   assert.equal(report.compression.archiveVerified, true);
   assert.equal(report.sizeBudgets.ok, true);
+  assert.equal(JSON.stringify(report).includes(`${path.sep}Users${path.sep}`), false);
+});
+
+test("skipping a native build rejects an unproven existing binary", () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-unproven-native-"));
+  fs.mkdirSync(path.join(projectRoot, "bin"), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, "bin", "agentshell-darwin-arm64"), "stale binary");
+  try {
+    assert.throws(() => buildReleaseArtifacts({
+      projectRoot,
+      platform: "darwin",
+      arch: "arm64",
+      skipNativeBuild: true,
+      runner() { throw new Error("no packaging command should run without attestation"); }
+    }), /requires AGENTSHELL_NATIVE_BUILD_ATTESTATION/);
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  }
 });
 
 test("release artifacts retain standalone builder metadata and packaging metrics", () => {
@@ -180,6 +209,10 @@ test("release artifacts retain standalone builder metadata and packaging metrics
     assert.equal(report.zipToStandaloneRatio, 0.4);
     assert.equal(report.compression.level, 9);
     assert.equal(report.compression.archiveVerified, true);
+    assert.equal(report.zip, "agentshell-codex-plugin.zip");
+    assert.equal(report.standalone.path, "agentshell-darwin-arm64");
+    assert.equal(report.lifecycle.packageDir, "agentshell-codex-plugin");
+    assert.equal(report.standalone.buildReport.output, undefined);
   } finally {
     fs.rmSync(projectRoot, { recursive: true, force: true });
   }
@@ -191,7 +224,7 @@ test("release artifacts reject unsupported build hosts before running build comm
     projectRoot: "/tmp/agentshell-release-toolchain-test",
     platform: "darwin",
     arch: "arm64",
-    nodeVersion: "22.0.0",
+    nodeVersion: "23.0.0",
     runner(command, args) {
       calls.push([command, ...args]);
       if (command === "bun") return { status: 0, stdout: "1.2.20", stderr: "" };
@@ -218,13 +251,27 @@ test("standalone build attestation rejects stale builder metadata", () => {
     protocolVersion: "agentshell.standalone-build.v1",
     status: "built",
     sha256: "a".repeat(64),
-    builder: { nodeVersion: "22.0.0", bunVersion: "1.2.20" },
+    builder: { nodeVersion: "22.0.0", bunVersion: "1.3.0" },
     toolchain: {
       actual: { nodeVersion: "20.20.2", bunVersion: "1.2.20" },
       enforcement: "strict",
       ok: true
     }
-  }), /Unsupported release toolchain/);
+  }), /does not match its toolchain attestation/);
+});
+
+test("standalone build attestation accepts a supported non-baseline toolchain", () => {
+  assert.doesNotThrow(() => assertStandaloneBuildReport({
+    protocolVersion: "agentshell.standalone-build.v1",
+    status: "built",
+    sha256: "a".repeat(64),
+    builder: { nodeVersion: "22.16.0", bunVersion: "1.3.12" },
+    toolchain: {
+      actual: { nodeVersion: "22.16.0", bunVersion: "1.3.12" },
+      enforcement: "strict",
+      ok: true
+    }
+  }));
 });
 
 test("standalone build attestation requires a strict digest-bearing report", () => {
@@ -313,4 +360,21 @@ function spawnReleaseGate(args = [], env = {}) {
 
 function success(report, prefix = "") {
   return { status: 0, stdout: `${prefix}${JSON.stringify(report, null, 2)}\n`, stderr: "" };
+}
+
+function buildAttestation(binary) {
+  return {
+    ok: true,
+    protocolVersion: "agentshell.standalone-build.v1",
+    status: "built",
+    target: "darwin-arm64",
+    output: binary,
+    sha256: crypto.createHash("sha256").update(fs.readFileSync(binary)).digest("hex"),
+    builder: { bundler: "bun", bunVersion: "1.3.12", runtime: "node-sea", nodeVersion: "22.16.0" },
+    toolchain: {
+      actual: { nodeVersion: "22.16.0", bunVersion: "1.3.12" },
+      enforcement: "strict",
+      ok: true
+    }
+  };
 }

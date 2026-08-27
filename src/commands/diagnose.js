@@ -6,6 +6,7 @@ import { find } from "./find.js";
 import { sha256 } from "../core/hash.js";
 import { createRun, ensureState, newId, readLog } from "../core/store.js";
 import { createProfile } from "../core/profile.js";
+import { operationIdsForVerification } from "../core/attribution.js";
 
 const PROTOCOL_VERSION = "agentshell.diagnose.v1";
 
@@ -103,6 +104,8 @@ export async function diagnose(root, type, options = {}) {
   const run = profile ? profile.measureSync("run-state", () => createRun(root, {
     type: "diagnose",
     ok: true,
+    operationId: verification.operationId,
+    operationIds: operationIdsForVerification(verification),
     verificationOk: verification.ok,
     summary: verification.summary,
     logRef: verification.logRef,
@@ -111,6 +114,8 @@ export async function diagnose(root, type, options = {}) {
   })) : createRun(root, {
     type: "diagnose",
     ok: true,
+    operationId: verification.operationId,
+    operationIds: operationIdsForVerification(verification),
     verificationOk: verification.ok,
     summary: verification.summary,
     logRef: verification.logRef,
@@ -277,7 +282,8 @@ function compactVerification(verification) {
     cacheKey: verification.cacheKey || null,
     summary: verification.summary,
     relatedFiles: verification.relatedFiles,
-    logRef: verification.logRef
+    logRef: verification.logRef,
+    relatedTestFileVerification: verification.relatedTestFileVerification || null
   };
 }
 

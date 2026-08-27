@@ -28,14 +28,23 @@
 - Fast, race, and coverage test profiles; bounded benchmark and fuzz workflows;
   and read-only `go generate -n` preview. Fuzz requires an explicit target,
   finite duration, and one package.
+- Bounded generic profiles for Go query, dependency, performance, security,
+  quality, debugging, and generation tools: `go run`, `go list`, `go env`,
+  `go get`, `go install`, `go mod download|graph|why`, `go tool cover|pprof`,
+  `govulncheck`, `staticcheck`, `golangci-lint run`, `dlv`, `mockgen`, and
+  `wire`. These profiles expose risk and do not install missing tools or
+  silently authorize workspace mutations.
 - Version 1 `.agentshell.json` Go command and built-in-profile overrides for
   repositories that use reviewed wrappers. Invalid configuration is surfaced
   rather than silently interpreted.
 
 The packaged standalone CLI is the supported user runtime. End users do not need
 Node.js, Bun, npm, a source checkout, or the developer's home directory to run
-AgentShell. Node.js 20 or newer and Bun 1.2.20 are release-build requirements for
-maintainers, not installation requirements for users.
+AgentShell. Maintainer builds support Node.js `>=20 <23` (20 or 22) and Bun
+`>=1.2 <1.4` (1.2 or 1.3). GitHub Release CI remains fixed to Node.js `20.20.2`
+and Bun `1.2.20` as the reproducible baseline. Build reports distinguish the
+actual toolchain, supported ranges, and baseline versions. These are build-time
+requirements, not installation requirements for users.
 
 Go verification requires a working `go` executable on `PATH`. The
 `agentshell doctor` command reports the Go version and blocks Go-module

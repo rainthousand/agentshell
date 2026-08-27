@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/boundary-check.schema.json",
+  "title": "AgentShell Boundary Check Response",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "mode", "summary", "policy", "violations", "files", "filesTruncated", "suggestedNextActions"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.boundary-check.v1" },
+    "compact": { "type": "boolean" },
+    "mode": { "const": "check" },
+    "summary": {
+      "type": "object",
+      "required": ["checkedFileCount", "allowedFileCount", "violationCount", "violationsTruncated", "changedFileCount", "returnedChangedFileCount", "changedFilesTruncated"],
+      "properties": {
+        "checkedFileCount": { "type": "integer", "minimum": 0 },
+        "allowedFileCount": { "type": "integer", "minimum": 0 },
+        "violationCount": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "violationsTruncated": { "type": "boolean" },
+        "changedFileCount": { "type": "integer", "minimum": 0 },
+        "returnedChangedFileCount": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "changedFilesTruncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "required": ["name", "defaultEffect", "ruleCount"],
+      "properties": {
+        "name": { "type": "string", "maxLength": 80 },
+        "defaultEffect": { "enum": ["allow", "deny"] },
+        "ruleCount": { "type": "integer", "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "violations": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/violation" }
+    },
+    "files": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "filesTruncated": { "type": "boolean" },
+    "suggestedNextActions": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "violation": {
+      "type": "object",
+      "required": ["file", "ruleId", "reason"],
+      "properties": {
+        "file": { "type": "string", "maxLength": 1000 },
+        "ruleId": { "type": "string", "maxLength": 80 },
+        "reason": { "type": "string", "maxLength": 240 }
+      },
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "required": ["file", "allowed", "matchedRuleIds"],
+      "properties": {
+        "file": { "type": "string", "maxLength": 1000 },
+        "allowed": { "type": "boolean" },
+        "matchedRuleIds": {
+          "type": "array",
+          "maxItems": 12,
+          "items": { "type": "string", "maxLength": 80 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string", "maxLength": 300 },
+        "reason": { "type": "string", "maxLength": 300 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

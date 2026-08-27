@@ -1,0 +1,20 @@
+{
+  "protocolVersion": "agentshell.performance-sla-sample.v1",
+  "source": {
+    "mode": "fixture",
+    "description": "Deterministic failing sample for CI."
+  },
+  "measurements": {
+    "coldStartMs": [140, 151, 175],
+    "overheadComparison": {
+      "comparable": true,
+      "baselineMs": 1000,
+      "agentshellMs": 1050
+    },
+    "compactEstimatedTokens": [3001],
+    "cacheComparison": {
+      "missMs": 400,
+      "hitMs": 200
+    }
+  }
+}

@@ -31,6 +31,11 @@ Adapter-specific notes:
 - [Adapter trial collector](trial-collector.md)
 - [Adapter trial suite](trial-suite.md)
 - [Adapter trial suite playbook](trial-suite-playbook.md)
+- [Privacy-safe command observation contract](command-observation-contract.md)
+
+## Automatic Coverage Observation
+
+Adapters can feed external shell fallbacks into AgentShell through the local batch ingest helper. Stable host event IDs are hashed for replay-safe deduplication; arguments, paths, output, and raw event IDs are never persisted. See the [command observation contract](command-observation-contract.md) for the hook payload and lifecycle requirements.
 
 ## Package Output
 

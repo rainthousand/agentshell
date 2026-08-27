@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 
-import { installOrUpdate } from "./plugin-lifecycle.js";
+import { doctor, installOrUpdate, refreshCache, rollback } from "./plugin-lifecycle.js";
 import {
   acquireReleasePackage,
   DEFAULT_RELEASE_CHANNEL,
@@ -24,11 +24,19 @@ try {
 
 let prepared = null;
 try {
-  if (options.remote && !options.dryRun) {
+  if ((options.action === "install" || options.action === "update") && options.remote && !options.dryRun) {
     prepared = await acquireReleasePackage({ channel: options.channel });
   }
   const source = options.source || prepared?.source || path.resolve(import.meta.dirname, "..");
-  const result = installOrUpdate({ source, dryRun: options.dryRun });
+  const lifecycleOptions = { source, home: options.home, dryRun: options.dryRun };
+  const result = options.action === "doctor"
+    ? doctor(lifecycleOptions)
+    : options.action === "rollback"
+      ? rollback(lifecycleOptions)
+      : installOrUpdate(lifecycleOptions);
+  const cache = (options.action === "install" || options.action === "update") && result.ok
+    ? refreshCache(lifecycleOptions)
+    : null;
   const release = prepared?.status || {
     ok: true,
     status: options.remote ? "would-resolve" : "local-source",
@@ -42,6 +50,8 @@ try {
     ...result,
     protocolVersion: "agentshell.codex-plugin-install.v1",
     channel: options.channel,
+    requestedAction: options.action,
+    ...(cache ? { cache } : {}),
     release,
     dryRun: options.dryRun,
     privacy: { dataUploaded: false, telemetry: "disabled" }
@@ -74,6 +84,7 @@ try {
 
 function parseArgs(argv) {
   const parsed = {
+    action: "update",
     channel: DEFAULT_RELEASE_CHANNEL,
     source: null,
     remote: false,
@@ -81,14 +92,18 @@ function parseArgs(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--dry-run") parsed.dryRun = true;
+    if (["install", "update", "doctor", "rollback"].includes(arg) && index === 0) parsed.action = arg;
+    else if (arg === "--dry-run") parsed.dryRun = true;
     else if (arg === "--channel") {
       parsed.channel = normalizeReleaseChannel(requiredValue(argv, ++index, "--channel"));
       parsed.remote = true;
     } else if (arg === "--source") {
       parsed.source = path.resolve(requiredValue(argv, ++index, "--source"));
+    } else if (arg === "--home") {
+      parsed.home = path.resolve(requiredValue(argv, ++index, "--home"));
     } else throw new ReleaseChannelError("INVALID_ARGUMENT", `Unknown argument: ${arg}`);
   }
+  if (parsed.action === "doctor" || parsed.action === "rollback") parsed.remote = false;
   if (parsed.remote && parsed.source) {
     throw new ReleaseChannelError("INVALID_ARGUMENT", "--channel and --source cannot be used together.");
   }

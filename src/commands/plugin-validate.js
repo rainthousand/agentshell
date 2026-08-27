@@ -143,7 +143,9 @@ export async function pluginValidate(root, options = {}) {
       ok: statusResult.ok,
       protocolVersion: statusResult.protocolVersion,
       summary: statusResult.summary,
-      cachePath: statusResult.paths?.cachePath || null
+      cachePath: statusResult.paths?.cachePath || null,
+      integrity: statusResult.integrity,
+      activation: statusResult.activation
     } : null,
     nextAction: compactNextAction(checks),
     suggestedNextActions: collectSuggestedNextActions(checks)
@@ -214,8 +216,8 @@ function maybeMeasureSync(profile, name, fn) {
 }
 
 function addSchemaRegistryChecks(checks, root) {
-  const schemaCommand = path.join(root, "src", "commands", "schema.js");
-  const source = readText(schemaCommand);
+  const schemaRegistry = path.join(root, "src", "core", "command-registry.js");
+  const source = readText(schemaRegistry);
   addCheck(checks, {
     name: "schema registry exposes plugin validation contracts",
     category: "schema",
@@ -227,9 +229,9 @@ function addSchemaRegistryChecks(checks, root) {
         && source.includes('"plugin-validate"')
         && source.includes('"strategy-coverage-matrix"')
     ),
-    details: { file: schemaCommand },
+    details: { file: schemaRegistry },
     suggestedNextActions: [
-      "Add `plugin-validate` and self-maintenance schemas to `src/commands/schema.js` and keep plugin schemas registered together."
+      "Add `plugin-validate` and self-maintenance schemas to `src/core/command-registry.js` and keep plugin schemas registered together."
     ]
   });
 

@@ -14,7 +14,8 @@ test("which resolves a common tool and returns a compact bounded version", async
   const output = await whichCommand(fixture.root, "node", {
     compact: true,
     pathEnv: fixture.bin,
-    env: { ...process.env, PATH: fixture.bin }
+    env: { ...process.env, PATH: fixture.bin },
+    versionTimeoutMs: 5000
   });
 
   assert.equal(output.ok, true);

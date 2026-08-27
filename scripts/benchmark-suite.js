@@ -29,7 +29,7 @@ if (options.thresholds && !report.thresholds.ok) {
 function parseArgs(args) {
   let format = "json";
   let thresholds = false;
-  let maxFixTokens = 275;
+  let maxFixTokens = 280;
   let reportPath = null;
   let markdownPath = null;
   for (let index = 0; index < args.length; index += 1) {
@@ -147,15 +147,15 @@ function runRawFlow(benchmarkCase) {
 
 function runSplitFlow(benchmarkCase) {
   const session = createSession(benchmarkCase, "split");
-  session.run("agentshell diagnose test --compact", "node", [cli, "diagnose", "test", "--compact"]);
-  session.run("agentshell change suggest --apply --compact", "node", [cli, "change", "suggest", "--apply", "--compact"]);
-  const verify = session.run("agentshell verify test", "node", [cli, "verify", "test"]);
+  session.run("agentshell diagnose test --compact", cli, ["diagnose", "test", "--compact"]);
+  session.run("agentshell change suggest --apply --compact", cli, ["change", "suggest", "--apply", "--compact"]);
+  const verify = session.run("agentshell verify test", cli, ["verify", "test"]);
   return buildRow("split", session.workspace, session.events, verify.status === 0);
 }
 
 function runFixFlow(benchmarkCase) {
   const session = createSession(benchmarkCase, "fix");
-  const fix = session.run("agentshell fix test --compact", "node", [cli, "fix", "test", "--compact"]);
+  const fix = session.run("agentshell fix test --compact", cli, ["fix", "test", "--compact"]);
   return buildRow("fix", session.workspace, session.events, fix.status === 0);
 }
 

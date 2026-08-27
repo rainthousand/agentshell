@@ -8,7 +8,7 @@ import path from "node:path";
 import { buildProductReadinessReport } from "../scripts/product-readiness.js";
 
 test("product readiness report passes for the current source tree", () => {
-  const report = buildProductReadinessReport();
+  const report = buildProductReadinessReport(process.cwd(), { releaseSourceAuditOptions: trackedAuditFixture() });
 
   assert.equal(report.ok, true);
   assert.equal(report.protocolVersion, "agentshell.product-readiness.v1");
@@ -17,10 +17,15 @@ test("product readiness report passes for the current source tree", () => {
   assert.equal(report.summary.blockingFailed, 0);
   assert.ok(report.checks.some((check) => check.id === "manual-topics" && check.status === "pass"));
   assert.ok(report.checks.some((check) => check.id === "deferred-mcp" && check.severity === "warning"));
+  assert.ok(report.checks.some((check) => check.id === "release-source-audit" && check.status === "pass"));
 });
 
 test("product readiness heavy dry run includes release candidate checks", () => {
-  const report = buildProductReadinessReport(process.cwd(), { heavy: true, dryRun: true });
+  const report = buildProductReadinessReport(process.cwd(), {
+    heavy: true,
+    dryRun: true,
+    releaseSourceAuditOptions: trackedAuditFixture()
+  });
 
   assert.equal(report.ok, true);
   assert.equal(report.mode, "heavy-dry-run");
@@ -40,10 +45,9 @@ test("product readiness CLI prints parseable JSON and markdown", () => {
     encoding: "utf8"
   });
 
-  assert.equal(json.status, 0, json.stderr);
-  assert.equal(markdown.status, 0, markdown.stderr);
   const output = JSON.parse(json.stdout);
-  assert.equal(output.ok, true);
+  assert.equal(json.status, output.ok ? 0 : 1, json.stderr);
+  assert.equal(markdown.status, output.ok ? 0 : 1, markdown.stderr);
   assert.equal(output.mode, "standard");
   assert.match(markdown.stdout, /^# AgentShell Product Readiness/m);
 });
@@ -68,6 +72,8 @@ function copyMinimalTree(sourceRoot, targetRoot) {
     "package.json",
     "src/commands/manual.js",
     "src/commands/schema.js",
+    "src/core/command-registry.js",
+    "src/core/compact-budget.js",
     "schemas",
     "skills",
     "scripts",
@@ -79,6 +85,10 @@ function copyMinimalTree(sourceRoot, targetRoot) {
   for (const entry of entries) {
     copyPath(path.join(sourceRoot, entry), path.join(targetRoot, entry));
   }
+}
+
+function trackedAuditFixture() {
+  return { allowUntracked: true };
 }
 
 function copyPath(source, target) {

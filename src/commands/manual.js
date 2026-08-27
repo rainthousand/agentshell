@@ -15,129 +15,26 @@ function compactManual() {
     compact: true,
     name: "AgentShell",
     version: "1.0.0",
-    purpose: "Structured local execution for AI coding agents with compact JSON output, task-level run status, hash-checked edits, and undo.",
+    purpose: "Compact, structured local commands for AI coding agents.",
     firstPass: {
       command: "agentshell start --compact",
-      fallback: "node src/cli.js start --compact",
-      reason: "Cheapest combined readiness, compact workspace shape, and next-action summary."
+      reason: "Check readiness, workspace shape, and the next action."
     },
     primaryCommands: [
       {
-        need: "Repair supported failing tests",
+        need: "Repair failing tests",
         command: "agentshell fix test --fast --compact",
         fallback: "agentshell diagnose test --compact"
       },
       {
-        need: "Preview before changing files",
-        command: "agentshell fix test --safe --compact"
+        need: "Inspect code",
+        command: "agentshell grep <query> --compact",
+        fallback: "agentshell read <file> --around <query>"
       },
       {
-        need: "Verify tests, builds, lint, formatting, modules, or bounded Go workflows",
+        need: "Verify tests and bounded Go workflows",
         command: "agentshell verify <test|build|lint|format|modules|benchmark|fuzz|generate>",
-        note: "format, modules, and generate are read-only checks; Go fuzzing requires an explicit target, duration, and package."
-      },
-      {
-        need: "Inspect task state",
-        command: "agentshell run status --compact"
-      },
-      {
-        need: "Read focused file context",
-        command: "agentshell read <file> --around <query>"
-      },
-      {
-        need: "Search code with bounded structured output",
-        command: "agentshell grep <query> --compact [--type <py|go|ts|java>] [--context N] [--files-with-matches]"
-      },
-      {
-        need: "Find files by name without scanning generated directories",
-        command: "agentshell find file --name <pattern> --compact"
-      },
-      {
-        need: "Inspect the current location and important directory entries",
-        command: "agentshell pwd --compact",
-        fallback: "agentshell ls --compact"
-      },
-      {
-        need: "Inspect disk usage, executables, processes, or listening ports compactly",
-        command: "agentshell du --compact",
-        fallback: "agentshell which <command> --compact | agentshell ps --compact | agentshell port list --compact"
-      },
-      {
-        need: "Prepare a reviewed process stop command without executing it",
-        command: "agentshell kill suggest --pid <pid> --compact"
-      },
-      {
-        need: "Inspect project structure without noisy generated folders",
-        command: "agentshell tree --compact"
-      },
-      {
-        need: "Summarize project health before choosing a workflow",
-        command: "agentshell project health --compact"
-      },
-      {
-        need: "Inspect changed files by category and risk",
-        command: "agentshell files changed --compact"
-      },
-      {
-        need: "Summarize changed-file impact and recommended validation",
-        command: "agentshell changed impact --compact"
-      },
-      {
-        need: "Inspect one file without dumping its contents",
-        command: "agentshell file info <path> --compact"
-      },
-      {
-        need: "Discover test entry points without running tests",
-        command: "agentshell test list --compact"
-      },
-      {
-        need: "Choose the likely test command without running it",
-        command: "agentshell test command --compact"
-      },
-      {
-        need: "Extract failures from a saved log without reading the whole log",
-        command: "agentshell errors from-log <file> --compact"
-      },
-      {
-        need: "Run a command but return compact error evidence instead of raw logs",
-        command: "agentshell errors from-command --compact -- <command...>"
-      },
-      {
-        need: "Inspect imports without dumping source",
-        command: "agentshell imports <file> --compact"
-      },
-      {
-        need: "Inspect symbols without dumping source",
-        command: "agentshell symbols <file> --compact"
-      },
-      {
-        need: "Find references with bounded grouped output",
-        command: "agentshell refs <symbol> --compact"
-      },
-      {
-        need: "Discover project config entry points",
-        command: "agentshell config list --compact"
-      },
-      {
-        need: "Inspect git changes safely",
-        command: "agentshell git status --compact",
-        fallback: "agentshell git diff --compact"
-      },
-      {
-        need: "Inspect runnable project scripts",
-        command: "agentshell package scripts --compact"
-      },
-      {
-        need: "Inspect one package script before running it",
-        command: "agentshell package script <name> --compact"
-      },
-      {
-        need: "Inspect manifest dependencies without expanding dependency trees",
-        command: "agentshell package deps --compact"
-      },
-      {
-        need: "Validate local Codex plugin",
-        command: "agentshell plugin validate --compact"
+        note: "format, modules, and generate are read-only checks."
       }
     ],
     topics: TOPICS.map((topic) => ({
@@ -147,9 +44,7 @@ function compactManual() {
     full: "agentshell manual --full",
     rules: [
       "Treat AgentShell JSON as the source of truth.",
-      "Prefer compact summaries and log refs before raw logs.",
-      "Use expectedHash from agentshell read before hash-checked edits.",
-      "Fall back to normal shell commands only when AgentShell does not support the needed action."
+      "Prefer compact summaries and topic pages before raw output."
     ]
   };
 }
@@ -196,6 +91,7 @@ function topicManual(topic) {
         "npm run benchmark:suite",
         "npm run benchmark:cache",
         "npm run benchmark:cold-start",
+        "npm run benchmark:runtime",
         "agentshell metrics --compact --scope global"
       ],
       rules: [
@@ -253,6 +149,12 @@ function topicManual(topic) {
       workflow: [
         "agentshell schema list",
         "agentshell schema get <name>",
+        "agentshell coverage candidates --limit 10",
+        "agentshell runtime status --compact",
+        "agentshell workspace guard --root <repo-a> --root <repo-b> --compact",
+        "agentshell compare-search <query> --root <repo-a> --root <repo-b> --compact",
+        "agentshell verify changed --compact",
+        "agentshell boundary check --policy <file> --compact",
         "agentshell history",
         "agentshell log get <logRef> --tail N",
         "agentshell undo [operationId]",

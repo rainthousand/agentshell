@@ -4,6 +4,9 @@ import os from "node:os";
 import path from "node:path";
 
 const REGISTRY_VERSION = 1;
+const LOCK_TIMEOUT_MS = 5000;
+const LOCK_WAIT_MS = 10;
+const STALE_LOCK_MS = 30000;
 
 export function registryPath(options = {}) {
   const homeDir = path.resolve(options.homeDir ?? os.homedir());
@@ -11,30 +14,41 @@ export function registryPath(options = {}) {
 }
 
 export function registerWorkspace(root, options = {}) {
-  const resolvedRoot = path.resolve(root);
-  const entries = readRegistryEntries(options);
-  const id = workspaceId(resolvedRoot);
-  const now = new Date().toISOString();
-  const existing = entries.find((entry) => entry.root === resolvedRoot);
-  const entry = {
-    id,
-    root: resolvedRoot,
-    name: workspaceName(resolvedRoot),
-    lastSeenAt: now
-  };
-
-  if (existing) {
-    Object.assign(existing, entry);
-  } else {
-    entries.push(entry);
+  const resolvedRoot = canonicalPath(root);
+  if (isManagedPluginRoot(resolvedRoot, options)) {
+    return {
+      id: workspaceId(resolvedRoot),
+      root: resolvedRoot,
+      name: workspaceName(resolvedRoot),
+      lastSeenAt: new Date().toISOString(),
+      ignored: true
+    };
   }
+  return withRegistryLock(options, () => {
+    const entries = readRegistryEntries(options, { repair: false });
+    const id = workspaceId(resolvedRoot);
+    const now = new Date().toISOString();
+    const existing = entries.find((entry) => entry.root === resolvedRoot);
+    const entry = {
+      id,
+      root: resolvedRoot,
+      name: workspaceName(resolvedRoot),
+      lastSeenAt: now
+    };
 
-  writeRegistry(entries, options);
-  return entry;
+    if (existing) {
+      Object.assign(existing, entry);
+    } else {
+      entries.push(entry);
+    }
+
+    writeRegistry(entries, options);
+    return entry;
+  });
 }
 
 export function readRegisteredWorkspaces(options = {}) {
-  const entries = readRegistryEntries(options);
+  const entries = withRegistryLock(options, () => readRegistryEntries(options, { repair: true }));
   return entries.filter((entry) => (
     (options.includeMissing === true || isDirectory(entry.root))
     && entry.root !== path.parse(entry.root).root
@@ -53,7 +67,7 @@ function canonicalPath(value) {
   try { return fs.realpathSync.native(value); } catch { return path.resolve(value); }
 }
 
-function readRegistryEntries(options) {
+function readRegistryEntries(options, { repair }) {
   const file = registryPath(options);
   if (!fs.existsSync(file)) return [];
 
@@ -70,7 +84,7 @@ function readRegistryEntries(options) {
   let changed = parsed?.version !== REGISTRY_VERSION || !Array.isArray(parsed?.workspaces);
 
   for (const candidate of source) {
-    const entry = normalizeEntry(candidate);
+    const entry = normalizeEntry(candidate, options);
     if (!entry || seenRoots.has(entry.root)) {
       changed = true;
       continue;
@@ -80,7 +94,7 @@ function readRegistryEntries(options) {
     if (!sameEntry(candidate, entry)) changed = true;
   }
 
-  if (changed) {
+  if (changed && repair) {
     try {
       writeRegistry(entries, options);
     } catch {
@@ -90,11 +104,12 @@ function readRegistryEntries(options) {
   return entries;
 }
 
-function normalizeEntry(candidate) {
+function normalizeEntry(candidate, options = {}) {
   if (!candidate || typeof candidate !== "object" || typeof candidate.root !== "string") return null;
   if (!path.isAbsolute(candidate.root)) return null;
 
-  const root = path.resolve(candidate.root);
+  const root = canonicalPath(candidate.root);
+  if (isManagedPluginRoot(root, options)) return null;
   if (!candidate.lastSeenAt || Number.isNaN(Date.parse(candidate.lastSeenAt))) return null;
   return {
     id: workspaceId(root),
@@ -102,6 +117,84 @@ function normalizeEntry(candidate) {
     name: workspaceName(root),
     lastSeenAt: candidate.lastSeenAt
   };
+}
+
+function isManagedPluginRoot(root, options = {}) {
+  const homeDir = canonicalPath(options.homeDir ?? os.homedir());
+  const managedRoots = [
+    path.join(homeDir, "plugins", "agentshell"),
+    path.join(homeDir, ".codex", "plugins", "cache", "personal", "agentshell")
+  ];
+  return managedRoots.some((managedRoot) => (
+    root === managedRoot || root.startsWith(`${managedRoot}${path.sep}`)
+  ));
+}
+
+function withRegistryLock(options, callback) {
+  const file = registryPath(options);
+  const directory = path.dirname(file);
+  const lock = `${file}.lock`;
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  fs.chmodSync(directory, 0o700);
+  const deadline = Date.now() + Number(options.lockTimeoutMs ?? LOCK_TIMEOUT_MS);
+  let descriptor;
+
+  while (descriptor === undefined) {
+    try {
+      descriptor = fs.openSync(lock, "wx", 0o600);
+      fs.writeFileSync(descriptor, `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`);
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      if (removeStaleLock(lock, options)) continue;
+      if (Date.now() >= deadline) {
+        const timeout = new Error(`Timed out waiting for workspace registry lock: ${lock}`);
+        timeout.code = "WORKSPACE_REGISTRY_LOCK_TIMEOUT";
+        throw timeout;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_WAIT_MS);
+    }
+  }
+
+  try {
+    return callback();
+  } finally {
+    fs.closeSync(descriptor);
+    fs.rmSync(lock, { force: true });
+  }
+}
+
+function removeStaleLock(lock, options) {
+  let stat;
+  try {
+    stat = fs.statSync(lock);
+  } catch {
+    return true;
+  }
+  const staleAfterMs = Number(options.staleLockMs ?? STALE_LOCK_MS);
+  if (Date.now() - stat.mtimeMs < staleAfterMs) return false;
+
+  let owner;
+  try {
+    owner = JSON.parse(fs.readFileSync(lock, "utf8"));
+  } catch {
+    owner = null;
+  }
+  if (Number.isInteger(owner?.pid) && processIsAlive(owner.pid)) return false;
+  try {
+    fs.rmSync(lock);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function processIsAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
 }
 
 function sameEntry(candidate, normalized) {

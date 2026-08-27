@@ -15,22 +15,54 @@ body {
 }
 
 .shell {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+header, .section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 16px 18px 8px;
+}
+
+header strong, .section-title strong { font-size: 13px; }
+header span, .section-title span { color: #8a8f98; font-size: 10px; }
+
+.today {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  width: 100vw;
-  height: 100vh;
-  background: #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .metric {
   display: flex;
   min-width: 0;
-  padding: 18px;
+  padding: 10px 18px 18px;
   background: #ffffff;
   flex-direction: column;
   justify-content: space-between;
 }
+
+.history { min-height: 0; }
+.section-title { padding-top: 14px; }
+.daily-savings { padding: 0 18px 14px; }
+.day {
+  display: grid;
+  grid-template-columns: 1fr auto 54px;
+  gap: 14px;
+  align-items: center;
+  min-height: 27px;
+  border-top: 1px solid #f0f1f2;
+  color: #777c84;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.day strong { color: #34373b; font-weight: 600; text-align: right; }
+.day span:last-child { text-align: right; }
 
 .metric span {
   color: #6b7280;

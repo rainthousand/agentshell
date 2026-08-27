@@ -121,6 +121,7 @@ function runBenchmark(options) {
   const commands = [
     { id: "help", args: ["--help"], profile: false },
     { id: "manual", args: ["manual"], profile: false },
+    { id: "pwd-compact", args: ["pwd", "--compact"], profile: false },
     { id: "plugin-validate-compact", args: ["plugin", "validate", "--compact", "--profile"], profile: true },
     { id: "start-compact", args: ["start", "--compact", "--profile"], profile: true }
   ].map((command) => runCommand(command, options));

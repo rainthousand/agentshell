@@ -3,7 +3,7 @@
   "$id": "https://agentshell.local/schemas/metrics.schema.json",
   "title": "AgentShell Metrics Response",
   "type": "object",
-  "required": ["ok", "protocolVersion", "compact", "scope", "workspaceCount", "window", "totals", "savings", "latestRun", "measurement", "dashboard", "privacy"],
+  "required": ["ok", "protocolVersion", "compact", "scope", "workspaceCount", "window", "totals", "savings", "tokenAccounting", "latestRun", "measurement", "dashboard", "privacy"],
   "properties": {
     "ok": { "const": true },
     "protocolVersion": { "const": "agentshell.metrics.v2" },
@@ -13,6 +13,8 @@
     "window": { "$ref": "#/$defs/window" },
     "totals": { "$ref": "#/$defs/totals" },
     "savings": { "oneOf": [{ "$ref": "#/$defs/savings" }, { "type": "null" }] },
+    "tokenAccounting": { "$ref": "#/$defs/tokenAccounting" },
+    "outputBudget": { "$ref": "#/$defs/outputBudget" },
     "byCommand": {
       "type": "object",
       "propertyNames": { "type": "string", "minLength": 1 },
@@ -20,6 +22,7 @@
     },
     "topCommands": {
       "type": "array",
+      "maxItems": 3,
       "items": { "$ref": "#/$defs/topCommand" }
     },
     "recentEvents": {
@@ -41,6 +44,36 @@
         "measured": { "type": "array", "items": { "type": "string" } },
         "estimated": { "type": "array", "items": { "type": "string" } },
         "unavailable": { "type": "array", "items": { "type": "string" } },
+        "estimation": {
+          "type": "object",
+          "required": ["contextTokens", "timeSavings"],
+          "properties": {
+            "contextTokens": {
+              "type": "object",
+              "required": ["availability", "method", "measuredUnit", "estimatedUnit", "charsPerToken"],
+              "properties": {
+                "availability": { "enum": ["available", "unavailable"] },
+                "method": { "const": "measured-characters-divided-by-four" },
+                "measuredUnit": { "const": "characters" },
+                "estimatedUnit": { "const": "context-tokens" },
+                "charsPerToken": { "const": 4 }
+              },
+              "additionalProperties": false
+            },
+            "timeSavings": {
+              "type": "object",
+              "required": ["availability", "method", "estimatedUnit", "robust"],
+              "properties": {
+                "availability": { "enum": ["available", "unavailable"] },
+                "method": { "const": "median-cache-miss-baseline" },
+                "estimatedUnit": { "const": "milliseconds" },
+                "robust": { "const": true }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "attribution": {
           "type": "object",
           "required": ["exactEvents", "legacyEvents", "method"],
@@ -70,7 +103,7 @@
     },
     "dashboard": {
       "type": "object",
-      "required": ["generatedAt", "workspace", "health", "freshness", "coverage", "totals", "latestTask", "trend"],
+      "required": ["generatedAt", "workspace", "health", "freshness", "coverage", "verifiedSavings", "totals", "latestTask", "trend"],
       "properties": {
         "generatedAt": { "type": "string" },
         "workspace": {
@@ -82,9 +115,65 @@
         "health": { "enum": ["ready", "attention", "idle"] },
         "freshness": { "$ref": "#/$defs/freshness" },
         "coverage": { "$ref": "#/$defs/coverage" },
+        "verifiedSavings": { "$ref": "#/$defs/verifiedSavings" },
         "totals": { "$ref": "#/$defs/dashboardTotals" },
         "latestTask": { "oneOf": [{ "$ref": "#/$defs/dashboardTask" }, { "type": "null" }] },
         "trend": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/trendTask" } }
+      },
+      "additionalProperties": false
+    },
+    "verifiedSavings": {
+      "type": "object",
+      "required": ["timeZone", "today", "last7Days", "allTime", "availability", "methodology"],
+      "properties": {
+        "timeZone": { "type": "string", "minLength": 1 },
+        "today": { "$ref": "#/$defs/dailySavings" },
+        "last7Days": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": { "$ref": "#/$defs/dailySavings" }
+        },
+        "allTime": { "$ref": "#/$defs/savingsPeriod" },
+        "availability": {
+          "type": "object",
+          "required": ["contextTokens", "time"],
+          "properties": {
+            "contextTokens": { "type": "boolean" },
+            "time": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "methodology": {
+          "type": "object",
+          "required": ["contextTokens", "time", "deduplication"],
+          "properties": {
+            "contextTokens": { "const": "exact-operation-attribution" },
+            "time": { "enum": ["verified-cache-hit-baseline", "robust-estimated-cache-hit-median-baseline"] },
+            "deduplication": { "const": "operation-id" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "dailySavings": {
+      "allOf": [
+        { "$ref": "#/$defs/savingsPeriod" },
+        {
+          "type": "object",
+          "required": ["date"],
+          "properties": { "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" } }
+        }
+      ]
+    },
+    "savingsPeriod": {
+      "type": "object",
+      "required": ["contextTokens", "timeMs"],
+      "properties": {
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "contextTokens": { "type": "integer", "minimum": 0 },
+        "timeMs": { "type": "number", "minimum": 0 }
       },
       "additionalProperties": false
     },
@@ -101,7 +190,9 @@
         "commandCount": { "type": "integer", "minimum": 0 },
         "averageCommandsPerTask": { "type": ["number", "null"], "minimum": 0 },
         "agentShellOutputTokens": { "type": "integer", "minimum": 0 },
+        "agentShellEstimatedContextTokens": { "type": ["integer", "null"], "minimum": 0 },
         "rawVerifyTokens": { "type": "integer", "minimum": 0 },
+        "rawVerifyEstimatedContextTokens": { "type": ["integer", "null"], "minimum": 0 },
         "estimatedContextAvoidedTokens": { "type": ["integer", "null"], "minimum": 0 },
         "contextAvoidedPercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
         "executionMs": { "type": "number", "minimum": 0 },
@@ -153,9 +244,15 @@
     },
     "coverage": {
       "type": "object",
-      "required": ["observedToolCalls", "managedRuns", "evaluatedManagedRuns", "activeManagedRuns", "staleManagedRuns", "attributableEvents", "exactAttributedEvents", "exactAttributionPercent", "verifiedTokenSavingsAvailable", "verifiedTimeSavingsAvailable"],
+      "required": ["observedToolCalls", "agentShellCommandHits", "externalCommandCount", "fallbackCommandCount", "commandCoveragePercent", "fallbackRatePercent", "externalCommandTelemetryAvailable", "managedRuns", "evaluatedManagedRuns", "activeManagedRuns", "staleManagedRuns", "attributableEvents", "exactAttributedEvents", "exactAttributionPercent", "verifiedTokenSavingsAvailable", "verifiedTimeSavingsAvailable"],
       "properties": {
         "observedToolCalls": { "type": "integer", "minimum": 0 },
+        "agentShellCommandHits": { "type": "integer", "minimum": 0 },
+        "externalCommandCount": { "type": ["integer", "null"], "minimum": 0 },
+        "fallbackCommandCount": { "type": ["integer", "null"], "minimum": 0 },
+        "commandCoveragePercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "fallbackRatePercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "externalCommandTelemetryAvailable": { "type": "boolean" },
         "managedRuns": { "type": "integer", "minimum": 0 },
         "evaluatedManagedRuns": { "type": "integer", "minimum": 0 },
         "activeManagedRuns": { "type": "integer", "minimum": 0 },
@@ -165,6 +262,65 @@
         "exactAttributionPercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
         "verifiedTokenSavingsAvailable": { "type": "boolean" },
         "verifiedTimeSavingsAvailable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "tokenAccounting": {
+      "type": "object",
+      "required": ["rawCommandBaseline", "agentShellActualOutput", "verifiedContextSaved", "modelTokens"],
+      "properties": {
+        "rawCommandBaseline": { "$ref": "#/$defs/accountingEntry" },
+        "agentShellActualOutput": { "$ref": "#/$defs/accountingEntry" },
+        "verifiedContextSaved": { "$ref": "#/$defs/savingsAccountingEntry" },
+        "modelTokens": { "$ref": "#/$defs/modelTokens" }
+      },
+      "additionalProperties": false
+    },
+    "accountingEntry": {
+      "type": "object",
+      "required": ["availability", "scope", "outputChars", "estimatedTokens"],
+      "properties": {
+        "availability": { "enum": ["available", "partial", "unavailable"] },
+        "scope": { "enum": ["attributed-verification-output", "observed-agentshell-events", "attributed-verification-events", "raw-baseline-minus-attributed-agentshell-output"] },
+        "outputChars": { "type": ["integer", "null"], "minimum": 0 },
+        "estimatedTokens": { "type": ["integer", "null"], "minimum": 0 },
+        "workspaceCount": { "type": "integer", "minimum": 0 },
+        "availableWorkspaceCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "savingsAccountingEntry": {
+      "type": "object",
+      "required": ["availability", "scope", "outputChars", "estimatedTokens", "percent"],
+      "properties": {
+        "availability": { "enum": ["available", "partial", "unavailable"] },
+        "scope": { "const": "raw-baseline-minus-attributed-agentshell-output" },
+        "outputChars": { "type": ["integer", "null"], "minimum": 0 },
+        "estimatedTokens": { "type": ["integer", "null"], "minimum": 0 },
+        "percent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "workspaceCount": { "type": "integer", "minimum": 0 },
+        "availableWorkspaceCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "outputBudget": {
+      "type": "object",
+      "required": ["maxSerializedChars", "serializedChars", "degraded"],
+      "properties": {
+        "maxSerializedChars": { "const": 8192 },
+        "serializedChars": { "type": "integer", "minimum": 0, "maximum": 8192 },
+        "degraded": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "modelTokens": {
+      "type": "object",
+      "required": ["availability", "inputTokens", "outputTokens", "totalTokens"],
+      "properties": {
+        "availability": { "const": "unavailable" },
+        "inputTokens": { "type": "null" },
+        "outputTokens": { "type": "null" },
+        "totalTokens": { "type": "null" }
       },
       "additionalProperties": false
     },

@@ -10,8 +10,8 @@ import { summarizeRun } from "./run-status.js";
 const PROTOCOL_VERSION = "agentshell.doctor.v1";
 const REQUIRED_NODE_MAJOR = 20;
 
-export async function doctor(root) {
-  const project = getProjectInfo(root);
+export async function doctor(root, options = {}) {
+  const project = options.project || getProjectInfo(root);
   const workspaceRoot = project?.root || root;
   const packageManager = project?.manager || null;
   const git = gitInfo(workspaceRoot);

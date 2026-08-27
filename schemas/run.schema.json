@@ -15,12 +15,17 @@
   "$defs": {
     "run": {
       "type": "object",
-      "required": ["id", "status", "startedAt", "updatedAt", "nodes", "commandStats"],
+      "required": ["id", "status", "startedAt", "updatedAt", "operationIds", "nodes", "commandStats"],
       "properties": {
         "id": { "type": "string" },
         "status": { "enum": ["in_progress", "failing", "passed"] },
         "startedAt": { "type": "string" },
         "updatedAt": { "type": "string" },
+        "operationIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
         "nodes": {
           "type": "array",
           "items": { "$ref": "#/$defs/runNode" }
@@ -46,6 +51,11 @@
           "oneOf": [{ "$ref": "#/$defs/changeTemplate" }, { "type": "null" }]
         },
         "operationId": { "type": ["string", "null"] },
+        "operationIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
         "template": { "type": "string" },
         "changedFiles": {
           "type": "array",
@@ -77,6 +87,11 @@
         "ok": { "type": "boolean" },
         "outputChars": { "type": "integer", "minimum": 0 },
         "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "operationIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
         "createdAt": { "type": "string" }
       },
       "additionalProperties": false
@@ -125,9 +140,19 @@
     },
     "summary": {
       "type": "object",
-      "required": ["runId", "status", "commandCount", "nodeCount", "outputChars", "estimatedTokens", "durationMs", "diagnosis", "latestChange", "latestVerify", "rollbackCommand", "nextBestAction"],
+      "required": ["runId", "operationIds", "verificationOperationIds", "status", "commandCount", "nodeCount", "outputChars", "estimatedTokens", "durationMs", "diagnosis", "latestChange", "latestVerify", "rollbackCommand", "nextBestAction"],
       "properties": {
         "runId": { "type": "string" },
+        "operationIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "verificationOperationIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
         "status": { "enum": ["in_progress", "failing", "passed"] },
         "commandCount": { "type": "integer", "minimum": 0 },
         "nodeCount": { "type": "integer", "minimum": 0 },
@@ -144,8 +169,9 @@
     },
     "diagnosisSummary": {
       "type": "object",
-      "required": ["verificationOk", "logRef", "confidence", "targetFile"],
+      "required": ["operationId", "verificationOk", "logRef", "confidence", "targetFile"],
       "properties": {
+        "operationId": { "type": ["string", "null"] },
         "verificationOk": { "type": "boolean" },
         "logRef": { "type": "string" },
         "confidence": { "type": ["string", "null"] },
@@ -155,8 +181,9 @@
     },
     "changeSummary": {
       "type": "object",
-      "required": ["ok", "changedFiles"],
+      "required": ["operationId", "ok", "changedFiles"],
       "properties": {
+        "operationId": { "type": ["string", "null"] },
         "ok": { "type": "boolean" },
         "changedFiles": {
           "type": "array",
@@ -167,8 +194,9 @@
     },
     "verifySummary": {
       "type": "object",
-      "required": ["ok", "logRef", "summary"],
+      "required": ["operationId", "ok", "logRef", "summary"],
       "properties": {
+        "operationId": { "type": ["string", "null"] },
         "ok": { "type": "boolean" },
         "logRef": { "type": "string" },
         "summary": { "$ref": "#/$defs/testSummary" }

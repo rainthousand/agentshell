@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { findPathLeaks, verifyReleaseArtifacts } from "./ci-verify-release-artifacts.js";
 
@@ -46,6 +47,43 @@ test("CI release verification blocks checksum, size report, and toolchain drift"
   }
 });
 
+test("CI release verification inspects the final ZIP instead of an adjacent directory", () => {
+  const fixture = createReleaseFixture();
+  try {
+    const adjacent = path.join(fixture, "agentshell-codex-plugin");
+    fs.mkdirSync(adjacent);
+    fs.writeFileSync(path.join(adjacent, "README.md"), ["", "Users", "local-only", "source"].join("/"));
+    assert.equal(verifyReleaseArtifacts({ directory: fixture }).ok, true);
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test("CI release verification rejects path leaks in the report and final ZIP", () => {
+  const reportLeak = createReleaseFixture({ reportLeak: ["", "Users", "alvin", "project"].join("/") });
+  try {
+    assert.throws(() => verifyReleaseArtifacts({ directory: reportLeak }), /release report contains build-machine paths/);
+  } finally {
+    fs.rmSync(reportLeak, { recursive: true, force: true });
+  }
+
+  const zipLeak = createReleaseFixture({ packageContent: "/home/runner/private/project" });
+  try {
+    assert.throws(() => verifyReleaseArtifacts({ directory: zipLeak }), /delivery ZIP contains build-machine paths/);
+  } finally {
+    fs.rmSync(zipLeak, { recursive: true, force: true });
+  }
+});
+
+test("CI release verification rejects a ZIP missing required plugin structure", () => {
+  const fixture = createReleaseFixture({ omitSkill: true });
+  try {
+    assert.throws(() => verifyReleaseArtifacts({ directory: fixture }), /missing file: .*SKILL\.md/);
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test("CI path hygiene detects macOS, Linux, Windows, and GitHub runner paths", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-path-leak-"));
   try {
@@ -78,7 +116,7 @@ test("workflows preserve the compatibility matrix and audit artifacts before pub
   assert.match(ci, /actions\/upload-artifact@v4/u);
   assert.match(release, /node-version: 20\.20\.2/u);
   assert.match(release, /bun-version: 1\.2\.20/u);
-  assert.match(release, /Prepare test-only standalone launcher[\s\S]*node scripts\/prepare-test-standalone\.js[\s\S]*npm test/u);
+  assert.match(release, /Prepare test-only standalone launcher[\s\S]*node scripts\/prepare-test-standalone\.js[\s\S]*npm run test:fast[\s\S]*npm run test:integration[\s\S]*npm run test:release/u);
   assert.match(release, /AGENTSHELL_TEST_STANDALONE_LAUNCHER: "1"/u);
   assert.match(release, /gh release create/u);
   assert.match(release, /artifacts\/release\/agentshell-darwin-arm64/u);
@@ -90,33 +128,49 @@ test("workflows preserve the compatibility matrix and audit artifacts before pub
   assert.ok(release.indexOf("actions/upload-artifact@v4") < release.indexOf("gh release create"));
 });
 
-function createReleaseFixture() {
+function createReleaseFixture(options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-ci-release-"));
   const packageDirectory = path.join(directory, "agentshell-codex-plugin");
-  fs.mkdirSync(packageDirectory);
-  fs.writeFileSync(path.join(packageDirectory, "README.md"), "portable package\n");
+  fs.mkdirSync(path.join(packageDirectory, ".codex-plugin"), { recursive: true });
+  fs.mkdirSync(path.join(packageDirectory, "skills", "agentshell"), { recursive: true });
+  fs.mkdirSync(path.join(packageDirectory, "bin"), { recursive: true });
+  fs.writeFileSync(path.join(packageDirectory, "README.md"), options.packageContent || "portable package\n");
+  fs.writeFileSync(path.join(packageDirectory, ".codex-plugin", "plugin.json"), "{}\n");
+  fs.writeFileSync(path.join(packageDirectory, "package.json"), "{}\n");
+  fs.writeFileSync(path.join(packageDirectory, "install.command"), "#!/bin/sh\n");
+  fs.writeFileSync(path.join(packageDirectory, "bin", "agentshell-darwin-arm64"), "native\n");
+  if (!options.omitSkill) fs.writeFileSync(path.join(packageDirectory, "skills", "agentshell", "SKILL.md"), "# AgentShell\n");
   const zip = path.join(directory, "agentshell-codex-plugin.zip");
   const standalone = path.join(directory, "agentshell-darwin-arm64");
-  fs.writeFileSync(zip, "zip payload");
+  const archived = spawnSync("zip", ["-qr", path.basename(zip), path.basename(packageDirectory)], {
+    cwd: directory,
+    encoding: "utf8"
+  });
+  assert.equal(archived.status, 0, archived.stderr || archived.stdout);
+  fs.rmSync(packageDirectory, { recursive: true, force: true });
   fs.writeFileSync(standalone, "standalone payload");
   const zipSha256 = checksum(zip);
   const standaloneSha256 = checksum(standalone);
   fs.writeFileSync(path.join(directory, "release-report.json"), `${JSON.stringify({
     ok: true,
     protocolVersion: "agentshell.release-artifacts.v1",
+    zip: "agentshell-codex-plugin.zip",
     sha256: zipSha256,
     zipBytes: fs.statSync(zip).size,
     sizeBudgets: { ok: true, zip: { ok: true }, standalone: { ok: true } },
     compression: { archiveVerified: true },
     lifecycle: {
       protocolVersion: "agentshell.package-lifecycle-smoke.v1",
+      packageDir: "agentshell-codex-plugin",
       summary: { passed: 4, finalState: "uninstalled" }
     },
     standalone: {
+      path: "agentshell-darwin-arm64",
       sha256: standaloneSha256,
       bytes: fs.statSync(standalone).size,
       builder: { bundler: "bun", runtime: "node-sea", nodeVersion: "20.20.2", bunVersion: "1.2.20" }
-    }
+    },
+    note: options.reportLeak || undefined
   }, null, 2)}\n`);
   return directory;
 }

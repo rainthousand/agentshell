@@ -30,11 +30,14 @@ agentshell dashboard --stop
 ```
 
 On macOS the command opens a native AppKit menu-bar utility by default. The status
-item shows compact verified savings such as `AS 79K`; clicking it reveals the full
-`Verified context saved` and `Verified time saved` values across all registered workspaces. The
-popover labels this scope as `All workspaces` without exposing project paths. It
+item shows today's compact estimated verified context savings such as `AS 12K`;
+clicking it reveals today's estimated verified context savings and verified cache
+time savings across all registered workspaces,
+plus one quiet all-time line. The popover labels this scope as
+`Today · All workspaces` without exposing project paths. It
 does not appear in the Dock or open a window at launch. Use `--window` when the
-optional detailed panel is useful.
+optional detailed panel is useful. The detailed native/browser surface adds seven
+local calendar days and the all-time aggregate.
 The native shell is built from `desktop/macos/AgentShellDashboard.swift`.
 
 The command binds only to `127.0.0.1`, chooses port 4317 or the next available
@@ -70,15 +73,23 @@ Measured values come from AgentShell's own local task state:
 - task and command counts;
 - final verification status.
 
-Estimated values use the documented four-characters-per-token proxy:
+Estimated values use the documented four-characters-per-token proxy and are
+labeled `Estimated verified context saved` in the UI:
 
 - AgentShell output tokens;
 - raw verification output tokens;
 - verified savings versus raw verification output.
 
-The Dashboard does not claim access to Codex model tokens, Codex thinking time,
-or commands executed outside AgentShell. Verified time saved stays unavailable
-until an actual cache hit can be compared with its measured uncached baseline.
+These are estimated context tokens avoided, not literal Codex input, output, or
+billed model tokens. The Dashboard does not claim access to Codex model tokens,
+Codex thinking time, or commands executed outside AgentShell. The time label is
+`Verified cache time saved`: it stays unavailable until an actual cache hit can
+be compared with its measured uncached baseline.
+
+Every Today, last-seven-days, and All-time value obeys
+`dashboard.verifiedSavings.availability`. An unavailable metric is rendered as
+`--`, even if an older aggregate remains elsewhere in the payload. The UI never
+uses those aggregates as fallback evidence.
 
 `tasks` counts managed AgentShell repair runs; `toolCalls` counts observed
 AgentShell CLI events. They intentionally answer different questions, so a small
@@ -101,6 +112,13 @@ New verification events are attributed to raw operations by `operationId`. Older
 records remain visible but are labeled as legacy fallback. Token values use the
 documented chars/4 estimate; time saved only counts validated cache hits against
 their measured uncached baseline.
+
+Daily buckets use the machine's current IANA time zone and local calendar dates,
+not rolling 24-hour windows. Today therefore resets at local midnight. Empty days
+are explicit zeroes. All-time and daily values deduplicate exact verification and
+cache-hit contributions by operation identity across workspace snapshots. Snapshot
+keys are one-way hashes; raw operation IDs, commands, paths, and output are not
+stored in the global dashboard directory.
 
 ```bash
 agentshell metrics --compact --since 24h

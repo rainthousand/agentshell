@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/workspace-audit.schema.json",
+  "title": "AgentShell Workspace Audit Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "limits", "summary", "repositories", "privacy", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.workspace-audit.v1" },
+        "compact": { "type": "boolean" },
+        "limits": {
+          "type": "object",
+          "required": ["maxConcurrentGitProcesses"],
+          "properties": {
+            "maxConcurrentGitProcesses": { "type": "integer", "minimum": 1, "maximum": 8 }
+          },
+          "additionalProperties": false
+        },
+        "summary": { "$ref": "#/$defs/summary" },
+        "repositories": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/repository" }
+        },
+        "privacy": {
+          "type": "object",
+          "required": ["workspacePathsExposed", "fileNamesExposed", "rawDiffExposed", "commandOutputExposed", "networkUpload"],
+          "properties": {
+            "workspacePathsExposed": { "const": false },
+            "fileNamesExposed": { "const": false },
+            "rawDiffExposed": { "const": false },
+            "commandOutputExposed": { "const": false },
+            "networkUpload": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ],
+  "$defs": {
+    "riskCategories": {
+      "type": "object",
+      "required": ["generated", "lockfile", "protocol", "configuration"],
+      "properties": {
+        "generated": { "type": "integer", "minimum": 0 },
+        "lockfile": { "type": "integer", "minimum": 0 },
+        "protocol": { "type": "integer", "minimum": 0 },
+        "configuration": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "numstat": {
+      "type": "object",
+      "required": ["files", "additions", "deletions", "binaryFiles"],
+      "properties": {
+        "files": { "type": "integer", "minimum": 0 },
+        "additions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 },
+        "binaryFiles": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["repositoryCount", "cleanRepositories", "dirtyRepositories", "changedTotal", "staged", "unstaged", "untracked", "conflicted", "diffCheckProblems", "additions", "deletions", "binaryFiles", "detachedRepositories", "riskFiles", "riskCategories", "truncated"],
+      "properties": {
+        "repositoryCount": { "type": "integer", "minimum": 2, "maximum": 32 },
+        "cleanRepositories": { "type": "integer", "minimum": 0 },
+        "dirtyRepositories": { "type": "integer", "minimum": 0 },
+        "changedTotal": { "type": "integer", "minimum": 0 },
+        "staged": { "type": "integer", "minimum": 0 },
+        "unstaged": { "type": "integer", "minimum": 0 },
+        "untracked": { "type": "integer", "minimum": 0 },
+        "conflicted": { "type": "integer", "minimum": 0 },
+        "diffCheckProblems": { "type": "integer", "minimum": 0 },
+        "additions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 },
+        "binaryFiles": { "type": "integer", "minimum": 0 },
+        "detachedRepositories": { "type": "integer", "minimum": 0 },
+        "riskFiles": { "type": "integer", "minimum": 0 },
+        "riskCategories": { "$ref": "#/$defs/riskCategories" },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "repository": {
+      "type": "object",
+      "required": ["rootId", "name", "branch", "status", "diff", "risks"],
+      "properties": {
+        "rootId": { "type": "string", "pattern": "^root-[1-9][0-9]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "branch": {
+          "type": "object",
+          "required": ["current", "detached", "truncated"],
+          "properties": {
+            "current": { "type": ["string", "null"], "maxLength": 160 },
+            "detached": { "type": "boolean" },
+            "truncated": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "status": {
+          "type": "object",
+          "required": ["clean", "dirty", "changedTotal", "staged", "unstaged", "untracked", "conflicted", "truncated"],
+          "properties": {
+            "clean": { "type": "boolean" },
+            "dirty": { "type": "boolean" },
+            "changedTotal": { "type": "integer", "minimum": 0 },
+            "staged": { "type": "integer", "minimum": 0 },
+            "unstaged": { "type": "integer", "minimum": 0 },
+            "untracked": { "type": "integer", "minimum": 0 },
+            "conflicted": { "type": "integer", "minimum": 0 },
+            "truncated": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "diff": {
+          "type": "object",
+          "required": ["staged", "unstaged", "check", "truncated"],
+          "properties": {
+            "staged": { "$ref": "#/$defs/numstat" },
+            "unstaged": { "$ref": "#/$defs/numstat" },
+            "check": {
+              "type": "object",
+              "required": ["passed", "problemCount", "truncated"],
+              "properties": {
+                "passed": { "type": "boolean" },
+                "problemCount": { "type": "integer", "minimum": 0 },
+                "truncated": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            "truncated": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "risks": {
+          "type": "object",
+          "required": ["riskFileCount", "categories"],
+          "properties": {
+            "riskFileCount": { "type": "integer", "minimum": 0 },
+            "categories": { "$ref": "#/$defs/riskCategories" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

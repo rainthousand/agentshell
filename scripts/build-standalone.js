@@ -9,7 +9,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const STANDALONE_BUILD_PROTOCOL_VERSION = "agentshell.standalone-build.v1";
 export const RELEASE_TOOLCHAIN = Object.freeze({
   nodeVersion: "20.20.2",
-  bunVersion: "1.2.20"
+  bunVersion: "1.2.20",
+  supported: Object.freeze({
+    node: ">=20.0.0 <23.0.0",
+    bun: ">=1.2.0 <1.4.0"
+  })
 });
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -137,7 +141,7 @@ export function buildStandalone(options = {}, dependencies = {}) {
     }
     fs.chmodSync(output, 0o755);
     ensureSucceeded(run("npx", [
-      "--yes", "postject@1.0.0-alpha.6", output, "NODE_SEA_BLOB", blob,
+      "--yes", "--package", "postject@1.0.0-alpha.6", "postject", output, "NODE_SEA_BLOB", blob,
       "--sentinel-fuse", "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
       "--macho-segment-name", "NODE_SEA"
     ], { cwd: packageRoot }), "postject failed to inject the Node SEA blob.");
@@ -201,18 +205,22 @@ export function evaluateReleaseToolchain(actual = {}, options = {}) {
     bunVersion: normalizeToolVersion(actual.bunVersion)
   };
   const checks = {
-    node: normalized.nodeVersion === RELEASE_TOOLCHAIN.nodeVersion,
-    bun: normalized.bunVersion === RELEASE_TOOLCHAIN.bunVersion
+    node: versionInRange(normalized.nodeVersion, [20, 0, 0], [23, 0, 0]),
+    bun: versionInRange(normalized.bunVersion, [1, 2, 0], [1, 4, 0])
   };
   const complete = Boolean(normalized.nodeVersion && normalized.bunVersion);
   const ok = complete && checks.node && checks.bun;
   return {
-    required: { ...RELEASE_TOOLCHAIN },
+    baseline: {
+      nodeVersion: RELEASE_TOOLCHAIN.nodeVersion,
+      bunVersion: RELEASE_TOOLCHAIN.bunVersion
+    },
+    supported: { ...RELEASE_TOOLCHAIN.supported },
     actual: normalized,
     checks,
     complete,
     ok,
-    status: !complete ? "incomplete" : ok ? "compliant" : "unsupported",
+    status: !complete ? "incomplete" : ok ? "compatible" : "unsupported",
     enforcement: enforce ? "strict" : "informational"
   };
 }
@@ -223,13 +231,33 @@ export function assertReleaseToolchain(report) {
   const actualBun = report?.actual?.bunVersion || "missing";
   throw new Error(
     `Unsupported release toolchain: Node ${actualNode}, Bun ${actualBun}; ` +
-    `required Node ${RELEASE_TOOLCHAIN.nodeVersion}, Bun ${RELEASE_TOOLCHAIN.bunVersion}.`
+    `supported Node ${RELEASE_TOOLCHAIN.supported.node}, Bun ${RELEASE_TOOLCHAIN.supported.bun} ` +
+    `(release CI baseline: Node ${RELEASE_TOOLCHAIN.nodeVersion}, Bun ${RELEASE_TOOLCHAIN.bunVersion}).`
   );
 }
 
 function normalizeToolVersion(value) {
   const text = String(value || "").trim();
   return text.startsWith("v") ? text.slice(1) : text || null;
+}
+
+function versionInRange(value, minimum, maximumExclusive) {
+  const parsed = parseStableVersion(value);
+  return parsed !== null
+    && compareVersion(parsed, minimum) >= 0
+    && compareVersion(parsed, maximumExclusive) < 0;
+}
+
+function parseStableVersion(value) {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(String(value || ""));
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function compareVersion(left, right) {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return 0;
 }
 
 export function assertSeaBundleCompatibility(bundle, options = {}) {

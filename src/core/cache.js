@@ -3,9 +3,10 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { ensureState } from "./store.js";
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const MAX_ENTRIES = 20;
 const MAX_GO_CACHE_FILES = 2000;
+const MAX_PROJECT_CACHE_FILES = 5000;
 const GO_INPUT_EXTENSIONS = new Set([
   ".go",
   ".c",
@@ -36,6 +37,32 @@ const GO_IGNORED_DIRECTORIES = new Set([
   "build",
   "coverage"
 ]);
+const PROJECT_IGNORED_DIRECTORIES = new Set([
+  ...GO_IGNORED_DIRECTORIES,
+  ".next",
+  ".nuxt",
+  ".output",
+  ".turbo",
+  ".vite",
+  ".venv",
+  ".gradle",
+  ".idea",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".ruff_cache",
+  "__pycache__",
+  "target",
+  "tmp",
+  "temp",
+  "artifacts",
+  "reports"
+]);
+const PROJECT_INPUT_EXTENSIONS = new Set([
+  ".c", ".cc", ".cpp", ".css", ".go", ".gradle", ".h", ".hpp", ".html",
+  ".java", ".js", ".json", ".jsx", ".kt", ".kts", ".mjs", ".cjs", ".py",
+  ".rb", ".rs", ".sh", ".sql", ".toml", ".ts", ".tsx", ".vue", ".xml",
+  ".yaml", ".yml"
+]);
 const LOCK_FILES = [
   "package-lock.json",
   "pnpm-lock.yaml",
@@ -49,9 +76,17 @@ export function findTestResultCache(root, { type, command, packagePath }) {
   return findTestResultCacheFromContext(context);
 }
 
-export function createTestResultCacheContext(root, { type, command, packagePath, project = null }) {
+export function createTestResultCacheContext(root, {
+  type,
+  command,
+  packagePath,
+  project = null,
+  readCacheFile = true
+}) {
   const identity = cacheIdentity(root, { type, command, packagePath });
-  const cache = readCache(root);
+  const cache = readCacheFile
+    ? readCache(root)
+    : { version: CACHE_VERSION, entries: [] };
   const entries = cache.entries
     .filter((entry) => entry.version === CACHE_VERSION && entry.identityKey === identity.identityKey)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -68,29 +103,91 @@ export function createTestResultCacheContext(root, { type, command, packagePath,
 }
 
 export function findTestResultCacheFromContext(context) {
+  let reason = context.entries.length === 0 ? "no-compatible-entry" : "inputs-changed";
+  const fingerprints = new Map();
+  const inputFor = (relatedFiles = []) => {
+    const usesWholeProjectFingerprint = context.project?.kind !== "go" &&
+      path.basename(context.packagePath) !== "go.mod";
+    const normalized = usesWholeProjectFingerprint
+      ? []
+      : [...new Set(relatedFiles)].sort();
+    const key = JSON.stringify(normalized);
+    if (!fingerprints.has(key)) {
+      fingerprints.set(key, fingerprintCacheInput(context, normalized));
+    }
+    return fingerprints.get(key);
+  };
+  const baseline = inputFor();
+  let currentInputDigest = baseline.inputDigest;
+  let currentInputFileCount = baseline.fileCount;
+  let currentCacheKey = baseline.cacheKey || context.identity.identityKey;
+  if (!baseline.ok) reason = baseline.reason;
   for (const entry of context.entries) {
     const root = context.root;
-    if (!hasLog(root, entry.logRef)) continue;
-    const currentFiles = context.project?.kind === "go" || path.basename(context.packagePath) === "go.mod"
-      ? collectFingerprintFiles(root, context.packagePath, entry.relatedFiles || [], context.project)
-      : entry.files || [];
-    if (currentFiles.length <= 1) continue;
-    const fingerprint = fingerprintFromFiles(root, currentFiles);
-    if (!fingerprint.ok) continue;
-    const cacheKey = buildCacheKey(context.identity, fingerprint.files);
+    if (!hasLog(root, entry.logRef)) {
+      reason = "source-log-missing";
+      continue;
+    }
+    const fingerprint = inputFor(entry.relatedFiles || []);
+    if (!fingerprint.ok) {
+      reason = fingerprint.reason || "input-read-failed";
+      continue;
+    }
+    currentInputDigest = fingerprint.inputDigest;
+    currentInputFileCount = fingerprint.fileCount;
+    const cacheKey = fingerprint.cacheKey;
+    currentCacheKey = cacheKey;
     if (cacheKey === entry.cacheKey) {
       return {
         cacheHit: true,
         cacheKey,
-        entry
+        entry,
+        createdAt: entry.createdAt,
+        inputDigest: fingerprint.inputDigest,
+        inputFileCount: fingerprint.fileCount,
+        reason: "inputs-unchanged"
       };
     }
   }
 
   return {
     cacheHit: false,
-    cacheKey: context.identity.identityKey,
-    identity: context.identity
+    cacheKey: currentCacheKey,
+    identity: context.identity,
+    createdAt: null,
+    inputDigest: currentInputDigest,
+    inputFileCount: currentInputFileCount,
+    reason
+  };
+}
+
+export function currentTestResultCacheInput(context, relatedFiles = []) {
+  return fingerprintCacheInput(context, relatedFiles);
+}
+
+function fingerprintCacheInput(context, relatedFiles = []) {
+  const files = collectFingerprintFiles(
+    context.root,
+    context.packagePath,
+    relatedFiles,
+    context.project
+  );
+  if (files.length <= 1) {
+    return {
+      ok: false,
+      inputDigest: null,
+      fileCount: files.length,
+      cacheKey: null,
+      reason: "input-set-unavailable"
+    };
+  }
+  const fingerprint = fingerprintFromFiles(context.root, files);
+  return {
+    ok: fingerprint.ok,
+    inputDigest: fingerprint.inputDigest,
+    fileCount: fingerprint.files.length,
+    cacheKey: fingerprint.ok ? buildCacheKey(context.identity, fingerprint.files) : null,
+    reason: fingerprint.reason
   };
 }
 
@@ -155,7 +252,8 @@ export function writeTestResultCacheFromContext(context, { result, summary, rela
     relatedFiles,
     logRef,
     rawOutputChars: `${result.stdout}\n${result.stderr}`.length,
-    files: fingerprint.files.map((file) => file.path)
+    files: fingerprint.files.map((file) => file.path),
+    inputDigest: fingerprint.inputDigest
   };
 
   cache.entries = [
@@ -167,7 +265,63 @@ export function writeTestResultCacheFromContext(context, { result, summary, rela
     ...context.entries.filter((candidate) => candidate.cacheKey !== cacheKey)
   ].slice(0, MAX_ENTRIES);
   writeCache(root, cache);
-  return { cacheKey };
+  return {
+    cacheKey,
+    createdAt: entry.createdAt,
+    inputDigest: entry.inputDigest,
+    inputFileCount: entry.files.length,
+    reason: "stored-failure-result"
+  };
+}
+
+export function explainTestResultCache(root, options) {
+  const context = createTestResultCacheContext(root, options);
+  const lookup = findTestResultCacheFromContext(context);
+  return {
+    ok: true,
+    protocolVersion: "agentshell.verify-cache.v1",
+    action: "explain",
+    cacheHit: lookup.cacheHit,
+    cacheKey: lookup.cacheKey,
+    cacheCreatedAt: lookup.createdAt || null,
+    cacheInputDigest: lookup.inputDigest || null,
+    cacheInputFileCount: lookup.inputFileCount || 0,
+    cacheReason: lookup.reason,
+    entryCount: context.entries.length,
+    identity: context.identity,
+    suggestedNextActions: lookup.cacheHit ? [{
+      command: "agentshell verify test --no-cache --compact",
+      reason: "Force a fresh verification when cached evidence should not be reused"
+    }] : []
+  };
+}
+
+export function clearTestResultCache(root, options = {}) {
+  const cache = readCache(root);
+  const before = cache.entries.length;
+  let removedEntries = before;
+
+  if (options.type && options.command && options.packagePath) {
+    const identity = cacheIdentity(root, options);
+    cache.entries = cache.entries.filter((entry) => entry.identityKey !== identity.identityKey);
+    removedEntries = before - cache.entries.length;
+  } else {
+    cache.entries = [];
+  }
+
+  writeCache(root, cache);
+  return {
+    ok: true,
+    protocolVersion: "agentshell.verify-cache.v1",
+    action: "clear",
+    removedEntries,
+    remainingEntries: cache.entries.length,
+    cacheFile: path.relative(root, cachePath(root)).split(path.sep).join("/"),
+    suggestedNextActions: [{
+      command: "agentshell verify test --compact",
+      reason: "Create fresh verification evidence"
+    }]
+  };
 }
 
 function isRelatedTestFile(file) {
@@ -213,6 +367,10 @@ function collectFingerprintFiles(root, packagePath, relatedFiles, project = null
     if (!goFiles) return [];
     for (const file of goFiles) files.add(file);
     if (fs.existsSync(path.join(root, "go.sum"))) files.add("go.sum");
+  } else {
+    const projectFiles = projectFingerprintFiles(root);
+    if (!projectFiles) return [];
+    for (const file of projectFiles) files.add(file);
   }
 
   for (const file of relatedFiles) {
@@ -225,6 +383,35 @@ function collectFingerprintFiles(root, packagePath, relatedFiles, project = null
   }
 
   return [...files].sort();
+}
+
+function projectFingerprintFiles(root) {
+  try {
+    const files = new Set();
+    const pending = [root];
+    while (pending.length > 0) {
+      const directory = pending.pop();
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const absolute = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          if (!PROJECT_IGNORED_DIRECTORIES.has(entry.name)) pending.push(absolute);
+          continue;
+        }
+        if (!entry.isFile() || !isProjectInputFile(entry.name)) continue;
+        files.add(relativePath(root, absolute));
+        if (files.size > MAX_PROJECT_CACHE_FILES) return null;
+      }
+    }
+    return [...files].sort();
+  } catch {
+    return null;
+  }
+}
+
+function isProjectInputFile(name) {
+  if (PROJECT_INPUT_EXTENSIONS.has(path.extname(name).toLowerCase())) return true;
+  return /^(?:Dockerfile|Makefile|Procfile|Jenkinsfile|mvnw|gradlew)$/.test(name) ||
+    /^(?:\.env(?:\..+)?|\.npmrc|\.nvmrc|\.tool-versions)$/.test(name);
 }
 
 function goModuleFingerprintFiles(root, moduleRoot) {
@@ -305,14 +492,20 @@ function fingerprintFromFiles(root, files) {
   for (const file of files) {
     const absolute = path.join(root, file);
     if (!isInside(root, absolute) || !fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
-      return { ok: false, files: [] };
+      return { ok: false, files: [], inputDigest: null, reason: "input-missing-or-outside-workspace" };
     }
     fingerprint.push({
       path: file,
       hash: crypto.createHash("sha256").update(fs.readFileSync(absolute)).digest("hex")
     });
   }
-  return { ok: true, files: fingerprint.sort((a, b) => a.path.localeCompare(b.path)) };
+  const sorted = fingerprint.sort((a, b) => a.path.localeCompare(b.path));
+  return {
+    ok: true,
+    files: sorted,
+    inputDigest: digest(sorted),
+    reason: "fingerprinted"
+  };
 }
 
 function localImports(root, file) {
@@ -373,7 +566,10 @@ function readCache(root) {
 }
 
 function writeCache(root, cache) {
-  fs.writeFileSync(cachePath(root), `${JSON.stringify(cache, null, 2)}\n`);
+  const file = cachePath(root);
+  const temporary = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify(cache, null, 2)}\n`);
+  fs.renameSync(temporary, file);
 }
 
 function cachePath(root) {

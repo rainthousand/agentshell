@@ -5,18 +5,51 @@
   "oneOf": [
     {
       "type": "object",
-      "required": ["ok", "protocolVersion", "file", "hash", "range", "matchedLine", "totalLines", "content", "mode", "byteSize", "bounded", "truncated"],
+      "required": ["ok", "protocolVersion", "file", "hash", "hashScope", "hashBytes", "hashWindow", "range", "lineNumbering", "matchedLine", "totalLines", "content", "mode", "byteSize", "workBytes", "bounded", "truncated"],
       "properties": {
         "ok": { "const": true },
         "protocolVersion": { "const": "agentshell.read.v1" },
         "file": { "type": "string" },
         "hash": { "type": "string", "pattern": "^sha256:" },
+        "hashScope": {
+          "description": "Only full hashes may be used as a whole-file expectedHash for edits.",
+          "enum": ["full", "window"]
+        },
+        "hashBytes": { "type": "integer", "minimum": 0, "maximum": 8388608 },
+        "hashWindow": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["start", "end"],
+              "properties": {
+                "start": { "type": "integer", "minimum": 0 },
+                "end": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "range": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["start", "end"],
+              "properties": {
+                "start": { "type": "integer", "minimum": 1 },
+                "end": { "type": "integer", "minimum": 1 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "lineNumbering": {
           "type": "object",
-          "required": ["start", "end"],
+          "required": ["scope", "reason"],
           "properties": {
-            "start": { "type": "integer", "minimum": 1 },
-            "end": { "type": "integer", "minimum": 1 }
+            "scope": { "enum": ["absolute", "unknown"] },
+            "reason": { "type": ["string", "null"] }
           },
           "additionalProperties": false
         },
@@ -25,6 +58,7 @@
         "content": { "type": "string" },
         "mode": { "enum": ["lines", "around", "head", "tail"] },
         "byteSize": { "type": "integer", "minimum": 0 },
+        "workBytes": { "type": "integer", "minimum": 0, "maximum": 8388608 },
         "bounded": { "type": "boolean" },
         "truncated": {
           "type": "object",

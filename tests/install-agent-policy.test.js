@@ -57,7 +57,7 @@ test("managed policy activates AgentShell from the real project root", () => {
   assert.match(text, /project root/);
   assert.match(text, /never blindly run project commands from `\$HOME`/);
   assert.match(text, /agentshell start --compact/);
-  assert.match(text, /resolve the newest version under .*plugins\/cache\/personal\/agentshell\//);
+  assert.match(text, /resolve the newest installed launcher under .*plugins\/cache\/personal\/agentshell\//i);
   assert.match(text, /agentshell verify test --compact/);
   assert.match(text, /agentshell trial status/);
   assert.match(text, /agentshell trial export --verify --rating 1-5/);

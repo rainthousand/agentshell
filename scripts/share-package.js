@@ -2,27 +2,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { auditReleaseSource } from "./release-source-audit.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 const SHARE_PACKAGE_PROTOCOL_VERSION = "agentshell.share-package.v1";
 const DEFAULT_NAME = "agentshell-share";
 const DEFAULT_OUT_DIR = path.join(root, "artifacts", "share-package");
-
-const INCLUDED_PATHS = [
-  ".codex-plugin",
-  "bin",
-  "desktop",
-  "docs",
-  "examples",
-  "schemas",
-  "scripts",
-  "skills",
-  "src",
-  "CHANGELOG.md",
-  "LICENSE",
-  "README.md",
-  "package.json"
-];
 
 const EXCLUDED_NAMES = new Set([
   ".agentshell",
@@ -56,14 +41,34 @@ export function buildSharePackage(projectRoot = root, options = {}) {
   const zipPath = path.join(outDir, `${packageName}.zip`);
 
   ensureSafeOutputPath(projectRoot, packageDir);
+  const allowTestWorktree = process.env.NODE_TEST_CONTEXT
+    && process.env.AGENTSHELL_TEST_ALLOW_UNTRACKED_RELEASE_SOURCE === "1";
+  const sourceAudit = auditReleaseSource(projectRoot, {
+    ...options.auditOptions,
+    allowUntracked: options.auditOptions?.allowUntracked || allowTestWorktree
+  });
+  if (!sourceAudit.ok) {
+    return {
+      ok: false,
+      protocolVersion: SHARE_PACKAGE_PROTOCOL_VERSION,
+      packageName,
+      packageDir,
+      zipPath: null,
+      summary: { copiedFiles: 0, excludedPresent: 0, zipCreated: false },
+      includedPaths: [],
+      excludedNames: [...EXCLUDED_NAMES].sort(),
+      excludedPresent: [],
+      sourceAudit,
+      zip: null
+    };
+  }
   fs.rmSync(packageDir, { recursive: true, force: true });
   fs.mkdirSync(packageDir, { recursive: true });
 
   const copied = [];
-  for (const entry of INCLUDED_PATHS) {
+  for (const entry of sourceAudit.deliveryFiles) {
     const source = path.join(projectRoot, entry);
-    if (!fs.existsSync(source)) continue;
-    copyPath(source, path.join(packageDir, entry), copied, entry);
+    copyFile(source, path.join(packageDir, entry), copied, entry);
   }
 
   const startHerePath = path.join(packageDir, "START-HERE.md");
@@ -97,9 +102,10 @@ export function buildSharePackage(projectRoot = root, options = {}) {
       excludedPresent: excludedPresent.length,
       zipCreated: Boolean(zip?.ok)
     },
-    includedPaths: INCLUDED_PATHS,
+    includedPaths: sourceAudit.deliveryFiles,
     excludedNames: [...EXCLUDED_NAMES].sort(),
     excludedPresent,
+    sourceAudit,
     zip
   };
 }
@@ -182,19 +188,8 @@ function ensureSafeOutputPath(projectRoot, packageDir) {
   }
 }
 
-function copyPath(source, target, copied, relativePath) {
-  const name = path.basename(source);
-  if (EXCLUDED_NAMES.has(name)) return;
-
+function copyFile(source, target, copied, relativePath) {
   const stat = fs.statSync(source);
-  if (stat.isDirectory()) {
-    fs.mkdirSync(target, { recursive: true });
-    for (const child of fs.readdirSync(source)) {
-      copyPath(path.join(source, child), path.join(target, child), copied, path.join(relativePath, child));
-    }
-    return;
-  }
-
   if (!stat.isFile()) return;
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(source, target);
@@ -318,7 +313,7 @@ bin/agentshell-darwin-arm64 manual --topic onboarding
 
 ## What Is Included
 
-The package keeps the source, plugin metadata, install scripts, docs, schemas, and demo fixtures needed for local use. It intentionally excludes runtime or repository state such as \`.git\`, \`.agentshell\`, \`artifacts\`, and \`node_modules\`.
+The package contains only the version-controlled runtime manifest plus the verified native executable. Development fixtures, deferred MCP files, and repository state such as \`.git\`, \`.agentshell\`, \`artifacts\`, and \`node_modules\` are excluded.
 
 Package directory name: \`${packageName}\`
 `;

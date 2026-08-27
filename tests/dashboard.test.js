@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { dashboardStatus, startDashboard } from "../src/commands/dashboard.js";
 import { exportMetrics, metrics, resetMetrics } from "../src/commands/metrics.js";
+import { buildSavingsView } from "../src/dashboard/app.js";
 
 test("metrics v2 separates measured, estimated, and unavailable values", async () => {
   const root = fixtureWorkspace();
@@ -34,6 +35,9 @@ test("metrics v2 separates measured, estimated, and unavailable values", async (
   assert.equal(report.dashboard.totals.agentShellOutputTokens, 100);
   assert.equal(report.dashboard.totals.rawVerifyTokens, 1000);
   assert.equal(report.dashboard.totals.estimatedContextAvoidedTokens, 900);
+  assert.equal(report.dashboard.verifiedSavings.today.contextTokens, 900);
+  assert.equal(report.dashboard.verifiedSavings.last7Days.length, 7);
+  assert.equal(report.dashboard.verifiedSavings.allTime.contextTokens, 900);
   assert.equal(report.dashboard.totals.contextAvoidedPercent, 90);
   assert.equal(report.dashboard.totals.executionMs, 350);
   assert.equal(report.dashboard.totals.estimatedTimeSavedMs, null);
@@ -56,6 +60,8 @@ test("metrics reset preserves history while starting a fresh measurement window"
   assert.equal(after.dashboard.totals.operations, 0);
   assert.equal(after.dashboard.totals.toolCalls, 0);
   assert.equal(after.dashboard.totals.estimatedContextAvoidedTokens, null);
+  assert.equal(after.dashboard.verifiedSavings.today.contextTokens, 0);
+  assert.equal(after.dashboard.verifiedSavings.allTime.contextTokens, 0);
   assert.equal(fs.existsSync(path.join(root, ".agentshell", "history.jsonl")), true);
 });
 
@@ -77,10 +83,20 @@ test("time saved counts verified cache hits, not ordinary runtime variance", asy
   first.cacheHit = false;
   first.durationMs = 350;
   const rest = fs.readFileSync(historyFile, "utf8").split("\n").slice(1).filter(Boolean);
-  fs.writeFileSync(historyFile, `${[JSON.stringify(first), ...rest].join("\n")}\n`);
+  const baselines = [first, {
+    ...first,
+    id: "op_baseline_2",
+    createdAt: new Date(Date.now() - 400).toISOString()
+  }, {
+    ...first,
+    id: "op_baseline_3",
+    createdAt: new Date(Date.now() - 300).toISOString()
+  }];
+  fs.writeFileSync(historyFile, `${[...baselines.map(JSON.stringify), ...rest].join("\n")}\n`);
   const report = await metrics(root, { compact: true });
   assert.equal(report.dashboard.totals.estimatedTimeSavedMs, 350);
   assert.equal(report.dashboard.coverage.verifiedTimeSavingsAvailable, true);
+  assert.equal(report.dashboard.verifiedSavings.today.timeMs, 350);
 });
 
 test("stale unfinished runs remain visible without counting as evaluated failures", async () => {
@@ -125,8 +141,9 @@ test("dashboard serves local read-only UI and metrics with security headers", as
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
     assert.match(html, /AgentShell Dashboard/);
-    assert.match(html, /Verified context saved/);
-    assert.match(html, /Verified time saved/);
+    assert.match(html, /Estimated verified context saved/);
+    assert.match(html, /Verified cache time saved/);
+    assert.match(html, /Last 7 days/);
 
     const api = await fetch(new URL("/api/metrics", session.report.url));
     const data = await api.json();
@@ -134,6 +151,7 @@ test("dashboard serves local read-only UI and metrics with security headers", as
     assert.equal(data.protocolVersion, "agentshell.metrics.v2");
     assert.equal(data.dashboard.scope, "global");
     assert.ok(data.dashboard.totals);
+    assert.equal(data.dashboard.verifiedSavings.last7Days.length, 7);
 
     const health = await fetch(new URL("/api/health", session.report.url));
     const healthData = await health.json();
@@ -161,6 +179,83 @@ test("dashboard serves local read-only UI and metrics with security headers", as
   } finally {
     await session.close();
   }
+});
+
+test("dashboard UI obeys verified savings availability without totals fallback", () => {
+  const report = {
+    dashboard: {
+      totals: {
+        estimatedContextAvoidedTokens: 999999,
+        estimatedTimeSavedMs: 999999
+      },
+      verifiedSavings: {
+        timeZone: "Asia/Shanghai",
+        availability: { contextTokens: false, time: false },
+        today: { date: "2026-08-27", contextTokens: 123, timeMs: 456 },
+        last7Days: [{ date: "2026-08-27", contextTokens: 123, timeMs: 456 }],
+        allTime: { contextTokens: 789, timeMs: 1011 }
+      }
+    }
+  };
+
+  const view = buildSavingsView(report);
+  assert.equal(view.today.contextTokens, null);
+  assert.equal(view.today.timeMs, null);
+  assert.equal(view.last7Days[0].contextTokens, null);
+  assert.equal(view.last7Days[0].timeMs, null);
+  assert.equal(view.allTime.contextTokens, null);
+  assert.equal(view.allTime.timeMs, null);
+});
+
+test("dashboard UI availability is independent for context and cache time", () => {
+  const report = {
+    dashboard: {
+      verifiedSavings: {
+        availability: { contextTokens: true, time: false },
+        today: { contextTokens: 123, timeMs: 456 },
+        last7Days: [],
+        allTime: { contextTokens: 789, timeMs: 1011 }
+      }
+    }
+  };
+
+  const view = buildSavingsView(report);
+  assert.equal(view.today.contextTokens, 123);
+  assert.equal(view.today.timeMs, null);
+  assert.equal(view.allTime.contextTokens, 789);
+  assert.equal(view.allTime.timeMs, null);
+});
+
+test("dashboard UI does not turn missing available values into zero", () => {
+  const view = buildSavingsView({
+    dashboard: {
+      verifiedSavings: {
+        availability: { contextTokens: true, time: true },
+        today: { contextTokens: null },
+        last7Days: [],
+        allTime: {}
+      }
+    }
+  });
+
+  assert.deepEqual(view.today, { contextTokens: null, timeMs: null });
+  assert.deepEqual(view.allTime, { contextTokens: null, timeMs: null });
+});
+
+test("dashboard static surfaces describe estimated context and cache baseline", () => {
+  const root = path.resolve(import.meta.dirname, "..");
+  const app = fs.readFileSync(path.join(root, "src/dashboard/app.js"), "utf8");
+  const swift = fs.readFileSync(path.join(root, "desktop/macos/AgentShellDashboard.swift"), "utf8");
+
+  assert.match(app, /availability\.contextTokens === true/);
+  assert.match(app, /availability\.time === true/);
+  assert.doesNotMatch(app, /totals\.estimatedContextAvoidedTokens/);
+  assert.doesNotMatch(app, /totals\.estimatedTimeSavedMs/);
+  assert.match(swift, /Estimated verified context saved/);
+  assert.match(swift, /Verified cache time saved/);
+  assert.match(swift, /availability\?\["contextTokens"\].*== true/);
+  assert.doesNotMatch(swift, /\?\? totals\["estimatedContextAvoidedTokens"\]/);
+  assert.match(fs.readFileSync(path.join(root, "src/dashboard/index.html"), "utf8"), /type="module"/);
 });
 
 test("dashboard reuses one healthy user-level server", async () => {

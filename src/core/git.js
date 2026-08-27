@@ -21,9 +21,9 @@ export function gitInfo(root) {
 
   const allChangedFiles = status.stdout
     .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.slice(3));
+    .filter((line) => line.length >= 3)
+    .map((line) => line.slice(3).trim())
+    .filter(Boolean);
   const changedFiles = allChangedFiles.slice(0, 10);
 
   return {

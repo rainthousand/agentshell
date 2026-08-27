@@ -76,12 +76,21 @@ test("large files require bounded head or tail reads", async () => {
   assert.equal(head.ok, true);
   assert.equal(head.truncated.value, true);
   assert.equal(head.totalLines, null);
+  assert.equal(head.hashScope, "window");
+  assert.equal(head.hashBytes, 512 * 1024);
+  assert.deepEqual(head.hashWindow, { start: 0, end: 512 * 1024 });
+  assert.equal(head.workBytes, 512 * 1024);
+  assert.equal(head.lineNumbering.scope, "absolute");
   assert.equal(tail.ok, true);
   assert.equal(tail.truncated.value, true);
-  assert.match(tail.content, /9000 \|/);
+  assert.equal(tail.range, null);
+  assert.equal(tail.lineNumbering.scope, "unknown");
+  assert.match(tail.content, /^\? \|/);
+  assert.equal(tail.hashScope, "window");
+  assert.equal(tail.workBytes, 512 * 1024);
 });
 
-test("bounded reads retain the whole-file hash beyond the byte window", async () => {
+test("bounded reads hash only their explicit byte window", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-read-"));
   const original = `${"prefix\n".repeat(90000)}first tail\n`;
   const changed = `${"prefix\n".repeat(90000)}second tail\n`;
@@ -91,7 +100,41 @@ test("bounded reads retain the whole-file hash beyond the byte window", async ()
   const second = await readFileHead(root, "large-enough.log", 2);
 
   assert.equal(first.content, second.content);
-  assert.notEqual(first.hash, second.hash);
+  assert.equal(first.hash, second.hash);
+  assert.equal(first.hashScope, "window");
+  assert.equal(first.hashBytes, 512 * 1024);
+  assert.deepEqual(first.hashWindow, { start: 0, end: 512 * 1024 });
+  assert.equal(first.workBytes, 512 * 1024);
+});
+
+test("read fails closed when the opened path is swapped before validation", async () => {
+  const root = makeFixture("sample.txt", "inside\n");
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-read-outside-"));
+  const external = path.join(outside, "secret.txt");
+  fs.writeFileSync(external, "secret\n");
+
+  const result = await readFileHead(root, "sample.txt", 1, {
+    _afterOpen() {
+      fs.renameSync(path.join(root, "sample.txt"), path.join(root, "original.txt"));
+      fs.symlinkSync(external, path.join(root, "sample.txt"));
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "FILE_OUTSIDE_WORKSPACE");
+  assert.doesNotMatch(JSON.stringify(result), /secret/);
+});
+
+test("read fails closed when the opened file changes during reading", async () => {
+  const root = makeFixture("sample.txt", "before\n");
+  const result = await readFileHead(root, "sample.txt", 1, {
+    _afterRead() {
+      fs.appendFileSync(path.join(root, "sample.txt"), "after\n");
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "FILE_OUTSIDE_WORKSPACE");
 });
 
 test("read schema exposes bounded read metadata", () => {
@@ -101,6 +144,8 @@ test("read schema exposes bounded read metadata", () => {
   assert.equal(success.properties.protocolVersion.const, "agentshell.read.v1");
   assert.ok(success.required.includes("mode"));
   assert.ok(success.required.includes("truncated"));
+  assert.ok(success.required.includes("hashScope"));
+  assert.ok(success.required.includes("workBytes"));
   assert.deepEqual(success.properties.mode.enum, ["lines", "around", "head", "tail"]);
 });
 

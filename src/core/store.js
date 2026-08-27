@@ -2,6 +2,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
+import { operationIdsForRun } from "./attribution.js";
 
 export function stateDir(root) {
   return path.join(root, ".agentshell");
@@ -48,8 +49,10 @@ export function createRun(root, node) {
     startedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [withTimestamp(node)],
-    commandStats: []
+    commandStats: [],
+    operationIds: []
   };
+  run.operationIds = operationIdsForRun(run);
   run.status = statusFor(run);
   writeActiveRun(root, run);
   appendRunSnapshot(root, run);
@@ -57,33 +60,34 @@ export function createRun(root, node) {
 }
 
 export function readActiveRun(root) {
-  const file = path.join(ensureState(root), "active-run.json");
+  const file = path.join(readableState(root), "active-run.json");
   if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, "utf8"));
+  return withRunAttribution(JSON.parse(fs.readFileSync(file, "utf8")));
 }
 
 export function clearActiveRun(root) {
-  const file = path.join(ensureState(root), "active-run.json");
+  const file = path.join(readableState(root), "active-run.json");
   if (!fs.existsSync(file)) return null;
-  const run = JSON.parse(fs.readFileSync(file, "utf8"));
+  const run = withRunAttribution(JSON.parse(fs.readFileSync(file, "utf8")));
   fs.unlinkSync(file);
   return run;
 }
 
 export function readRuns(root) {
-  const file = path.join(ensureState(root), "runs.jsonl");
+  const file = path.join(readableState(root), "runs.jsonl");
   if (!fs.existsSync(file)) return [];
   return fs.readFileSync(file, "utf8")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => JSON.parse(line));
+    .map((line) => withRunAttribution(JSON.parse(line)));
 }
 
 export function appendRunNode(root, runId, node) {
   const run = readActiveRun(root);
   if (!run || run.id !== runId) return null;
   run.nodes.push(withTimestamp(node));
+  run.operationIds = operationIdsForRun(run);
   run.updatedAt = new Date().toISOString();
   run.status = statusFor(run);
   writeActiveRun(root, run);
@@ -95,6 +99,7 @@ export function appendRunCommandStats(root, runId, stats) {
   const run = readActiveRun(root);
   if (!run || run.id !== runId) return null;
   run.commandStats.push(withTimestamp(stats));
+  run.operationIds = operationIdsForRun(run);
   run.updatedAt = new Date().toISOString();
   run.status = statusFor(run);
   writeActiveRun(root, run);
@@ -103,7 +108,7 @@ export function appendRunCommandStats(root, runId, stats) {
 }
 
 export function readEvents(root) {
-  const file = path.join(ensureState(root), "events.jsonl");
+  const file = path.join(readableState(root), "events.jsonl");
   if (!fs.existsSync(file)) return [];
   return fs.readFileSync(file, "utf8")
     .split("\n")
@@ -113,7 +118,7 @@ export function readEvents(root) {
 }
 
 export function readOperations(root) {
-  const file = path.join(ensureState(root), "history.jsonl");
+  const file = path.join(readableState(root), "history.jsonl");
   if (!fs.existsSync(file)) return [];
   return fs.readFileSync(file, "utf8")
     .split("\n")
@@ -141,8 +146,9 @@ export function writeLog(root, logRef, stdout, stderr) {
 }
 
 export function readLog(root, logRef) {
-  const stdoutPath = logPath(root, logRef, "stdout");
-  const stderrPath = logPath(root, logRef, "stderr");
+  const dir = readableState(root);
+  const stdoutPath = path.join(dir, "logs", `${logRef}.stdout.log`);
+  const stderrPath = path.join(dir, "logs", `${logRef}.stderr.log`);
   return {
     stdout: fs.existsSync(stdoutPath) ? fs.readFileSync(stdoutPath, "utf8") : null,
     stderr: fs.existsSync(stderrPath) ? fs.readFileSync(stderrPath, "utf8") : null
@@ -155,12 +161,28 @@ function prepareStateDir(dir) {
   fs.mkdirSync(path.join(dir, "change-templates"), { recursive: true });
 }
 
+function readableState(root) {
+  const primary = stateDir(root);
+  if (fs.existsSync(primary)) return primary;
+  const fallback = fallbackStateDir(root);
+  return fs.existsSync(fallback) ? fallback : primary;
+}
+
 function writeActiveRun(root, run) {
   fs.writeFileSync(path.join(ensureState(root), "active-run.json"), `${JSON.stringify(run, null, 2)}\n`);
 }
 
 function appendRunSnapshot(root, run) {
   fs.appendFileSync(path.join(ensureState(root), "runs.jsonl"), `${JSON.stringify(run)}\n`);
+}
+
+function withRunAttribution(run) {
+  return {
+    ...run,
+    nodes: Array.isArray(run?.nodes) ? run.nodes : [],
+    commandStats: Array.isArray(run?.commandStats) ? run.commandStats : [],
+    operationIds: operationIdsForRun(run)
+  };
 }
 
 function withTimestamp(value) {

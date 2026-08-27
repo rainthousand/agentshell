@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const PROTOCOL_VERSION = "agentshell.ci-release-verification.v1";
@@ -19,6 +21,13 @@ const PATH_LEAKS = [
   { name: "Windows user path", pattern: /[A-Za-z]:\\Users\\[^\\\s]+\\/u },
   { name: "GitHub workspace path", pattern: /\/__w\/[^/\s]+\//u }
 ];
+const REQUIRED_PACKAGE_PATHS = [
+  ".codex-plugin/plugin.json",
+  "package.json",
+  "skills/agentshell/SKILL.md",
+  "install.command",
+  "bin/agentshell-darwin-arm64"
+];
 
 export function verifyReleaseArtifacts(options = {}) {
   const directory = path.resolve(options.directory || "artifacts/release");
@@ -26,12 +35,16 @@ export function verifyReleaseArtifacts(options = {}) {
 
   const zip = path.join(directory, "agentshell-codex-plugin.zip");
   const standalone = path.join(directory, "agentshell-darwin-arm64");
-  const report = readJson(path.join(directory, "release-report.json"));
+  const reportPath = path.join(directory, "release-report.json");
+  const report = readJson(reportPath);
   const zipSha256 = verifyChecksum(zip);
   const standaloneSha256 = verifyChecksum(standalone);
 
   assert.equal(report.ok, true, "release report must pass");
   assert.equal(report.protocolVersion, "agentshell.release-artifacts.v1");
+  assert.equal(report.zip, "agentshell-codex-plugin.zip", "release report ZIP path must be artifact-relative");
+  assert.equal(report.standalone?.path, "agentshell-darwin-arm64", "release report standalone path must be artifact-relative");
+  assert.equal(report.lifecycle?.packageDir, "agentshell-codex-plugin", "release report package path must be artifact-relative");
   assert.equal(report.sha256, zipSha256, "ZIP hash must match release report");
   assert.equal(report.standalone?.sha256, standaloneSha256, "standalone hash must match release report");
   assert.equal(report.zipBytes, fs.statSync(zip).size, "ZIP size must match release report");
@@ -53,10 +66,20 @@ export function verifyReleaseArtifacts(options = {}) {
     if (options.bunVersion) assert.equal(builder.bunVersion, options.bunVersion, "unexpected standalone Bun version");
   }
 
-  const packageDirectory = path.join(directory, "agentshell-codex-plugin");
-  assertDirectory(packageDirectory);
-  const pathLeaks = findPathLeaks(packageDirectory);
-  assert.deepEqual(pathLeaks, [], `delivery package contains build-machine paths: ${JSON.stringify(pathLeaks)}`);
+  const reportLeaks = findPathLeaksInFile(reportPath, directory);
+  assert.deepEqual(reportLeaks, [], `release report contains build-machine paths: ${JSON.stringify(reportLeaks)}`);
+
+  const extracted = extractReleaseZip(zip, options.runner || spawnSync);
+  let pathLeaks;
+  try {
+    const packageDirectory = path.join(extracted.directory, "agentshell-codex-plugin");
+    assertDirectory(packageDirectory);
+    for (const required of REQUIRED_PACKAGE_PATHS) assertFile(path.join(packageDirectory, required));
+    pathLeaks = findPathLeaks(packageDirectory);
+    assert.deepEqual(pathLeaks, [], `delivery ZIP contains build-machine paths: ${JSON.stringify(pathLeaks)}`);
+  } finally {
+    fs.rmSync(extracted.directory, { recursive: true, force: true });
+  }
 
   return {
     ok: true,
@@ -70,6 +93,22 @@ export function verifyReleaseArtifacts(options = {}) {
   };
 }
 
+export function extractReleaseZip(zip, runner = spawnSync) {
+  const listing = runner("unzip", ["-Z1", zip], { encoding: "utf8" });
+  assert.equal(listing.status, 0, listing.stderr || listing.stdout || "could not list release ZIP");
+  const entries = String(listing.stdout || "").split(/\r?\n/u).filter(Boolean);
+  assert.ok(entries.length > 0, "release ZIP must not be empty");
+  for (const entry of entries) assertSafeZipEntry(entry);
+
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-release-verify-"));
+  const extracted = runner("unzip", ["-qq", zip, "-d", directory], { encoding: "utf8" });
+  if (extracted.status !== 0) {
+    fs.rmSync(directory, { recursive: true, force: true });
+    assert.fail(extracted.stderr || extracted.stdout || "could not extract release ZIP");
+  }
+  return { directory, entries };
+}
+
 export function findPathLeaks(directory) {
   const findings = [];
   walk(directory, (file) => {
@@ -81,6 +120,22 @@ export function findPathLeaks(directory) {
     }
   });
   return findings;
+}
+
+function findPathLeaksInFile(file, relativeRoot) {
+  const content = fs.readFileSync(file, "utf8");
+  return PATH_LEAKS
+    .filter((leak) => leak.pattern.test(content))
+    .map((leak) => ({ kind: leak.name, file: path.relative(relativeRoot, file) }));
+}
+
+function assertSafeZipEntry(entry) {
+  assert.equal(entry.includes("\\"), false, `release ZIP contains non-portable path: ${entry}`);
+  const portable = entry.replace(/\\/gu, "/");
+  assert.equal(path.posix.isAbsolute(portable), false, `release ZIP contains absolute path: ${entry}`);
+  assert.equal(portable.split("/").includes(".."), false, `release ZIP contains traversal path: ${entry}`);
+  assert.ok(portable === "agentshell-codex-plugin/" || portable.startsWith("agentshell-codex-plugin/"),
+    `release ZIP contains an unexpected top-level path: ${entry}`);
 }
 
 function verifyChecksum(file) {

@@ -6,7 +6,7 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ok", "protocolVersion", "checkedAt", "plugin", "paths", "summary", "checks", "suggestedNextActions"],
+      "required": ["ok", "protocolVersion", "checkedAt", "plugin", "integrity", "activation", "paths", "summary", "checks", "suggestedNextActions"],
       "properties": {
         "ok": { "type": "boolean" },
         "protocolVersion": { "enum": ["agentshell.plugin-status.v1", "agentshell.plugin-doctor-local.v1"] },
@@ -22,6 +22,8 @@
             "developerName": { "type": ["string", "null"] }
           }
         },
+        "integrity": { "$ref": "#/$defs/integrity" },
+        "activation": { "$ref": "#/$defs/activation" },
         "paths": {
           "type": "object",
           "additionalProperties": false,
@@ -72,7 +74,7 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ok", "protocolVersion", "compact", "checkedAt", "status", "plugin", "summary", "cachePath", "nextAction", "suggestedNextActions"],
+      "required": ["ok", "protocolVersion", "compact", "checkedAt", "status", "plugin", "integrity", "activation", "summary", "cachePath", "nextAction", "suggestedNextActions"],
       "properties": {
         "ok": { "type": "boolean" },
         "protocolVersion": { "enum": ["agentshell.plugin-status.v1", "agentshell.plugin-doctor-local.v1"] },
@@ -90,6 +92,8 @@
             "developerName": { "type": ["string", "null"] }
           }
         },
+        "integrity": { "$ref": "#/$defs/integrity" },
+        "activation": { "$ref": "#/$defs/activation" },
         "summary": {
           "type": "object",
           "additionalProperties": false,
@@ -124,5 +128,70 @@
       }
     },
     { "$ref": "common.schema.json#/$defs/failure" }
-  ]
+  ],
+  "$defs": {
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "algorithm", "hash", "fileCount", "totalBytes", "missingPaths", "includePaths", "excludedNames"],
+      "properties": {
+        "protocolVersion": { "const": "agentshell.plugin-content-hash.v1" },
+        "algorithm": { "const": "sha256" },
+        "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "fileCount": { "type": "integer", "minimum": 0 },
+        "totalBytes": { "type": "integer", "minimum": 0 },
+        "missingPaths": { "type": "array", "items": { "type": "string" } },
+        "includePaths": { "type": "array", "items": { "type": "string" } },
+        "excludedNames": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "comparable", "matches", "source", "installed"],
+      "properties": {
+        "protocolVersion": { "const": "agentshell.plugin-content-hash.v1" },
+        "comparable": { "type": "boolean" },
+        "matches": { "type": "boolean" },
+        "source": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "installed": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "reason": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "missingPaths", "skill", "command"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "missingPaths": { "type": "array", "items": { "type": "string" } },
+        "skill": { "oneOf": [{ "$ref": "#/$defs/skillSmoke" }, { "type": "null" }] },
+        "command": { "oneOf": [{ "$ref": "#/$defs/commandSmoke" }, { "type": "null" }] }
+      }
+    },
+    "skillSmoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "path", "guidance", "missing"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "path": { "type": "string" },
+        "guidance": { "type": "object", "additionalProperties": { "type": "boolean" } },
+        "missing": { "type": "array", "items": { "type": "string" } },
+        "error": { "type": "string" }
+      }
+    },
+    "commandSmoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "protocolVersion"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "protocolVersion": { "type": ["string", "null"] },
+        "exitCode": { "type": ["integer", "null"] },
+        "error": { "type": "string" }
+      }
+    }
+  }
 }

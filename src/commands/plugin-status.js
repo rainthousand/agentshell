@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { resolvePackageRoot } from "../core/package-root.js";
+import { comparePluginContent, installedPluginSmoke, pluginContentHash } from "../core/plugin-content-hash.js";
 
 export const PLUGIN_STATUS_PROTOCOL_VERSION = "agentshell.plugin-status.v1";
 
@@ -46,6 +47,11 @@ export function pluginStatus(root, options = {}) {
       "Run `npm run plugin:cachebust` to refresh the local plugin version."
     ]
   });
+
+  const integrity = inspectPluginIntegrity(packageRoot, paths.cachePath, options);
+  const activation = paths.cachePath && fs.existsSync(paths.cachePath)
+    ? installedPluginSmoke(paths.cachePath, options.smoke || {})
+    : { ok: false, missingPaths: ["installed plugin cache"], skill: null, command: null };
 
   const marketplaceJson = readJsonCheck(checks, "personal marketplace is readable", marketplace, [
     "Run `npm run plugin:install-local` to create or update the personal marketplace.",
@@ -137,6 +143,26 @@ export function pluginStatus(root, options = {}) {
     ]
   });
 
+  addCheck(checks, {
+    name: "codex plugin cache content matches source content",
+    ok: integrity.matches === true,
+    details: integrity,
+    suggestedNextActions: [
+      "Run `npm run plugin:cachebust` so source changes receive a new plugin version.",
+      "Run `codex plugin add agentshell@personal` to replace the drifted Codex cache."
+    ]
+  });
+
+  addCheck(checks, {
+    name: "installed plugin command and skill smoke passes",
+    ok: activation.ok,
+    details: activation,
+    suggestedNextActions: [
+      "Run `codex plugin add agentshell@personal` to reinstall the complete plugin payload.",
+      "Start a new Codex thread after reinstalling so the refreshed Skill is loaded."
+    ]
+  });
+
   const summary = summarizeChecks(checks);
   const result = {
     ok: summary.failed === 0,
@@ -148,6 +174,8 @@ export function pluginStatus(root, options = {}) {
       authorName: sourcePluginMetadata.authorName,
       developerName: sourcePluginMetadata.developerName
     },
+    integrity,
+    activation,
     paths,
     summary,
     checks,
@@ -162,6 +190,8 @@ export function pluginStatus(root, options = {}) {
       checkedAt: result.checkedAt,
       status: compactStatus(result.summary),
       plugin: result.plugin,
+      integrity: result.integrity,
+      activation: result.activation,
       summary: result.summary,
       cachePath: result.paths.cachePath || null,
       nextAction: compactNextAction(checks),
@@ -170,6 +200,32 @@ export function pluginStatus(root, options = {}) {
   }
 
   return result;
+}
+
+function inspectPluginIntegrity(sourceRoot, cachePath, options) {
+  try {
+    if (!cachePath || !fs.existsSync(cachePath)) {
+      return {
+        protocolVersion: "agentshell.plugin-content-hash.v1",
+        comparable: false,
+        matches: false,
+        source: pluginContentHash(sourceRoot, options.contentHash),
+        installed: null,
+        reason: "installed-cache-missing"
+      };
+    }
+    return comparePluginContent(sourceRoot, cachePath, options.contentHash);
+  } catch (error) {
+    return {
+      protocolVersion: "agentshell.plugin-content-hash.v1",
+      comparable: false,
+      matches: false,
+      source: null,
+      installed: null,
+      reason: "hash-failed",
+      error: error.message
+    };
+  }
 }
 
 function compactStatus(summary) {

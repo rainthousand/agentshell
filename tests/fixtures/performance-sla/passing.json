@@ -1,0 +1,20 @@
+{
+  "protocolVersion": "agentshell.performance-sla-sample.v1",
+  "source": {
+    "mode": "fixture",
+    "description": "Deterministic passing sample for CI."
+  },
+  "measurements": {
+    "coldStartMs": [92, 101, 107, 110, 116, 120, 128, 133, 139, 147],
+    "overheadComparison": {
+      "comparable": true,
+      "baselineMs": 1000,
+      "agentshellMs": 1040
+    },
+    "compactEstimatedTokens": [320, 851, 1290, 2999],
+    "cacheComparison": {
+      "missMs": 400,
+      "hitMs": 190
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/compact-semantic-report.schema.json",
+  "title": "AgentShell Compact Semantic Quality Report",
+  "type": "object",
+  "required": ["ok", "protocolVersion", "compact", "summary", "thresholds", "scores", "micro", "macro", "coverage", "gates", "groups", "limits", "cases"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "protocolVersion": { "const": "agentshell.compact-semantic-quality.v2" },
+    "compact": { "const": true },
+    "summary": {
+      "type": "object",
+      "required": ["status", "fixtureCount", "passedFixtures", "failedFixtures", "budgetPass", "measuredTokenReductionCases", "measuredExtraReadRiskCases"],
+      "properties": {
+        "status": { "enum": ["passed", "failed"] },
+        "fixtureCount": { "type": "integer", "minimum": 0 },
+        "passedFixtures": { "type": "integer", "minimum": 0 },
+        "failedFixtures": { "type": "integer", "minimum": 0 },
+        "budgetPass": { "type": "boolean" },
+        "measuredTokenReductionCases": { "type": "integer", "minimum": 0 },
+        "measuredExtraReadRiskCases": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "thresholds": { "$ref": "#/$defs/metrics" },
+    "scores": { "$ref": "#/$defs/metricsWithOverall" },
+    "micro": { "$ref": "#/$defs/metricsWithOverall" },
+    "macro": { "$ref": "#/$defs/metricsWithOverall" },
+    "coverage": { "$ref": "#/$defs/coverage" },
+    "gates": { "$ref": "#/$defs/gates" },
+    "groups": {
+      "type": "object",
+      "required": ["byLanguage", "byScenario"],
+      "properties": {
+        "byLanguage": { "$ref": "#/$defs/groupMap" },
+        "byScenario": { "$ref": "#/$defs/groupMap" }
+      },
+      "additionalProperties": false
+    },
+    "limits": { "type": "object" },
+    "cases": { "type": "array", "items": { "$ref": "#/$defs/case" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "metrics": {
+      "type": "object",
+      "required": ["errorRecall", "fileLocationAccuracy", "lineAccuracy", "decisionConsistency", "necessaryInformationRetention", "extraReadRisk", "tokenReduction"],
+      "properties": {
+        "errorRecall": { "$ref": "#/$defs/rate" },
+        "fileLocationAccuracy": { "$ref": "#/$defs/rate" },
+        "lineAccuracy": { "$ref": "#/$defs/rate" },
+        "decisionConsistency": { "$ref": "#/$defs/rate" },
+        "necessaryInformationRetention": { "$ref": "#/$defs/rate" },
+        "extraReadRisk": { "$ref": "#/$defs/rate" },
+        "tokenReduction": { "$ref": "#/$defs/rate" }
+      },
+      "additionalProperties": false
+    },
+    "metricsWithOverall": {
+      "type": "object",
+      "required": ["errorRecall", "fileLocationAccuracy", "lineAccuracy", "decisionConsistency", "necessaryInformationRetention", "extraReadRisk", "tokenReduction", "overall"],
+      "properties": {
+        "errorRecall": { "$ref": "#/$defs/rate" },
+        "fileLocationAccuracy": { "$ref": "#/$defs/rate" },
+        "lineAccuracy": { "$ref": "#/$defs/rate" },
+        "decisionConsistency": { "$ref": "#/$defs/rate" },
+        "necessaryInformationRetention": { "$ref": "#/$defs/rate" },
+        "extraReadRisk": { "$ref": "#/$defs/rate" },
+        "tokenReduction": { "$ref": "#/$defs/rate" },
+        "overall": { "$ref": "#/$defs/rate" }
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["errorRecall", "fileLocationAccuracy", "lineAccuracy", "decisionConsistency", "necessaryInformationRetention", "extraReadRisk", "tokenReduction"],
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "gate": {
+      "type": "object",
+      "required": ["measured", "direction", "threshold", "value", "passed"],
+      "properties": {
+        "measured": { "type": "boolean" },
+        "direction": { "enum": ["minimum", "maximum"] },
+        "threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "value": { "$ref": "#/$defs/rate" },
+        "passed": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "gates": {
+      "type": "object",
+      "required": ["errorRecall", "fileLocationAccuracy", "lineAccuracy", "decisionConsistency", "necessaryInformationRetention", "extraReadRisk", "tokenReduction"],
+      "additionalProperties": { "$ref": "#/$defs/gate" }
+    },
+    "groupMap": { "type": "object", "additionalProperties": { "$ref": "#/$defs/group" } },
+    "group": {
+      "type": "object",
+      "required": ["fixtureCount", "micro", "macro", "coverage"],
+      "properties": {
+        "fixtureCount": { "type": "integer", "minimum": 1 },
+        "micro": { "$ref": "#/$defs/metricsWithOverall" },
+        "macro": { "$ref": "#/$defs/metricsWithOverall" },
+        "coverage": { "$ref": "#/$defs/coverage" }
+      },
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": ["id", "language", "scenario", "supported", "ok", "scores", "counts", "measurement", "budgetViolations", "evidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "language": { "type": "string" },
+        "scenario": { "type": "string" },
+        "supported": { "type": "boolean" },
+        "ok": { "type": "boolean" },
+        "scores": { "$ref": "#/$defs/metrics" },
+        "counts": { "type": "object" },
+        "measurement": { "type": "object" },
+        "budgetViolations": { "type": "array" },
+        "evidence": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

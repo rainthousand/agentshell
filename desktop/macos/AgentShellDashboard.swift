@@ -10,6 +10,7 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
     private var scopeValue: NSTextField!
     private var savingsValue: NSTextField!
     private var timeValue: NSTextField!
+    private var allTimeValue: NSTextField!
     private var refreshTimer: Timer?
     private var requestTask: URLSessionDataTask?
     private var localEventMonitor: Any?
@@ -86,15 +87,16 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func buildPopover() {
         let controller = NSViewController()
-        let content = NSView(frame: NSRect(x: 0, y: 0, width: 276, height: 184))
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 276, height: 202))
 
         let title = label("AgentShell", size: 13, weight: .semibold, color: .labelColor)
         scopeValue = label("All workspaces", size: 11, weight: .regular, color: .secondaryLabelColor)
         savingsValue = label("--", size: 22, weight: .semibold, color: .labelColor)
         timeValue = label("--", size: 22, weight: .semibold, color: .labelColor)
+        allTimeValue = label("All time --", size: 10, weight: .regular, color: .tertiaryLabelColor)
 
-        let savings = metric(title: "Verified context saved", value: savingsValue)
-        let time = metric(title: "Verified time saved", value: timeValue)
+        let savings = metric(title: "Estimated verified context saved", value: savingsValue)
+        let time = metric(title: "Verified cache time saved", value: timeValue)
         let metrics = NSStackView(views: [savings, time])
         metrics.orientation = .horizontal
         metrics.distribution = .fillEqually
@@ -110,12 +112,13 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         actions.orientation = .horizontal
         actions.alignment = .centerY
 
-        let stack = NSStackView(views: [title, scopeValue, metrics, actions])
+        let stack = NSStackView(views: [title, scopeValue, metrics, allTimeValue, actions])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 5
         stack.setCustomSpacing(14, after: scopeValue)
-        stack.setCustomSpacing(13, after: metrics)
+        stack.setCustomSpacing(6, after: metrics)
+        stack.setCustomSpacing(10, after: allTimeValue)
         stack.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stack)
 
@@ -161,7 +164,7 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         webView.setValue(false, forKey: "drawsBackground")
 
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 170),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 380),
             styleMask: [.titled, .closable, .resizable, .utilityWindow],
             backing: .buffered,
             defer: false
@@ -172,8 +175,8 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         panel.level = .normal
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.minSize = NSSize(width: 280, height: 140)
-        panel.maxSize = NSSize(width: 480, height: 260)
+        panel.minSize = NSSize(width: 340, height: 300)
+        panel.maxSize = NSSize(width: 640, height: 560)
         panel.setFrameAutosaveName("AgentShellSavingsPanel")
         panel.center()
         webView.load(URLRequest(url: dashboardURL, cachePolicy: .reloadIgnoringLocalCacheData))
@@ -248,17 +251,22 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
             guard error == nil,
                   let data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let dashboard = json["dashboard"] as? [String: Any],
-                  let totals = dashboard["totals"] as? [String: Any] else {
+                  let dashboard = json["dashboard"] as? [String: Any] else {
                 DispatchQueue.main.async { self.renderOffline() }
                 return
             }
-            let tokens = totals["estimatedContextAvoidedTokens"] as? NSNumber
-            let time = totals["estimatedTimeSavedMs"] as? NSNumber
+            let verifiedSavings = dashboard["verifiedSavings"] as? [String: Any]
+            let today = verifiedSavings?["today"] as? [String: Any]
+            let allTime = verifiedSavings?["allTime"] as? [String: Any]
+            let availability = verifiedSavings?["availability"] as? [String: Any]
+            let tokensAvailable = availability?["contextTokens"] as? Bool == true
+            let timeAvailable = availability?["time"] as? Bool == true
+            let tokens = tokensAvailable ? today?["contextTokens"] as? NSNumber : nil
+            let time = timeAvailable ? today?["timeMs"] as? NSNumber : nil
+            let allTimeTokens = tokensAvailable ? allTime?["contextTokens"] as? NSNumber : nil
+            let allTimeMs = timeAvailable ? allTime?["timeMs"] as? NSNumber : nil
             let coverage = dashboard["coverage"] as? [String: Any]
             let freshness = dashboard["freshness"] as? [String: Any]
-            let tokensAvailable = coverage?["verifiedTokenSavingsAvailable"] as? Bool ?? (tokens != nil)
-            let timeAvailable = coverage?["verifiedTimeSavingsAvailable"] as? Bool ?? (time != nil)
             let freshnessStatus = freshness?["status"] as? String ?? "unknown"
             let exactAttribution = coverage?["exactAttributionPercent"] as? NSNumber
             let scope = dashboard["scope"] as? String
@@ -266,6 +274,8 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
                 self.render(
                     tokens: tokensAvailable ? tokens : nil,
                     time: timeAvailable ? time : nil,
+                    allTimeTokens: tokensAvailable ? allTimeTokens : nil,
+                    allTimeMs: timeAvailable ? allTimeMs : nil,
                     scope: scope,
                     freshness: freshnessStatus,
                     exactAttribution: exactAttribution
@@ -275,18 +285,21 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         requestTask?.resume()
     }
 
-    private func render(tokens: NSNumber?, time: NSNumber?, scope: String?, freshness: String, exactAttribution: NSNumber?) {
-        scopeValue.stringValue = scope == "workspace" ? "Project" : "All workspaces"
+    private func render(tokens: NSNumber?, time: NSNumber?, allTimeTokens: NSNumber?, allTimeMs: NSNumber?, scope: String?, freshness: String, exactAttribution: NSNumber?) {
+        scopeValue.stringValue = scope == "workspace" ? "Today · Project" : "Today · All workspaces"
         let attribution = exactAttribution.map { "\($0.intValue)% exact attribution" } ?? "attribution unavailable"
-        statusItem.button?.toolTip = "AgentShell local tooling; data \(freshness); \(attribution); Codex model tokens unavailable"
+        statusItem.button?.toolTip = "Estimated context saved from compact output; cache time saved versus measured uncached baseline; data \(freshness); \(attribution); Codex model tokens unavailable"
         if let tokens {
             statusItem.button?.title = "AS \(compactNumber(tokens.intValue))"
-            savingsValue.stringValue = "\(formattedNumber(tokens.intValue)) tokens"
+            savingsValue.stringValue = formattedNumber(tokens.intValue)
         } else {
             statusItem.button?.title = "AS --"
             savingsValue.stringValue = "--"
         }
         timeValue.stringValue = time.map { formatDuration($0.intValue) } ?? "--"
+        let allTokens = allTimeTokens.map { "\(compactNumber($0.intValue)) est. context" } ?? "--"
+        let allDuration = allTimeMs.map { formatDuration($0.intValue) } ?? "--"
+        allTimeValue.stringValue = "All time  \(allTokens) · \(allDuration)"
     }
 
     private func renderOffline() {
@@ -295,6 +308,7 @@ final class DashboardController: NSObject, NSApplicationDelegate, NSWindowDelega
         scopeValue.stringValue = "All workspaces"
         savingsValue.stringValue = "--"
         timeValue.stringValue = "--"
+        allTimeValue.stringValue = "All time --"
     }
 
     private func compactNumber(_ value: Int) -> String {

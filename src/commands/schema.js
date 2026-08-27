@@ -2,77 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fail } from "../core/output.js";
 import { resolvePackageRoot } from "../core/package-root.js";
+import { SCHEMA_NAMES } from "../core/command-registry.js";
 
-const SCHEMAS = [
-  "common",
-  "start",
-  "understand",
-  "project-health",
-  "doctor",
-  "plugin-status",
-  "plugin-validate",
-  "plugin-release-local",
-  "plugin-smoke",
-  "manual",
-  "read",
-  "grep",
-  "find-file",
-  "ls",
-  "pwd",
-  "du",
-  "which",
-  "ps",
-  "port",
-  "kill-suggest",
-  "tree",
-  "package-scripts",
-  "package-script",
-  "package-deps",
-  "files-changed",
-  "changed-impact",
-  "file-info",
-  "test-list",
-  "test-command",
-  "errors-from-log",
-  "errors-from-command",
-  "imports",
-  "symbols",
-  "refs",
-  "config-list",
-  "git-status",
-  "git-diff",
-  "git-log",
-  "git-branch",
-  "verify",
-  "diagnose",
-  "change",
-  "change-fill",
-  "change-suggest",
-  "fix",
-  "benchmark",
-  "benchmark-suite",
-  "strategy-coverage-matrix",
-  "strategy-intake",
-  "product-readiness",
-  "codex-plugin-trial",
-  "codex-plugin-trial-template",
-  "codex-plugin-trial-plan",
-  "codex-plugin-trial-suite",
-  "trial-export",
-  "trial-status",
-  "beta-funnel",
-  "dashboard",
-  "cold-start-benchmark",
-  "real-project-eval",
-  "real-project-candidates",
-  "adapter-trial",
-  "adapter-trial-collect",
-  "adapter-trial-suite",
-  "metrics",
-  "run",
-  "run-next",
-  "run-clear"
-];
+const SCHEMAS = SCHEMA_NAMES;
 const SCHEMA_LIST_PROTOCOL_VERSION = "agentshell.schema-list.v1";
 const SCHEMA_GET_PROTOCOL_VERSION = "agentshell.schema-get.v1";
 
@@ -98,9 +30,10 @@ export async function schema(root, action, name) {
     });
   }
 
-  const schemaPath = path.resolve(root, "schemas", `${name}.schema.json`);
-  const fallbackPath = path.join(resolvePackageRoot({ root }), "schemas", `${name}.schema.json`);
-  const file = fs.existsSync(schemaPath) ? schemaPath : fallbackPath;
+  const entryRoot = process.env.AGENTSHELL_PACKAGE_ROOT
+    || (process.argv[1] ? path.resolve(path.dirname(process.argv[1]), "..") : undefined);
+  const packageRoot = resolvePackageRoot({ sourceRoot: entryRoot });
+  const file = path.join(packageRoot, "schemas", `${name}.schema.json`);
   return {
     protocolVersion: SCHEMA_GET_PROTOCOL_VERSION,
     ...JSON.parse(fs.readFileSync(file, "utf8"))

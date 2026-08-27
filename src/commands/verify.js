@@ -8,7 +8,10 @@ import { fail } from "../core/output.js";
 import { runShell } from "../core/run.js";
 import { appendOperation, appendRunNode, newId, readActiveRun, readLog, writeLog } from "../core/store.js";
 import {
+  clearTestResultCache,
   createTestResultCacheContext,
+  currentTestResultCacheInput,
+  explainTestResultCache,
   findRelatedTestFilesCacheFromContext,
   findTestResultCacheFromContext,
   writeTestResultCacheFromContext
@@ -39,6 +42,21 @@ export async function verify(root, type, options = {}) {
     return fail("SCRIPT_NOT_FOUND", message);
   }
 
+  if (options.cacheAction) {
+    if (!["explain", "clear"].includes(options.cacheAction)) {
+      return fail("CACHE_ACTION_INVALID", "Cache action must be explain or clear");
+    }
+    const cacheOptions = {
+      type,
+      command,
+      packagePath: project.path,
+      project
+    };
+    return options.cacheAction === "explain"
+      ? explainTestResultCache(project.root, cacheOptions)
+      : clearTestResultCache(project.root, cacheOptions);
+  }
+
   if (goQuality) {
     const verification = await runVerificationCommand(project.root, type, command, options, {
       cacheContext: null,
@@ -64,9 +82,12 @@ export async function verify(root, type, options = {}) {
     type,
     command,
     packagePath: project.path,
-    project
+    project,
+    readCacheFile: !options.noCache
   });
-  const cacheLookup = findTestResultCacheFromContext(cacheContext);
+  const cacheLookup = options.noCache
+    ? disabledCacheLookup(cacheContext)
+    : findTestResultCacheFromContext(cacheContext);
   if (cacheLookup.cacheHit) {
     return cachedVerify(project.root, type, command, cacheLookup, options);
   }
@@ -76,19 +97,23 @@ export async function verify(root, type, options = {}) {
     command,
     project,
     relatedFiles: options.relatedFiles || [],
-    cacheContext
+    cacheContext,
+    allowCachedRelated: !options.noCache
   });
   if (relatedPlan) {
     const relatedCacheContext = createTestResultCacheContext(project.root, {
       type,
       command: relatedPlan.command,
       packagePath: project.path,
-      project
+      project,
+      readCacheFile: !options.noCache
     });
     const related = await runVerificationCommand(project.root, type, relatedPlan.command, options, {
       packagePath: project.path,
-      cacheContext: relatedCacheContext,
-      cacheLookup: findTestResultCacheFromContext(relatedCacheContext),
+      cacheContext: options.noCache ? null : relatedCacheContext,
+      cacheLookup: options.noCache
+        ? disabledCacheLookup(relatedCacheContext)
+        : findTestResultCacheFromContext(relatedCacheContext),
       verificationMode: "related-test-file",
       fullCommand: command,
       relatedTestFile: relatedPlan.file,
@@ -100,7 +125,7 @@ export async function verify(root, type, options = {}) {
 
     const full = await runVerificationCommand(project.root, type, command, options, {
       packagePath: project.path,
-      cacheContext,
+      cacheContext: options.noCache ? null : cacheContext,
       cacheLookup,
       projectKind: project.kind,
       projectModules: project.modules,
@@ -111,7 +136,7 @@ export async function verify(root, type, options = {}) {
 
   const verification = await runVerificationCommand(project.root, type, command, options, {
     packagePath: project.path,
-    cacheContext,
+    cacheContext: options.noCache ? null : cacheContext,
     cacheLookup,
     projectKind: project.kind,
     projectModules: project.modules
@@ -153,6 +178,11 @@ async function runVerificationCommand(root, type, command, options, metadata) {
     durationMs,
     cacheHit: false,
     cacheKey: metadata.cacheLookup.cacheKey,
+    cacheCreatedAt: metadata.cacheLookup.createdAt || null,
+    cacheInputDigest: metadata.cacheLookup.inputDigest || null,
+    cacheInputFileCount: metadata.cacheLookup.inputFileCount || 0,
+    cacheReason: metadata.cacheLookup.reason || "fresh-execution",
+    cacheStored: false,
     summary: {
       mainError: ok ? null : (result.summary?.mainError || goTest?.mainError || extractMainError(summaryText)),
       failedTests: ok ? 0 : (result.summary?.failedTests ?? goTest?.failedTests ?? countFailedTests(summaryText))
@@ -181,7 +211,13 @@ async function runVerificationCommand(root, type, command, options, metadata) {
         logRef
       })
     : null;
-  if (cacheWrite) output.cacheKey = cacheWrite.cacheKey;
+  if (cacheWrite) {
+    output.cacheKey = cacheWrite.cacheKey;
+    output.cacheCreatedAt = cacheWrite.createdAt;
+    output.cacheInputDigest = cacheWrite.inputDigest;
+    output.cacheInputFileCount = cacheWrite.inputFileCount;
+    output.cacheStored = true;
+  }
 
   appendOperation(root, {
     id: operationId,
@@ -236,7 +272,7 @@ function goTestJsonCommand(command) {
 function relatedTestFilePlan(root, context) {
   if (context.type !== "test") return null;
   const explicitFiles = selectRelatedTestFiles(context.relatedFiles);
-  const cached = explicitFiles.length > 0
+  const cached = explicitFiles.length > 0 || !context.allowCachedRelated
     ? { relatedTestFiles: explicitFiles, sourceLogRef: null }
     : findRelatedTestFilesCacheFromContext(context.cacheContext);
   const candidates = explicitFiles.length > 0 ? explicitFiles : cached.relatedTestFiles;
@@ -251,6 +287,18 @@ function relatedTestFilePlan(root, context) {
     command,
     source: explicitFiles.length > 0 ? "options" : "cache",
     sourceLogRef: cached.sourceLogRef || null
+  };
+}
+
+function disabledCacheLookup(context) {
+  const input = currentTestResultCacheInput(context);
+  return {
+    cacheHit: false,
+    cacheKey: context.identity.identityKey,
+    createdAt: null,
+    inputDigest: input.inputDigest,
+    inputFileCount: input.fileCount,
+    reason: "disabled-by-option"
   };
 }
 
@@ -303,6 +351,11 @@ function cachedVerify(root, type, command, cacheLookup, options) {
     durationMs,
     cacheHit: true,
     cacheKey: cacheLookup.cacheKey,
+    cacheCreatedAt: cacheLookup.createdAt || entry.createdAt || null,
+    cacheInputDigest: cacheLookup.inputDigest || entry.inputDigest || null,
+    cacheInputFileCount: cacheLookup.inputFileCount || entry.files?.length || 0,
+    cacheReason: cacheLookup.reason || "inputs-unchanged",
+    cacheStored: false,
     cacheSourceLogRef: entry.logRef,
     summary: entry.summary,
     relatedFiles: entry.relatedFiles,

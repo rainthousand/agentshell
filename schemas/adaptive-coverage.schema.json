@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.dev/schemas/adaptive-coverage.schema.json",
+  "title": "AgentShell Adaptive Command Coverage",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "protocolVersion", "status", "thresholds", "summary", "candidates", "bounded", "privacy", "suggestedNextActions"],
+  "properties": {
+    "ok": { "const": true },
+    "protocolVersion": { "const": "agentshell.adaptive-coverage.v1" },
+    "status": { "enum": ["no-observations", "covered", "candidates-available"] },
+    "thresholds": { "$ref": "#/$defs/thresholds" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observationCount", "unsupportedObservationCount", "unsupportedFamilyCount", "discoverableCandidateCount", "promotableCandidateCount"],
+      "properties": {
+        "observationCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "unsupportedObservationCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "unsupportedFamilyCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "discoverableCandidateCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "promotableCandidateCount": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
+    },
+    "candidates": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/candidate" } },
+    "bounded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateLimit", "returnedCandidateCount", "omittedCandidateCount", "maximumCandidateLimit", "maximumInputObservations"],
+      "properties": {
+        "candidateLimit": { "type": "integer", "minimum": 1, "maximum": 25 },
+        "returnedCandidateCount": { "type": "integer", "minimum": 0, "maximum": 25 },
+        "omittedCandidateCount": { "type": "integer", "minimum": 0 },
+        "maximumCandidateLimit": { "const": 25 },
+        "maximumInputObservations": { "const": 10000 }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputContract", "includesRawArguments", "includesPaths", "includesOutput", "includesSourceNames", "includesEventIdentifiers"],
+      "properties": {
+        "inputContract": { "const": "privacy-safe-command-observations" },
+        "includesRawArguments": { "const": false },
+        "includesPaths": { "const": false },
+        "includesOutput": { "const": false },
+        "includesSourceNames": { "const": false },
+        "includesEventIdentifiers": { "const": false }
+      }
+    },
+    "suggestedNextActions": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "candidateCount", "reason"],
+        "properties": {
+          "action": { "enum": ["review-promotable-candidates", "collect-more-observations"] },
+          "candidateCount": { "type": "integer", "minimum": 1, "maximum": 10000 },
+          "reason": { "type": "string", "maxLength": 160 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateMinObservations", "candidateMinPriorityScore", "promotionMinObservations", "promotionMinSources", "promotionMinPriorityScore"],
+      "properties": {
+        "candidateMinObservations": { "type": "integer", "minimum": 0 },
+        "candidateMinPriorityScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "promotionMinObservations": { "type": "integer", "minimum": 0 },
+        "promotionMinSources": { "type": "integer", "minimum": 0 },
+        "promotionMinPriorityScore": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executableFamily", "category", "observationCount", "sourceCount", "unsupportedSharePercent", "priorityScore", "scoreComponents", "profileDraft", "fixtureDraft", "promotion"],
+      "properties": {
+        "executableFamily": { "type": "string", "pattern": "^[a-z0-9][a-z0-9+._-]{0,63}$" },
+        "category": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$" },
+        "observationCount": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "sourceCount": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "unsupportedSharePercent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "priorityScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "scoreComponents": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["frequency", "prevalence", "sourceDiversity"],
+          "properties": {
+            "frequency": { "type": "number", "minimum": 0, "maximum": 50 },
+            "prevalence": { "type": "number", "minimum": 0, "maximum": 30 },
+            "sourceDiversity": { "type": "number", "minimum": 0, "maximum": 20 }
+          }
+        },
+        "profileDraft": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "match", "strategy", "outputContract"],
+          "properties": {
+            "id": { "type": "string", "maxLength": 96 },
+            "match": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["executableFamily"],
+              "properties": { "executableFamily": { "type": "string", "maxLength": 64 } }
+            },
+            "strategy": { "const": "bounded-semantic-summary" },
+            "outputContract": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["preserveExitStatus", "maxLines", "maxEstimatedTokens"],
+              "properties": {
+                "preserveExitStatus": { "const": true },
+                "maxLines": { "type": "integer", "minimum": 1, "maximum": 200 },
+                "maxEstimatedTokens": { "type": "integer", "minimum": 1, "maximum": 3000 }
+              }
+            }
+          }
+        },
+        "fixtureDraft": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "scenarios", "requiredAssertions"],
+          "properties": {
+            "id": { "type": "string", "maxLength": 104 },
+            "scenarios": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "string", "maxLength": 64 } },
+            "requiredAssertions": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "string", "maxLength": 64 } }
+          }
+        },
+        "promotion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "checks"],
+          "properties": {
+            "status": { "enum": ["eligible", "needs-evidence"] },
+            "checks": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/check" } }
+          }
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "passed", "value", "operator", "threshold"],
+      "properties": {
+        "id": { "enum": ["observation-count", "source-diversity", "priority-score"] },
+        "passed": { "type": "boolean" },
+        "value": { "type": "number", "minimum": 0 },
+        "operator": { "const": ">=" },
+        "threshold": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

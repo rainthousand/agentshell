@@ -22,7 +22,10 @@ export function installOrUpdate(options = {}) {
 
   fs.mkdirSync(paths.backups, { recursive: true });
   fs.rmSync(paths.staging, { recursive: true, force: true });
-  copyDir(paths.source, paths.staging);
+  copyDir(paths.source, paths.staging, {
+    sourceRoot: paths.source,
+    forbidden: deliveryForbiddenPaths(paths.source)
+  });
   validateStaging(paths.staging);
 
   const backup = fs.existsSync(paths.target) ? path.join(paths.backups, `plugin-${timestamp()}`) : null;
@@ -57,15 +60,55 @@ export function rollback(options = {}) {
   const paths = lifecyclePaths(options);
   const transaction = readJson(paths.transaction);
   if (!transaction) return report(true, "rollback", paths, { rolledBack: false, reason: "no-transaction" });
-  fs.rmSync(paths.target, { recursive: true, force: true });
-  if (transaction.backup && fs.existsSync(transaction.backup)) fs.renameSync(transaction.backup, paths.target);
+  if ((transaction.backup && !safeChild(paths.backups, transaction.backup))
+    || (transaction.marketplaceBackup && !safeChild(paths.backups, transaction.marketplaceBackup))) {
+    return report(false, "rollback", paths, {
+      rolledBack: false,
+      reason: "transaction-invalid",
+      error: "The rollback transaction references an unmanaged path."
+    });
+  }
+  if (transaction.backup && !fs.existsSync(transaction.backup)) {
+    return report(false, "rollback", paths, {
+      rolledBack: false,
+      reason: "backup-missing",
+      error: "The previous plugin backup is no longer available."
+    });
+  }
+  if (transaction.backup) validateStaging(transaction.backup);
+
+  const displaced = fs.existsSync(paths.target)
+    ? path.join(paths.backups, `.rollback-current-${timestamp()}-${process.pid}`)
+    : null;
+  const marketplaceCurrent = fs.existsSync(paths.marketplace) ? fs.readFileSync(paths.marketplace) : null;
   const marketplaceBefore = transaction.marketplaceBackup && fs.existsSync(transaction.marketplaceBackup)
     ? fs.readFileSync(transaction.marketplaceBackup)
     : null;
-  restoreFile(paths.marketplace, marketplaceBefore);
-  fs.rmSync(paths.cacheRoot, { recursive: true, force: true });
-  fs.rmSync(paths.transaction, { force: true });
-  return report(true, "rollback", paths, { rolledBack: true });
+  try {
+    if (displaced) fs.renameSync(paths.target, displaced);
+    if (transaction.backup) fs.renameSync(transaction.backup, paths.target);
+    restoreFile(paths.marketplace, marketplaceBefore);
+    const cache = refreshCache(options);
+    fs.rmSync(displaced, { recursive: true, force: true });
+    fs.rmSync(paths.transaction, { force: true });
+    return report(true, "rollback", paths, { rolledBack: true, cache });
+  } catch (error) {
+    fs.rmSync(paths.target, { recursive: true, force: true });
+    if (displaced && fs.existsSync(displaced)) fs.renameSync(displaced, paths.target);
+    restoreFile(paths.marketplace, marketplaceCurrent);
+    return report(false, "rollback", paths, { rolledBack: false, error: error.message });
+  }
+}
+
+export function refreshCache(options = {}) {
+  const paths = lifecyclePaths(options);
+  const existed = fs.existsSync(paths.cacheRoot);
+  if (!options.dryRun) fs.rmSync(paths.cacheRoot, { recursive: true, force: true });
+  return {
+    ok: true,
+    status: options.dryRun ? "would-refresh" : existed ? "refreshed" : "already-empty",
+    path: paths.cacheRoot
+  };
 }
 
 export function uninstall(options = {}) {
@@ -77,6 +120,8 @@ export function uninstall(options = {}) {
   }
   fs.rmSync(paths.target, { recursive: true, force: true });
   fs.rmSync(paths.cacheRoot, { recursive: true, force: true });
+  fs.rmSync(paths.transaction, { force: true });
+  fs.rmSync(paths.backups, { recursive: true, force: true });
   removeMarketplaceEntry(paths.marketplace);
   removePolicyBlock(paths.policy);
   return report(true, "uninstall", paths, { installed, removedPolicy: true, legacyDashboardMigration });
@@ -139,7 +184,11 @@ export function doctor(options = {}) {
     executable: executable(path.join(paths.target, "bin", "agentshell")),
     policy: fs.existsSync(paths.policy) && fs.readFileSync(paths.policy, "utf8").includes("<!-- agentshell-policy:start -->")
   };
-  return report(Object.values(checks).every(Boolean), "doctor", paths, { checks, version: manifest?.version || null });
+  return report(Object.values(checks).every(Boolean), "doctor", paths, {
+    checks,
+    version: manifest?.version || null,
+    rollbackAvailable: Boolean(readJson(paths.transaction))
+  });
 }
 
 function lifecyclePaths(options) {
@@ -198,18 +247,27 @@ function removePolicyBlock(file) {
   else fs.rmSync(file, { force: true });
 }
 
-function copyDir(from, to) {
+function copyDir(from, to, options = {}) {
   fs.mkdirSync(to, { recursive: true });
   for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
     if (IGNORED.has(entry.name)) continue;
     const source = path.join(from, entry.name);
     const target = path.join(to, entry.name);
-    if (entry.isDirectory()) copyDir(source, target);
+    const relative = path.relative(options.sourceRoot || from, source).split(path.sep).join("/");
+    if (options.forbidden?.some((blocked) => relative === blocked || relative.startsWith(`${blocked}/`))) continue;
+    if (entry.isDirectory()) copyDir(source, target, options);
     else if (entry.isFile()) {
       fs.copyFileSync(source, target);
       fs.chmodSync(target, fs.statSync(source).mode);
     }
   }
+}
+
+function deliveryForbiddenPaths(sourceRoot) {
+  const contract = readJson(path.join(sourceRoot, "package.json"))?.agentshellDelivery;
+  return contract?.protocolVersion === "agentshell.delivery.v1" && Array.isArray(contract.forbiddenPaths)
+    ? contract.forbiddenPaths.filter((entry) => typeof entry === "string" && entry && !path.isAbsolute(entry) && !entry.includes(".."))
+    : [];
 }
 
 function validateStaging(staging) {
@@ -269,6 +327,11 @@ function defaultRunner(command, args, options) {
 
 function timestamp() {
   return new Date().toISOString().replace(/[-:.TZ]/g, "");
+}
+
+function safeChild(parent, candidate) {
+  const root = `${path.resolve(parent)}${path.sep}`;
+  return path.resolve(candidate).startsWith(root);
 }
 
 function report(ok, action, paths, extra) {

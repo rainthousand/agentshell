@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.dev/schemas/high-noise-profile-summary.schema.json",
+  "title": "AgentShell High-noise Profile Summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profileId", "category", "status", "exitCode", "mainError", "failures", "locations", "counts", "truncated", "suggestedNextActions"],
+  "properties": {
+    "profileId": { "type": "string" },
+    "category": { "type": "string" },
+    "status": { "enum": ["passed", "failed", "changed", "unknown"] },
+    "exitCode": { "type": ["integer", "null"] },
+    "mainError": { "type": ["string", "null"], "maxLength": 240 },
+    "failures": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/failure" } },
+    "locations": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/location" } },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detectedFailures", "returnedFailures", "returnedLocations"],
+      "properties": {
+        "detectedFailures": { "type": "integer", "minimum": 0 },
+        "returnedFailures": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "returnedLocations": { "type": "integer", "minimum": 0, "maximum": 8 }
+      }
+    },
+    "truncated": { "type": "boolean" },
+    "summaryKind": { "type": ["string", "null"] },
+    "details": { "type": ["object", "null"], "maxProperties": 8 },
+    "suggestedNextActions": {
+      "type": "array",
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "line", "column"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": ["integer", "null"], "minimum": 1 },
+        "column": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "code", "location"],
+      "properties": {
+        "message": { "type": "string", "maxLength": 240 },
+        "code": { "type": ["string", "null"] },
+        "location": { "oneOf": [{ "$ref": "#/$defs/location" }, { "type": "null" }] }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "reason"],
+      "properties": {
+        "command": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

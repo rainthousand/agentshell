@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/go-locate.schema.json",
+  "title": "AgentShell Go Locate Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "mode", "query", "summary", "results", "privacy", "limits", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.go-locate.v1" },
+        "compact": { "type": "boolean" },
+        "mode": { "enum": ["symbol", "dependency", "generated"] },
+        "query": { "type": "string", "minLength": 1 },
+        "summary": {
+          "type": "object",
+          "required": ["resultCount", "observedResults", "packageCount", "inspectedFiles", "inspectedBytes", "truncated"],
+          "properties": {
+            "resultCount": { "type": "integer", "minimum": 0 },
+            "observedResults": { "type": "integer", "minimum": 0 },
+            "packageCount": { "type": "integer", "minimum": 0 },
+            "inspectedFiles": { "type": "integer", "minimum": 0 },
+            "inspectedBytes": { "type": "integer", "minimum": 0 },
+            "truncated": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "results": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "required": ["kind", "package", "module"],
+            "properties": {
+              "kind": { "enum": ["symbol", "dependency", "generated"] },
+              "symbol": { "type": "string" },
+              "declaration": { "enum": ["function", "type", "variable", "constant"] },
+              "generator": { "enum": ["pb", "grpc", "mock", "wire", "generic"] },
+              "evidence": { "type": "string" },
+              "package": { "type": "string", "minLength": 1 },
+              "module": { "type": "string", "minLength": 1 },
+              "source": { "enum": ["workspace", "module-cache", "local-replace", "standard-library"] },
+              "file": { "type": "string", "minLength": 1 },
+              "line": { "type": "integer", "minimum": 1 },
+              "standardLibrary": { "type": "boolean" },
+              "workspace": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "required": ["workspacePathsRelative", "dependencyCachePathsExposed", "homePathsExposed", "networkAccess"],
+          "properties": {
+            "workspacePathsRelative": { "const": true },
+            "dependencyCachePathsExposed": { "const": false },
+            "homePathsExposed": { "const": false },
+            "networkAccess": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "limits": {
+          "type": "object",
+          "required": ["maxResults", "maxPackages", "maxFiles", "maxReadBytes"],
+          "properties": {
+            "maxResults": { "type": "integer", "minimum": 1, "maximum": 200 },
+            "maxPackages": { "type": "integer", "minimum": 1 },
+            "maxFiles": { "type": "integer", "minimum": 1 },
+            "maxReadBytes": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["ok", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string", "minLength": 1 },
+            "message": { "type": "string", "minLength": 1 },
+            "details": { "type": "object" },
+            "suggestedNextActions": { "type": "array" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

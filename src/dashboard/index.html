@@ -9,15 +9,22 @@
   </head>
   <body>
     <main class="shell" aria-label="AgentShell savings">
-      <section class="metric metric-tokens">
-        <span>Verified context saved</span>
-        <strong id="tokens-saved">--</strong>
-      </section>
-      <section class="metric metric-time">
-        <span>Verified time saved</span>
-        <strong id="time-saved">--</strong>
+      <header><strong>Today</strong><span id="timezone"></span></header>
+      <div class="today">
+        <section class="metric metric-tokens">
+          <span title="Estimated from raw command output versus AgentShell compact output; not Codex model usage">Estimated verified context saved</span>
+          <strong id="tokens-saved">--</strong>
+        </section>
+        <section class="metric metric-time">
+          <span title="Measured cache-hit time compared with its observed uncached baseline">Verified cache time saved</span>
+          <strong id="time-saved">--</strong>
+        </section>
+      </div>
+      <section class="history" aria-label="Last 7 days">
+        <div class="section-title"><strong>Last 7 days</strong><span id="all-time">All time --</span></div>
+        <div id="daily-savings" class="daily-savings"></div>
       </section>
     </main>
-    <script src="/app.js" defer></script>
+    <script src="/app.js" type="module"></script>
   </body>
 </html>

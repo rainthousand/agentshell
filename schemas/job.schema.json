@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.dev/schemas/job.schema.json",
+  "title": "AgentShell background job protocol",
+  "oneOf": [
+    { "$ref": "#/$defs/start" },
+    { "$ref": "#/$defs/status" },
+    { "$ref": "#/$defs/delta" },
+    { "$ref": "#/$defs/cancel" },
+    { "$ref": "#/$defs/failure" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "schemaVersion", "action"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.job.v1" },
+        "schemaVersion": { "const": 1 },
+        "action": { "enum": ["start", "status", "delta", "cancel"] }
+      }
+    },
+    "job": {
+      "type": "object",
+      "required": ["jobId", "status", "argv", "startedAt", "updatedAt", "timeoutMs", "timedOut", "cancelRequested", "log"],
+      "properties": {
+        "jobId": { "type": "string", "pattern": "^[a-z0-9-]{8,80}$" },
+        "status": { "enum": ["starting", "running", "completed", "failed", "cancelled", "timed_out", "lost"] },
+        "argv": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 4096 } },
+        "pid": { "type": ["integer", "null"] },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": ["string", "null"], "format": "date-time" },
+        "timeoutMs": { "type": "integer", "minimum": 10, "maximum": 86400000 },
+        "exitCode": { "type": ["integer", "null"] },
+        "signal": { "type": ["string", "null"] },
+        "timedOut": { "type": "boolean" },
+        "cancelRequested": { "type": "boolean" },
+        "terminationReason": { "type": ["string", "null"] },
+        "log": {
+          "type": "object",
+          "required": ["segmentBytes", "maxSegments", "stdoutBytes", "stderrBytes"],
+          "properties": {
+            "segmentBytes": { "type": "integer" },
+            "maxSegments": { "type": "integer" },
+            "stdoutBytes": { "type": "integer" },
+            "stderrBytes": { "type": "integer" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "start": { "allOf": [{ "$ref": "#/$defs/base" }, { "type": "object", "properties": { "action": { "const": "start" }, "job": { "$ref": "#/$defs/job" }, "cursor": { "type": "string" } }, "required": ["job", "cursor"] }] },
+    "status": { "allOf": [{ "$ref": "#/$defs/base" }, { "type": "object", "properties": { "action": { "const": "status" }, "job": { "$ref": "#/$defs/job" } }, "required": ["job"] }] },
+    "delta": { "allOf": [{ "$ref": "#/$defs/base" }, { "type": "object", "properties": { "action": { "const": "delta" }, "job": { "$ref": "#/$defs/job" }, "output": { "type": "object", "properties": { "stdout": { "type": "string" }, "stderr": { "type": "string" } }, "required": ["stdout", "stderr"], "additionalProperties": false }, "cursor": { "type": "string" }, "bytesRead": { "type": "integer" }, "truncated": { "type": "boolean" }, "hasMore": { "type": "boolean" } }, "required": ["job", "output", "cursor", "bytesRead", "truncated", "hasMore"] }] },
+    "cancel": { "allOf": [{ "$ref": "#/$defs/base" }, { "type": "object", "properties": { "action": { "const": "cancel" }, "cancelled": { "type": "boolean" }, "jobId": { "type": "string" }, "instanceVerified": { "type": "boolean" } }, "required": ["cancelled"] }] },
+    "failure": {
+      "type": "object",
+      "required": ["ok", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "error": { "type": "object", "required": ["code", "message", "details", "suggestedNextActions"] }
+      }
+    }
+  }
+}

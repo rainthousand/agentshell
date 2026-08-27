@@ -4,6 +4,11 @@ All notable changes to AgentShell are documented here.
 
 ## Unreleased
 
+- Allow supported standalone builds on Node.js `>=20 <23` and Bun `>=1.2 <1.4`
+  while retaining Node.js `20.20.2` and Bun `1.2.20` as the reproducible GitHub
+  Release CI baseline; build reports distinguish actual versions, supported
+  ranges, and baseline versions.
+
 ## 1.0.0 - 2026-07-16
 
 - Freeze the first stable local CLI and Codex plugin product contract.
@@ -24,7 +29,8 @@ All notable changes to AgentShell are documented here.
 - Move the native Dashboard into an installer-managed, crash-recovering menu-bar service.
 - Aggregate verified savings through permission-independent, path-free workspace snapshots.
 - Add bounded snapshot retention, corruption quarantine, lifecycle diagnostics, and migration seeding.
-- Pin and attest the Node 20.20.2/Bun 1.2.20 release toolchain and verify delivery artifacts in CI.
+- Establish and attest Node 20.20.2/Bun 1.2.20 as the reproducible release
+  baseline and verify delivery artifacts in CI.
 - Harden install, update, rollback, doctor, packaged lifecycle, checksums, and release size budgets.
 
 ## 0.25.0 - 2026-07-14

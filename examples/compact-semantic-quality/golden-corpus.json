@@ -1,0 +1,204 @@
+{
+  "version": 2,
+  "acceptanceThreshold": 0.98,
+  "fixtures": [
+    {
+      "id": "node-assertion", "language": "javascript", "supported": true,
+      "compact": {
+        "ok": true, "protocolVersion": "agentshell.diagnose.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "AssertionError: Expected user.id to be present" },
+        "primaryFailure": { "file": "test/user.test.js", "line": 5, "message": "AssertionError: Expected user.id to be present" },
+        "fixPlan": { "target": { "file": "src/user.js", "line": 2 }, "nextCommand": "agentshell change suggest --dry-run --compact" },
+        "suggestedNextActions": [{ "command": "agentshell change suggest --dry-run --compact", "reason": "Preview the missing id repair" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["Expected user.id to be present"] },
+        "locations": [{ "file": "test/user.test.js", "line": 5 }, { "file": "src/user.js", "line": 2 }],
+        "nextActions": [{ "command": "agentshell change suggest --dry-run --compact" }],
+        "criticalFacts": ["failed", "user.id", "Preview the missing id repair"]
+      }
+    },
+    {
+      "id": "typescript-missing-property", "language": "typescript", "supported": true,
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "TS2741: Property 'id' is missing in type '{ name: string; }'" },
+        "primaryFailure": { "file": "src/user.ts", "line": 6, "column": 7, "message": "Property 'id' is missing" },
+        "suggestedNextActions": [{ "command": "agentshell read src/user.ts --lines 1:10", "reason": "Inspect the failing object literal" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["TS2741", "Property 'id' is missing"] },
+        "locations": [{ "file": "src/user.ts", "line": 6 }],
+        "nextActions": [{ "command": "agentshell read src/user.ts --lines 1:10" }],
+        "criticalFacts": ["TS2741", "id", "object literal"]
+      }
+    },
+    {
+      "id": "go-subtest-failure", "language": "go", "supported": true,
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "TestParse/empty: expected invalid input error, got nil" },
+        "verification": { "primaryFailure": { "file": "parser/parser_test.go", "line": 42, "message": "expected invalid input error, got nil" }, "failedPackages": ["example/parser"] },
+        "suggestedNextActions": [{ "command": "agentshell read parser/parser_test.go --lines 34:48", "reason": "Inspect the failing subtest" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["expected invalid input error, got nil"] },
+        "locations": [{ "file": "parser/parser_test.go", "line": 42 }],
+        "nextActions": [{ "command": "agentshell read parser/parser_test.go --lines 34:48" }],
+        "criticalFacts": ["TestParse/empty", "example/parser", "failing subtest"]
+      }
+    },
+    {
+      "id": "python-pytest-failure", "language": "python", "supported": true,
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "AssertionError: assert 401 == 200" },
+        "primaryFailure": { "file": "tests/test_api.py", "line": 27, "message": "assert 401 == 200" },
+        "details": { "test": "test_profile_requires_valid_session", "failed": 1 },
+        "suggestedNextActions": [{ "command": "agentshell read tests/test_api.py --lines 20:32", "reason": "Inspect the failed API assertion" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["assert 401 == 200"] },
+        "locations": [{ "file": "tests/test_api.py", "line": 27 }],
+        "nextActions": [{ "command": "agentshell read tests/test_api.py --lines 20:32" }],
+        "criticalFacts": ["test_profile_requires_valid_session", "401", "failed API assertion"]
+      }
+    },
+    {
+      "id": "java-junit-failure", "language": "java", "supported": true,
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "OrderServiceTest.createsOrder: expected: <PAID> but was: <PENDING>" },
+        "primaryFailure": { "file": "src/test/java/app/OrderServiceTest.java", "line": 58, "message": "expected PAID but was PENDING" },
+        "details": { "testsRun": 12, "failures": 1 },
+        "suggestedNextActions": [{ "command": "agentshell read src/test/java/app/OrderServiceTest.java --lines 50:64", "reason": "Inspect the failed JUnit assertion" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["expected: <PAID> but was: <PENDING>"] },
+        "locations": [{ "file": "src/test/java/app/OrderServiceTest.java", "line": 58 }],
+        "nextActions": [{ "command": "agentshell read src/test/java/app/OrderServiceTest.java --lines 50:64" }],
+        "criticalFacts": ["OrderServiceTest.createsOrder", "12", "failures"]
+      }
+    },
+    {
+      "id": "node-import-resolution", "language": "javascript", "supported": true,
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.diagnose.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "ERR_MODULE_NOT_FOUND: Cannot find module './users.js'" },
+        "primaryFailure": { "file": "src/index.js", "line": 3, "message": "Cannot find module './users.js'" },
+        "relatedFiles": ["src/user.js"],
+        "suggestedNextActions": [{ "command": "agentshell file info src/user.js --compact", "reason": "Confirm the likely import target" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["ERR_MODULE_NOT_FOUND", "Cannot find module './users.js'"] },
+        "locations": [{ "file": "src/index.js", "line": 3 }],
+        "nextActions": [{ "command": "agentshell file info src/user.js --compact" }],
+        "criticalFacts": ["./users.js", "src/user.js", "likely import target"]
+      }
+    },
+    {
+      "id": "go-build-failure", "language": "go", "supported": true,
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "undefined: NewHTTPServer" },
+        "primaryFailure": { "file": "cmd/api/main.go", "line": 19, "message": "undefined: NewHTTPServer" },
+        "details": { "command": "go build ./...", "exitCode": 1 },
+        "suggestedNextActions": [{ "command": "agentshell refs NewHTTPServer --compact", "reason": "Find the missing symbol or renamed constructor" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["undefined: NewHTTPServer"] },
+        "locations": [{ "file": "cmd/api/main.go", "line": 19 }],
+        "nextActions": [{ "command": "agentshell refs NewHTTPServer --compact" }],
+        "criticalFacts": ["go build ./...", "exitCode", "renamed constructor"]
+      }
+    },
+    {
+      "id": "eslint-rule-failure", "language": "typescript", "supported": true,
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "@typescript-eslint/no-floating-promises: Promises must be awaited" },
+        "primaryFailure": { "file": "src/worker.ts", "line": 73, "column": 5, "message": "Promises must be awaited" },
+        "details": { "errors": 1, "warnings": 0 },
+        "suggestedNextActions": [{ "command": "agentshell read src/worker.ts --lines 66:80", "reason": "Inspect the unhandled promise" }]
+      },
+      "expected": {
+        "mainError": { "anyOf": ["Promises must be awaited"] },
+        "locations": [{ "file": "src/worker.ts", "line": 73 }],
+        "nextActions": [{ "command": "agentshell read src/worker.ts --lines 66:80" }],
+        "criticalFacts": ["no-floating-promises", "warnings", "unhandled promise"]
+      }
+    },
+    {
+      "id": "typescript-noisy-typecheck", "language": "typescript", "scenario": "typecheck-noise", "supported": true,
+      "baseline": "tsc project graph: loading lib.es2023.d.ts; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; resolving dependencies; cache miss; src/cart.ts:41:9 TS2322 Type 'string' is not assignable to type 'number'",
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "TS2322: Type 'string' is not assignable to type 'number'" },
+        "primaryFailure": { "file": "src/cart.ts", "line": 41, "message": "Type 'string' is not assignable to type 'number'" },
+        "suggestedNextActions": [{ "command": "agentshell read src/cart.ts --lines 35:47", "reason": "Inspect the failing assignment" }]
+      },
+      "expected": {
+        "errors": [{ "anyOf": ["TS2322", "not assignable to type 'number'"] }],
+        "locations": [{ "file": "src/cart.ts", "line": 41 }],
+        "decisions": [{ "command": "agentshell read src/cart.ts --lines 35:47" }],
+        "necessaryFacts": ["TS2322", "src/cart.ts", "failing assignment"],
+        "forbiddenFacts": ["project graph"],
+        "additionalRead": { "allowed": false }
+      }
+    },
+    {
+      "id": "go-noisy-test", "language": "go", "scenario": "test-noise", "supported": true,
+      "baseline": "go: downloading module metadata; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; package discovery; internal/store/store_test.go:88: expected 3 rows, got 2",
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "expected 3 rows, got 2" },
+        "primaryFailure": { "file": "internal/store/store_test.go", "line": 88, "message": "expected 3 rows, got 2" },
+        "suggestedNextActions": [{ "command": "go test ./internal/store -run TestInsert", "reason": "Rerun the focused failing test" }]
+      },
+      "expected": {
+        "errors": [{ "anyOf": ["expected 3 rows, got 2"] }],
+        "locations": [{ "file": "internal/store/store_test.go", "line": 88 }],
+        "decisions": [{ "command": "go test ./internal/store -run TestInsert" }],
+        "necessaryFacts": ["failed", "3 rows", "focused failing test"],
+        "forbiddenFacts": ["downloading module metadata"],
+        "additionalRead": { "allowed": false }
+      }
+    },
+    {
+      "id": "python-noisy-pytest", "language": "python", "scenario": "test-noise", "supported": true,
+      "baseline": "pytest plugin initialization; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; collecting tests; tests/test_checkout.py:64: AssertionError: assert 'pending' == 'paid'",
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "AssertionError: assert 'pending' == 'paid'" },
+        "primaryFailure": { "file": "tests/test_checkout.py", "line": 64, "message": "assert 'pending' == 'paid'" },
+        "suggestedNextActions": [{ "command": "agentshell read tests/test_checkout.py --lines 56:70", "reason": "Inspect the checkout assertion" }]
+      },
+      "expected": {
+        "errors": [{ "anyOf": ["assert 'pending' == 'paid'"] }],
+        "locations": [{ "file": "tests/test_checkout.py", "line": 64 }],
+        "decisions": [{ "command": "agentshell read tests/test_checkout.py --lines 56:70" }],
+        "necessaryFacts": ["AssertionError", "pending", "checkout assertion"],
+        "forbiddenFacts": ["plugin initialization"],
+        "additionalRead": { "allowed": false }
+      }
+    },
+    {
+      "id": "java-noisy-gradle", "language": "java", "scenario": "build-noise", "supported": true,
+      "baseline": "Gradle daemon starting; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; resolving classpath; src/main/java/app/PaymentService.java:73: error: cannot find symbol PaymentResult",
+      "compact": {
+        "ok": false, "protocolVersion": "agentshell.verify.v1", "compact": true,
+        "summary": { "status": "failed", "mainError": "cannot find symbol PaymentResult" },
+        "primaryFailure": { "file": "src/main/java/app/PaymentService.java", "line": 73, "message": "cannot find symbol PaymentResult" },
+        "suggestedNextActions": [{ "command": "agentshell grep PaymentResult --type java --compact", "reason": "Locate the missing symbol" }]
+      },
+      "expected": {
+        "errors": [{ "anyOf": ["cannot find symbol PaymentResult"] }],
+        "locations": [{ "file": "src/main/java/app/PaymentService.java", "line": 73 }],
+        "decisions": [{ "command": "agentshell grep PaymentResult --type java --compact" }],
+        "necessaryFacts": ["PaymentResult", "PaymentService.java", "missing symbol"],
+        "forbiddenFacts": ["Gradle daemon starting"],
+        "additionalRead": { "allowed": false }
+      }
+    }
+  ]
+}

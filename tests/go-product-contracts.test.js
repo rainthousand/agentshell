@@ -7,10 +7,14 @@ const compatibility = fs.readFileSync(
   new URL("../docs/compatibility.md", import.meta.url),
   "utf8"
 );
-const skill = fs.readFileSync(
-  new URL("../skills/agentshell/SKILL.md", import.meta.url),
-  "utf8"
-);
+const skillRoot = new URL("../skills/agentshell/", import.meta.url);
+const referencesRoot = new URL("references/", skillRoot);
+const skill = [
+  fs.readFileSync(new URL("SKILL.md", skillRoot), "utf8"),
+  ...fs.readdirSync(referencesRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => fs.readFileSync(new URL(entry.name, referencesRoot), "utf8"))
+].join("\n");
 
 test("public docs expose the Go project and verification surface", () => {
   for (const text of [readme, compatibility, skill]) {

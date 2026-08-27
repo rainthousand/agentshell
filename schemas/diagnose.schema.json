@@ -38,7 +38,27 @@
               "type": "array",
               "items": { "type": "string" }
             },
-            "logRef": { "type": "string" }
+            "logRef": { "type": "string" },
+            "relatedTestFileVerification": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": ["ok", "operationId", "command", "exitCode", "durationMs", "summary", "relatedTestFile", "logRef"],
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "operationId": { "type": "string" },
+                    "command": { "type": "string" },
+                    "exitCode": { "type": ["integer", "null"] },
+                    "durationMs": { "type": "integer", "minimum": 0 },
+                    "summary": { "type": "object" },
+                    "relatedTestFile": { "type": ["string", "null"] },
+                    "logRef": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            }
           },
           "additionalProperties": false
         },

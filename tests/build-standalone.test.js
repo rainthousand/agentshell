@@ -60,6 +60,11 @@ test("standalone dry run describes the macOS arm64 artifact and smoke checks", (
   }
 });
 
+test("standalone injector uses explicit npx package resolution", () => {
+  const source = fs.readFileSync(new URL("../scripts/build-standalone.js", import.meta.url), "utf8");
+  assert.match(source, /"--package", "postject@1\.0\.0-alpha\.6", "postject"/);
+});
+
 test("standalone signing defaults to ad-hoc and opts into hardened Developer ID signing", () => {
   assert.deepEqual(resolveSigningConfiguration({}), {
     identity: "ad-hoc",
@@ -98,17 +103,33 @@ test("standalone dry run reports planned Developer ID release signing", () => {
   }
 });
 
-test("release toolchain requires the canonical Node and Bun versions", () => {
+test("release toolchain accepts supported versions and reports the CI baseline", () => {
   const compliant = evaluateReleaseToolchain({ nodeVersion: "v20.20.2", bunVersion: "1.2.20\n" });
   assert.equal(compliant.ok, true);
-  assert.equal(compliant.status, "compliant");
-  assert.deepEqual(compliant.required, RELEASE_TOOLCHAIN);
+  assert.equal(compliant.status, "compatible");
+  assert.deepEqual(compliant.baseline, {
+    nodeVersion: RELEASE_TOOLCHAIN.nodeVersion,
+    bunVersion: RELEASE_TOOLCHAIN.bunVersion
+  });
+  assert.deepEqual(compliant.supported, RELEASE_TOOLCHAIN.supported);
   assert.doesNotThrow(() => assertReleaseToolchain(compliant));
 
-  const unsupported = evaluateReleaseToolchain({ nodeVersion: "22.0.0", bunVersion: "1.2.19" });
+  const current = evaluateReleaseToolchain({ nodeVersion: "22.16.0", bunVersion: "1.3.12" });
+  assert.equal(current.ok, true);
+  assert.equal(current.status, "compatible");
+
+  const unsupported = evaluateReleaseToolchain({ nodeVersion: "23.0.0", bunVersion: "1.4.0" });
   assert.equal(unsupported.ok, false);
   assert.equal(unsupported.status, "unsupported");
-  assert.throws(() => assertReleaseToolchain(unsupported), /required Node 20\.20\.2, Bun 1\.2\.20/);
+  assert.throws(() => assertReleaseToolchain(unsupported), /supported Node >=20\.0\.0 <23\.0\.0, Bun >=1\.2\.0 <1\.4\.0/);
+
+  for (const actual of [
+    { nodeVersion: "19.99.0", bunVersion: "1.2.20" },
+    { nodeVersion: "20.20.2", bunVersion: "1.1.99" },
+    { nodeVersion: "22.0.0-rc.1", bunVersion: "1.3.0" }
+  ]) {
+    assert.equal(evaluateReleaseToolchain(actual).ok, false);
+  }
 });
 
 test("standalone build rejects unsupported toolchains before writing output", () => {
@@ -118,7 +139,7 @@ test("standalone build rejects unsupported toolchains before writing output", ()
       root,
       platform: "darwin",
       arch: "arm64",
-      nodeVersion: "22.0.0",
+      nodeVersion: "23.0.0",
       run(command, args) {
         assert.deepEqual([command, ...args], ["bun", "--version"]);
         return { status: 0, stdout: "1.2.20\n", stderr: "" };

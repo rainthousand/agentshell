@@ -2,24 +2,38 @@
 
 ## Current Candidate
 
-- Version: `1.0.0+codex.20260716102207`.
-- Git import: complete.
-- Private GitHub repository push: complete.
-- Local standalone, release report, share ZIP, checksum/archive verification,
-  and packaged install/update/doctor/uninstall smoke: complete.
+- Core version: `1.0.0`.
+- Public GitHub repository and immutable `v1.0.0` release: complete.
+- Release assets, checksums, clean install/update/doctor/uninstall smoke: complete.
 - Canonical product path: local CLI + Codex plugin on macOS.
 
-## V1.0 Release Gates
+## Post-v1.0 Reliability Work
 
-- [x] Define V1.0 as a Core GitHub/Codex plugin release without native PKG or
-  App Store distribution; Apple credentials are not required for this track.
-- [x] Pass stable-channel install, update, rollback, doctor, Dashboard, support
-  export, and uninstall acceptance in a clean HOME.
-- [ ] Make the repository public after the Core release assets and documentation
-  pass their final local audit.
-- [ ] Decide whether to rewrite Git history to remove legacy standalone blobs;
-  this requires an explicit force-push approval and is not needed for runtime.
-- [ ] Publish the immutable `v1.0.0` tag and verify every Release Asset.
+- [x] Verify source and installed plugin content hashes, not version strings alone.
+- [x] Make verification cache decisions explainable and safe for untracked files.
+- [x] Enforce compact-output budgets in CI.
+- [x] Keep savings, baseline, observed output, and unavailable model metrics distinct.
+- [x] Keep fast, integration, release, and benchmark tests independently runnable.
+- [x] Attribute every compact fix and verification to real operation IDs.
+- [x] Gate compact semantic quality across JS/TS, Go, Python, and Java fixtures.
+- [x] Measure privacy-safe command hit rate without inventing external telemetry.
+- [x] Provide checkout-free update, doctor, rollback, hash, and release-integrity checks.
+- [x] Enforce explicit cold-start, overhead, compact-token, and cache-speedup SLA contracts.
+- [x] Show Today, Last 7 days, and All time verified savings in the Dashboard.
+- [x] Ingest privacy-safe adapter fallback observations with idempotent deduplication.
+- [x] Provide bounded generic exec with high-noise command profiles.
+- [x] Read only incremental log deltas with rotation and truncation recovery.
+- [x] Rank privacy-safe fallback observations into adaptive profile and fixture candidates.
+- [x] Add an optional read-only local Runtime with TTL and fingerprint invalidation.
+- [x] Gate compact output on semantic fidelity, extra-read risk, and measured Token reduction.
+- [x] Add bounded multi-repository branch guards and aligned cross-repository search.
+- [x] Add structured focused Go verification, including safe Mockey parameters.
+- [x] Add conservative changed-file verification plans and generic boundary policies.
+- [x] Add bounded multi-repository branch, dirty-state, and risk auditing.
+- [x] Add ordered multi-file reads with partial results and a global output budget.
+- [x] Add offline dependency-aware changed verification for Go and Node workspaces.
+- [x] Add owned background jobs with rotating logs, delta cursors, timeout, and cancellation.
+- [x] Add bounded Go symbol, SDK/module, and generated-code location.
 
 ## Completed Release Work
 
@@ -30,11 +44,12 @@
 - Downloaded the published binary and ZIP into clean temporary locations and
   verified both checksums.
 - Verified the downloaded standalone reports version `0.25.3` after applying
-  its executable bit, and confirmed strict toolchain and size-budget evidence
+  its executable bit, and confirmed toolchain attestation and size-budget evidence
   in the downloaded release report.
 - Release: `https://github.com/rainthousand/agentshell/releases/tag/v0.25.3`.
 
-No blocking release-engineering task remains for v0.25.3.
+The `v1.0.0` Core release is public and its downloadable assets have been
+checksum-verified. No blocking release-engineering task remains for V1.0.
 
 The failed `v0.25.1` and `v0.25.2` workflow tags have no GitHub Releases and
 must not be presented as published versions. Their tags remain immutable audit
@@ -54,7 +69,11 @@ learning and broader claims, but it does not block v0.25.3 or v1.0.
 
 ## Release Maintenance
 
-- Keep Node `20.20.2` and Bun `1.2.20` release-toolchain enforcement green.
+- Keep local builds compatible with Node `>=20 <23` and Bun `>=1.2 <1.4`.
+- Keep GitHub Release CI fixed to the reproducible Node `20.20.2` and Bun
+  `1.2.20` baseline.
+- Keep build-report actual versions, supported ranges, and baseline versions
+  explicit and independently verifiable.
 - Keep CI, security scan, product readiness, plugin smoke, and package lifecycle
   checks blocking on release-contract drift.
 - Re-run local release artifacts only when candidate code or bundled docs change.

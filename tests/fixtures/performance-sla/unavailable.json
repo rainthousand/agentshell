@@ -1,0 +1,17 @@
+{
+  "protocolVersion": "agentshell.performance-sla-sample.v1",
+  "source": {
+    "mode": "fixture",
+    "description": "Missing evidence must remain unavailable."
+  },
+  "measurements": {
+    "coldStartMs": null,
+    "overheadComparison": {
+      "comparable": false,
+      "baselineMs": 1000,
+      "agentshellMs": 1000
+    },
+    "compactEstimatedTokens": null,
+    "cacheComparison": null
+  }
+}

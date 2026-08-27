@@ -6,7 +6,7 @@ import { getProjectInfo, projectCommand } from "../core/project.js";
 const PROTOCOL_VERSION = "agentshell.understand.v1";
 
 export async function understand(root, options = {}) {
-  const project = getProjectInfo(root);
+  const project = options.project || getProjectInfo(root);
   const workspaceRoot = project?.root || root;
   const scripts = {};
 

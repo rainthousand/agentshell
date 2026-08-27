@@ -26,8 +26,14 @@ test("dashboard snapshots aggregate verified values without retaining workspace 
   assert.equal(report.savings.charsSavedVsRawVerify, 5400);
   assert.equal(report.savings.percentSavedVsRawVerify, 90);
   assert.equal(report.dashboard.totals.estimatedContextAvoidedTokens, 1350);
+  assert.equal(report.dashboard.verifiedSavings.last7Days.length, 7);
+  assert.equal(report.dashboard.verifiedSavings.allTime.contextTokens, 1350);
   assert.equal(report.dashboard.totals.successRate, 100);
   assert.equal(report.dashboard.coverage.evaluatedManagedRuns, 2);
+  assert.equal(report.tokenAccounting.rawCommandBaseline.availability, "available");
+  assert.equal(report.tokenAccounting.rawCommandBaseline.availableWorkspaceCount, 2);
+  assert.equal(report.tokenAccounting.agentShellActualOutput.outputChars, 600);
+  assert.equal(report.tokenAccounting.verifiedContextSaved.estimatedTokens, 1350);
   assert.equal(report.dashboard.latestTask.id, "run_snapshot-two");
   assert.doesNotMatch(JSON.stringify(report), new RegExp(escapeRegExp(first)));
   assert.doesNotMatch(JSON.stringify(report), new RegExp(escapeRegExp(second)));
@@ -35,6 +41,7 @@ test("dashboard snapshots aggregate verified values without retaining workspace 
     .map((file) => fs.readFileSync(path.join(home, ".agentshell", "dashboard-snapshots", file), "utf8")).join("\n");
   assert.doesNotMatch(stored, new RegExp(escapeRegExp(first)));
   assert.doesNotMatch(stored, new RegExp(escapeRegExp(second)));
+  assert.doesNotMatch(stored, /operation_snapshot-(one|two)/);
 });
 
 test("managed dashboard serves snapshots after the source workspace disappears", async () => {
@@ -69,6 +76,47 @@ test("empty snapshot storage returns an explicit unavailable global report", () 
   assert.equal(report.dashboard.freshness.status, "empty");
   assert.equal(report.dashboard.coverage.verifiedTokenSavingsAvailable, false);
   assert.equal(report.dashboard.totals.estimatedContextAvoidedTokens, null);
+  assert.equal(report.tokenAccounting.agentShellActualOutput.availability, "unavailable");
+  assert.equal(report.tokenAccounting.agentShellActualOutput.workspaceCount, 0);
+  assert.equal(report.dashboard.verifiedSavings.today.contextTokens, 0);
+  assert.equal(report.dashboard.verifiedSavings.allTime.timeMs, 0);
+});
+
+test("snapshot aggregation deduplicates a verified operation repeated by two workspaces", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-snapshot-dedup-"));
+  const now = Date.parse("2026-08-24T12:00:00.000Z");
+  const first = fixtureWorkspace("snapshot-duplicate-one", 400, 4000, now - Date.now());
+  const second = fixtureWorkspace("snapshot-duplicate-two", 400, 4000, now - Date.now());
+  rewriteOperationIdentity(first, "shared-operation", new Date(now - 1000).toISOString());
+  rewriteOperationIdentity(second, "shared-operation", new Date(now - 1000).toISOString());
+  writeDashboardSnapshot(first, await metrics(first, { compact: true, now, timeZone: "UTC" }), { home, now });
+  writeDashboardSnapshot(second, await metrics(second, { compact: true, now, timeZone: "UTC" }), { home, now });
+
+  const report = readGlobalDashboardSnapshot({ home, now, timeZone: "UTC" });
+  assert.equal(report.dashboard.verifiedSavings.today.contextTokens, 900);
+  assert.equal(report.dashboard.verifiedSavings.allTime.contextTokens, 900);
+});
+
+test("snapshot aggregation marks verified accounting partial when a legacy snapshot lacks exact attribution", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-snapshot-partial-"));
+  const currentRoot = fixtureWorkspace("snapshot-current", 200, 2000, -200);
+  const legacyRoot = fixtureWorkspace("snapshot-legacy", 300, 3000, -100);
+  const current = await metrics(currentRoot, { compact: true });
+  const legacy = await metrics(legacyRoot, { compact: true });
+  delete legacy.tokenAccounting;
+  writeDashboardSnapshot(currentRoot, current, { home });
+  writeDashboardSnapshot(legacyRoot, legacy, { home });
+
+  const report = readGlobalDashboardSnapshot({ home });
+
+  assert.equal(report.tokenAccounting.rawCommandBaseline.availability, "partial");
+  assert.equal(report.tokenAccounting.rawCommandBaseline.workspaceCount, 2);
+  assert.equal(report.tokenAccounting.rawCommandBaseline.availableWorkspaceCount, 1);
+  assert.equal(report.tokenAccounting.rawCommandBaseline.outputChars, 2000);
+  assert.equal(report.tokenAccounting.agentShellActualOutput.availability, "available");
+  assert.equal(report.tokenAccounting.agentShellActualOutput.availableWorkspaceCount, 2);
+  assert.equal(report.tokenAccounting.agentShellActualOutput.outputChars, 500);
+  assert.equal(report.tokenAccounting.verifiedContextSaved.availability, "partial");
 });
 
 test("corrupt snapshots are quarantined and excluded with path-free diagnostics", () => {
@@ -119,6 +167,7 @@ test("snapshot retention removes expired entries and bounds retained stale snaps
     maxSnapshots: 2
   });
   assert.equal(aggregate.report.workspaceCount, 2);
+  assert.equal(aggregate.report.dashboard.verifiedSavings.allTime.contextTokens, 900);
   assert.deepEqual(pickLifecycleCounts(aggregate.diagnostics), {
     discovered: 4,
     refreshed: 1,
@@ -131,6 +180,15 @@ test("snapshot retention removes expired entries and bounds retained stale snaps
   });
   const directory = path.join(home, ".agentshell", "dashboard-snapshots");
   assert.equal(fs.readdirSync(directory).filter((file) => file.endsWith(".json")).length, 2);
+  const afterPrune = readGlobalDashboardSnapshot({ home, now, retentionMs: 90 * day, maxSnapshots: 2 });
+  assert.equal(afterPrune.dashboard.verifiedSavings.allTime.contextTokens, 900);
+  for (const file of fs.readdirSync(directory).filter((entry) => entry.endsWith(".json"))) {
+    fs.unlinkSync(path.join(directory, file));
+  }
+  const ledgerOnly = readGlobalDashboardSnapshot({ home, now, retentionMs: 90 * day, maxSnapshots: 2 });
+  assert.equal(ledgerOnly.workspaceCount, 0);
+  assert.equal(ledgerOnly.dashboard.coverage.verifiedTokenSavingsAvailable, true);
+  assert.equal(ledgerOnly.dashboard.verifiedSavings.allTime.contextTokens, 900);
 });
 
 test("snapshot writes stay atomic and cleanup leaves active temporary files alone", async () => {
@@ -220,6 +278,18 @@ function fixtureWorkspace(name, eventChars, rawChars, updatedOffsetMs) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function rewriteOperationIdentity(root, id, createdAt) {
+  const state = path.join(root, ".agentshell");
+  const operation = JSON.parse(fs.readFileSync(path.join(state, "history.jsonl"), "utf8"));
+  operation.id = id;
+  operation.createdAt = createdAt;
+  fs.writeFileSync(path.join(state, "history.jsonl"), `${JSON.stringify(operation)}\n`);
+  const event = JSON.parse(fs.readFileSync(path.join(state, "events.jsonl"), "utf8"));
+  event.operationIds = [id];
+  event.createdAt = createdAt;
+  fs.writeFileSync(path.join(state, "events.jsonl"), `${JSON.stringify(event)}\n`);
 }
 
 function pickLifecycleCounts(diagnostics) {

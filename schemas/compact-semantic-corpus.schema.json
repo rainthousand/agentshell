@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/compact-semantic-corpus.schema.json",
+  "title": "AgentShell Compact Semantic Golden Corpus",
+  "type": "object",
+  "required": ["version", "fixtures"],
+  "properties": {
+    "version": { "enum": [1, 2] },
+    "acceptanceThreshold": { "$ref": "#/$defs/rate" },
+    "defaultLineTolerance": { "type": "integer", "minimum": 0 },
+    "gates": {
+      "type": "object",
+      "properties": {
+        "minimumErrorRecall": { "$ref": "#/$defs/rate" },
+        "minimumFileLocationAccuracy": { "$ref": "#/$defs/rate" },
+        "minimumLineAccuracy": { "$ref": "#/$defs/rate" },
+        "minimumDecisionConsistency": { "$ref": "#/$defs/rate" },
+        "minimumInformationRetention": { "$ref": "#/$defs/rate" },
+        "maximumExtraReadRisk": { "$ref": "#/$defs/rate" },
+        "minimumTokenReduction": { "$ref": "#/$defs/rate" }
+      },
+      "additionalProperties": false
+    },
+    "fixtures": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fixture" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "fixture": {
+      "type": "object",
+      "required": ["id", "language", "supported", "compact", "expected"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 1 },
+        "scenario": { "type": "string", "minLength": 1 },
+        "supported": { "type": "boolean" },
+        "baseline": {},
+        "compact": {
+          "type": "object",
+          "required": ["ok", "protocolVersion", "compact", "summary"],
+          "properties": {
+            "ok": { "type": "boolean" },
+            "protocolVersion": { "type": "string" },
+            "compact": { "const": true },
+            "summary": {}
+          },
+          "additionalProperties": true
+        },
+        "expected": { "$ref": "#/$defs/expected" }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "properties": {
+        "mainError": { "$ref": "#/$defs/textExpectation" },
+        "errors": { "type": "array", "minItems": 1, "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textExpectation" }] } },
+        "locations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/location" } },
+        "nextActions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/action" } },
+        "decisions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/decision" } },
+        "criticalFacts": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "necessaryFacts": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "forbiddenFacts": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "lineTolerance": { "type": "integer", "minimum": 0 },
+        "additionalRead": {
+          "type": "object",
+          "required": ["allowed"],
+          "properties": {
+            "allowed": { "type": "boolean" },
+            "disallowedPatterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        { "anyOf": [{ "required": ["mainError"] }, { "required": ["errors"] }] },
+        { "required": ["locations"] },
+        { "anyOf": [{ "required": ["nextActions"] }, { "required": ["decisions"] }] },
+        { "anyOf": [{ "required": ["criticalFacts"] }, { "required": ["necessaryFacts"] }] }
+      ]
+    },
+    "textExpectation": {
+      "type": "object",
+      "required": ["anyOf"],
+      "properties": { "anyOf": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } } },
+      "additionalProperties": false
+    },
+    "location": {
+      "type": "object",
+      "required": ["file", "line"],
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "lineTolerance": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["command"],
+      "properties": { "command": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "anyOf": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      },
+      "additionalProperties": false,
+      "anyOf": [{ "required": ["command"] }, { "required": ["anyOf"] }]
+    }
+  }
+}

@@ -2,17 +2,21 @@ import { doctor } from "./doctor.js";
 import { understand } from "./understand.js";
 import { runNext } from "./run-status.js";
 import { createProfile } from "../core/profile.js";
+import { getProjectInfo } from "../core/project.js";
 
 const PROTOCOL_VERSION = "agentshell.start.v1";
 
 export async function start(root, options = {}) {
   const profile = options.profile ? createProfile() : null;
+  const project = profile
+    ? profile.measureSync("project", () => getProjectInfo(root))
+    : getProjectInfo(root);
   const doctorResult = profile
-    ? await profile.measure("doctor", () => doctor(root))
-    : await doctor(root);
+    ? await profile.measure("doctor", () => doctor(root, { project }))
+    : await doctor(root, { project });
   const understandResult = profile
-    ? await profile.measure("understand-compact", () => understand(root, { compact: true }))
-    : await understand(root, { compact: true });
+    ? await profile.measure("understand-compact", () => understand(root, { compact: true, project }))
+    : await understand(root, { compact: true, project });
   const nextResult = profile
     ? profile.measureSync("run-next", () => runNext(root))
     : runNext(root);

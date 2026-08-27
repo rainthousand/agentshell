@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -39,6 +39,8 @@ test("plugin doctor local passes with dry local fixture paths", () => {
   assert.equal(output.paths.cachePath, join(fixture.cacheRoot, "0.24.0+codex.fixture"));
   assert.equal(output.summary.failed, 0);
   assert.equal(output.summary.warnings, 0);
+  assert.equal(output.integrity.matches, true);
+  assert.equal(output.activation.ok, true);
   assert.equal(output.primaryNextAction, null);
   assert.deepEqual(output.suggestedNextActions, []);
 });
@@ -54,7 +56,7 @@ test("plugin doctor local reports cache mismatch with suggested next actions", (
   assert.equal(result.status, 1);
   const output = JSON.parse(result.stdout);
   assert.equal(output.ok, false);
-  assert.equal(output.summary.failed, 1);
+  assert(output.summary.failed >= 1);
   assert(
     output.checks.some((check) => check.name === "codex plugin cache manifest matches source manifest" && !check.ok)
   );
@@ -99,7 +101,7 @@ test("plugin doctor local reports cache developer metadata mismatch with suggest
   assert.equal(result.status, 1);
   const output = JSON.parse(result.stdout);
   assert.equal(output.ok, false);
-  assert.equal(output.summary.failed, 1);
+  assert(output.summary.failed >= 1);
   const mismatchCheck = output.checks.find(
     (check) => check.name === "codex plugin cache manifest matches source manifest"
   );
@@ -141,6 +143,9 @@ test("plugin doctor local exposes markdown summary output", () => {
   assert.match(result.stdout, /^# Agentshell Plugin Doctor Local/m);
   assert.match(result.stdout, /^Status: FAIL$/m);
   assert.match(result.stdout, /^Marketplace: `/m);
+  assert.match(result.stdout, /^Source hash: `/m);
+  assert.match(result.stdout, /^Installed hash: `/m);
+  assert.match(result.stdout, /^Content match: no$/m);
   assert.match(result.stdout, /^Primary next action: Run `npm run plugin:install-local`/m);
   assert.match(result.stdout, /Suggested: Run `npm run plugin:install-local`/);
 });
@@ -190,6 +195,22 @@ function writePluginManifest(root, version, metadata = {}) {
     },
     skills: "./skills/"
   }, null, 2)}\n`);
+  mkdirSync(join(root, "bin"), { recursive: true });
+  mkdirSync(join(root, "skills", "agentshell"), { recursive: true });
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "package.json"), '{"name":"agentshell","type":"module"}\n');
+  writeFileSync(join(root, "src", "cli.js"), "// fixture cli\n");
+  writeFileSync(join(root, "skills", "agentshell", "SKILL.md"), [
+    "agentshell start --compact",
+    "agentshell verify test --compact",
+    "agentshell grep <query> --compact",
+    ""
+  ].join("\n"));
+  for (const name of ["agentshell", "agentshell-mcp"]) {
+    const file = join(root, "bin", name);
+    writeFileSync(file, '#!/usr/bin/env node\nconsole.log(JSON.stringify({ok:true,protocolVersion:"agentshell.manual.v1"}));\n');
+    chmodSync(file, 0o755);
+  }
 }
 
 function writeMarketplace(home, policy = { installation: "AVAILABLE" }) {

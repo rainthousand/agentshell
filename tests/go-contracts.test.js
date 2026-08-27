@@ -12,6 +12,18 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
 }
 
+function readSkillBundle() {
+  const skillRoot = path.join(root, "skills", "agentshell");
+  const sources = [fs.readFileSync(path.join(skillRoot, "SKILL.md"), "utf8")];
+  const referencesRoot = path.join(skillRoot, "references");
+  for (const entry of fs.readdirSync(referencesRoot, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".md")) {
+      sources.push(fs.readFileSync(path.join(referencesRoot, entry.name), "utf8"));
+    }
+  }
+  return sources.join("\n");
+}
+
 function run(args, cwd) {
   const result = spawnSync(process.execPath, [cli, ...args], {
     cwd,
@@ -84,7 +96,7 @@ test("Go workspace discovery keeps runtime response shapes aligned", () => {
 test("Go documentation keeps verification and repair boundaries explicit", () => {
   const docs = [
     fs.readFileSync(path.join(root, "README.md"), "utf8"),
-    fs.readFileSync(path.join(root, "skills", "agentshell", "SKILL.md"), "utf8"),
+    readSkillBundle(),
     fs.readFileSync(path.join(root, "docs", "compatibility.md"), "utf8")
   ].join("\n");
 

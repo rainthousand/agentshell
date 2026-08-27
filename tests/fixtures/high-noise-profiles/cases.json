@@ -1,0 +1,118 @@
+[
+  {
+    "id": "docker-logs",
+    "command": ["docker", "logs", "api"],
+    "exitCode": 1,
+    "output": "2026-08-24T10:00:00Z INFO ready\n2026-08-24T10:00:01Z ERROR database connection refused\n",
+    "message": "database connection refused"
+  },
+  {
+    "id": "docker-compose-logs",
+    "command": "docker compose logs api",
+    "exitCode": 1,
+    "output": "api-1  | INFO booting\napi-1  | FATAL migration failed\n",
+    "message": "migration failed"
+  },
+  {
+    "id": "kubectl-logs",
+    "command": ["kubectl", "-n", "prod", "logs", "api-123"],
+    "exitCode": 1,
+    "output": "INFO request complete\npanic: runtime error: invalid memory address\n",
+    "message": "runtime error"
+  },
+  {
+    "id": "kubectl-describe",
+    "command": "kubectl describe pod api-123",
+    "exitCode": 1,
+    "output": "Events:\n  Warning  Failed  2m  kubelet  Failed to pull image private/api:latest\n",
+    "message": "pull image"
+  },
+  {
+    "id": "kubectl-get",
+    "command": "oc get deployment api",
+    "exitCode": 1,
+    "output": "Error from server (NotFound): deployments.apps \"api\" not found\n",
+    "message": "not found"
+  },
+  {
+    "id": "make",
+    "command": "make test",
+    "exitCode": 2,
+    "output": "src/main.c:42:7: error: use of undeclared identifier 'result'\nmake: *** [build] Error 1\n",
+    "message": "undeclared identifier",
+    "file": "src/main.c",
+    "line": 42
+  },
+  {
+    "id": "cargo-test",
+    "command": "cargo test parser",
+    "exitCode": 101,
+    "output": "error[E0308]: mismatched types\n  --> src/parser.rs:18:9\n   |\n18 | value\n   | ^^^^^ expected usize, found String\n",
+    "message": "mismatched types",
+    "file": "src/parser.rs",
+    "line": 18
+  },
+  {
+    "id": "dotnet-test",
+    "command": "dotnet test App.Tests",
+    "exitCode": 1,
+    "output": "/repo/Parser.cs(31,14): error CS0103: The name 'token' does not exist in the current context [App.csproj]\n",
+    "message": "does not exist",
+    "file": "/repo/Parser.cs",
+    "line": 31
+  },
+  {
+    "id": "terraform-plan",
+    "command": "terraform plan",
+    "exitCode": 1,
+    "output": "Error: Unsupported argument\n\n  on main.tf line 12, in resource \"aws_s3_bucket\" \"assets\":\n  12: invalid = true\n",
+    "message": "Unsupported argument",
+    "file": "main.tf",
+    "line": 12
+  },
+  {
+    "id": "terraform-validate",
+    "command": "terraform validate",
+    "exitCode": 1,
+    "output": "{\"valid\":false,\"diagnostics\":[{\"severity\":\"error\",\"summary\":\"Missing required argument\",\"detail\":\"The argument region is required.\",\"range\":{\"filename\":\"main.tf\",\"start\":{\"line\":5,\"column\":3}}}]}",
+    "message": "Missing required argument",
+    "file": "main.tf",
+    "line": 5
+  },
+  {
+    "id": "maven",
+    "command": "./mvnw test",
+    "exitCode": 1,
+    "output": "[ERROR] /repo/src/main/java/App.java:[17,9] cannot find symbol\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:compile\n",
+    "message": "cannot find symbol",
+    "file": "/repo/src/main/java/App.java",
+    "line": 17
+  },
+  {
+    "id": "gradle",
+    "command": "./gradlew test",
+    "exitCode": 1,
+    "output": "> Task :compileJava FAILED\nsrc/main/java/App.java:21: error: cannot find symbol\nFAILURE: Build failed with an exception.\n",
+    "message": "cannot find symbol",
+    "file": "src/main/java/App.java",
+    "line": 21
+  },
+  {
+    "id": "ruff",
+    "command": "ruff check .",
+    "exitCode": 1,
+    "output": "src/api.py:9:5: F841 Local variable `response` is assigned to but never used\n",
+    "message": "never used",
+    "file": "src/api.py",
+    "line": 9
+  },
+  {
+    "id": "mypy",
+    "command": "mypy src",
+    "exitCode": 1,
+    "output": "src/api.py:27: error: Incompatible return value type (got \"str\", expected \"int\") [return-value]\n",
+    "message": "Incompatible return value",
+    "file": "src/api.py",
+    "line": 27
+  }
+]

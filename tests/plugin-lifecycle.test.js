@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { doctor, installOrUpdate, migrateLegacyDashboardJob, rollback, uninstall } from "../scripts/plugin-lifecycle.js";
+import { doctor, installOrUpdate, migrateLegacyDashboardJob, refreshCache, rollback, uninstall } from "../scripts/plugin-lifecycle.js";
 
 test("plugin lifecycle installs, updates, diagnoses, rolls back, and uninstalls", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-lifecycle-"));
@@ -42,6 +42,39 @@ test("plugin lifecycle restores the previous install after a post-swap failure",
   assert.equal(failed.ok, false);
   assert.equal(failed.rolledBack, true);
   assert.equal(fs.readFileSync(marker, "utf8"), "keep me");
+});
+
+test("plugin lifecycle refuses a destructive rollback when the backup is missing", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-lifecycle-missing-backup-"));
+  const options = { home, platform: "linux" };
+  assert.equal(installOrUpdate(options).ok, true);
+  const marker = path.join(home, "plugins", "agentshell", "current.txt");
+  fs.writeFileSync(marker, "current");
+  assert.equal(installOrUpdate(options).ok, true);
+  const transaction = JSON.parse(fs.readFileSync(path.join(home, ".agentshell", "last-install.json"), "utf8"));
+  fs.rmSync(transaction.backup, { recursive: true, force: true });
+
+  const result = rollback({ home });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "backup-missing");
+  assert.equal(fs.existsSync(path.join(home, "plugins", "agentshell")), true);
+});
+
+test("plugin lifecycle refreshes only the generated Codex cache", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "agentshell-lifecycle-cache-"));
+  const cache = path.join(home, ".codex", "plugins", "cache", "personal", "agentshell");
+  const plugin = path.join(home, "plugins", "agentshell");
+  fs.mkdirSync(cache, { recursive: true });
+  fs.mkdirSync(plugin, { recursive: true });
+  fs.writeFileSync(path.join(cache, "stale"), "stale");
+  fs.writeFileSync(path.join(plugin, "keep"), "keep");
+
+  const result = refreshCache({ home });
+
+  assert.equal(result.status, "refreshed");
+  assert.equal(fs.existsSync(cache), false);
+  assert.equal(fs.readFileSync(path.join(plugin, "keep"), "utf8"), "keep");
 });
 
 test("plugin lifecycle removes the exact legacy dashboard job during install, update, and uninstall", () => {

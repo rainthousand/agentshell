@@ -14,7 +14,8 @@ test("help exposes the complete verify command surface", () => {
 
   assert.equal(result.status, 0, result.stderr);
   const output = JSON.parse(result.stdout);
-  assert.ok(output.commands.includes("agentshell verify test [--profile fast|race|coverage] [--compact] [--tail N]"));
+  assert.ok(output.commands.includes("agentshell verify test [--profile fast|race|coverage] [--compact] [--tail N] [--no-cache]"));
+  assert.ok(output.commands.includes("agentshell verify cache <explain|clear> [--compact]"));
   assert.ok(output.commands.includes("agentshell verify <build|lint|format|modules|generate> [--compact] [--tail N]"));
   assert.ok(output.commands.includes("agentshell verify benchmark [--bench REGEX] [--compact] [--tail N]"));
   assert.ok(output.commands.includes("agentshell verify fuzz --fuzz TARGET [--duration DURATION] --package PACKAGE [--compact] [--tail N]"));

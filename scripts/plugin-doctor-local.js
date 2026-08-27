@@ -112,6 +112,10 @@ function formatMarkdownReport(report) {
     `Manifest: \`${report.paths.manifest}\``,
     `Marketplace: \`${report.paths.marketplace}\``,
     `Cache: \`${report.paths.cachePath || "unknown"}\``,
+    `Source hash: \`${report.integrity?.source?.hash || "unavailable"}\``,
+    `Installed hash: \`${report.integrity?.installed?.hash || "unavailable"}\``,
+    `Content match: ${report.integrity?.matches === true ? "yes" : "no"}`,
+    `Installed activation: ${report.activation?.ok === true ? "pass" : "fail"}`,
     `Checks: ${report.summary.passed}/${report.summary.total} passed`
   ];
 

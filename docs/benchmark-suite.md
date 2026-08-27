@@ -50,7 +50,7 @@ report includes a `thresholds` object with `ok`, `maxFixTokens`, and detailed
 - `split` and `fix` must pass;
 - `split` and `fix` must expose rollback guidance;
 - `fix` must use no more than 1 command;
-- `fix` must use no more than 275 estimated tokens. The ceiling includes the
+- `fix` must use no more than 280 estimated tokens. The ceiling includes the
   verification operation IDs required for exact savings attribution.
 
 The fix token ceiling can be overridden without adding a config file:

@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { auditReleaseSource } from "./release-source-audit.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 const PROTOCOL_VERSION = "agentshell.product-readiness.v1";
@@ -32,6 +33,13 @@ const REQUIRED_FILES = [
   "docs/adapters/trial-suite.md",
   "docs/adapters/trial-suite-playbook.md",
   "skills/agentshell/SKILL.md",
+  "skills/agentshell/references/core-workflow.md",
+  "skills/agentshell/references/search-and-read.md",
+  "skills/agentshell/references/verify-and-repair.md",
+  "skills/agentshell/references/go-workflows.md",
+  "skills/agentshell/references/generic-exec.md",
+  "skills/agentshell/references/metrics-and-trial.md",
+  "skills/agentshell/references/plugin-maintenance.md",
   "scripts/plugin-smoke.js",
   "scripts/plugin-activation-smoke.js",
   "scripts/plugin-release-local.js",
@@ -51,6 +59,8 @@ const REQUIRED_FILES = [
   "src/core/package-root.js",
   "src/core/dashboard-service.js",
   "src/core/support-bundle.js",
+  "src/core/command-registry.js",
+  "src/core/compact-budget.js",
   "src/commands/setup-codex.js",
   "src/commands/dashboard.js",
   "src/dashboard/index.html",
@@ -71,6 +81,72 @@ const REQUIRED_FILES = [
   "scripts/package-lifecycle-smoke.js",
   "scripts/v1-clean-machine-smoke.js",
   "scripts/support-bundle.js",
+  "scripts/run-test-tier.js",
+  "scripts/compact-contract-audit.js",
+  "scripts/compact-semantic-evaluator.js",
+  "scripts/performance-sla.js",
+  "scripts/performance-sla-probe.js",
+  "scripts/runtime-benchmark.js",
+  "scripts/skill-performance.js",
+  "scripts/skill-ab-eval.js",
+  "docs/performance-sla.md",
+  "docs/skill-performance.md",
+  "docs/cli-startup-performance.md",
+  "docs/adaptive-coverage.md",
+  "docs/runtime-daemon.md",
+  "docs/compact-semantic-quality.md",
+  "docs/workspace-workflows.md",
+  "docs/go-focused-verify.md",
+  "docs/change-aware-workflows.md",
+  "docs/workspace-audit.md",
+  "docs/read-batch.md",
+  "docs/go-locate.md",
+  "docs/job-management.md",
+  "examples/compact-semantic-quality/golden-corpus.json",
+  "src/core/attribution.js",
+  "src/core/command-coverage.js",
+  "src/core/adaptive-coverage.js",
+  "src/core/runtime-daemon.js",
+  "src/core/workspace-guard.js",
+  "src/core/compare-search.js",
+  "src/core/go-focused-verify.js",
+  "src/core/verify-changed.js",
+  "src/core/boundary-check.js",
+  "src/core/workspace-audit.js",
+  "src/core/batch-read.js",
+  "src/core/go-locator.js",
+  "src/core/job-manager.js",
+  "src/commands/coverage.js",
+  "src/commands/runtime.js",
+  "src/commands/workspace-guard.js",
+  "src/commands/compare-search.js",
+  "src/commands/verify-go.js",
+  "src/commands/verify-changed.js",
+  "src/commands/boundary-check.js",
+  "src/commands/workspace-audit.js",
+  "src/commands/read-batch.js",
+  "src/commands/go-locate.js",
+  "src/commands/job.js",
+  "src/commands/exec.js",
+  "src/commands/log-delta.js",
+  "src/core/bounded-process.js",
+  "src/core/high-noise-profiles.js",
+  "src/core/go-command-profiles.js",
+  "src/core/go-query-command-profiles.js",
+  "src/core/go-performance-command-profiles.js",
+  "src/core/go-quality-command-profiles.js",
+  "src/core/go-dev-command-profiles.js",
+  "src/core/incremental-log.js",
+  "src/core/verified-savings.js",
+  "src/cli.js",
+  "src/cli-runtime.js",
+  "scripts/coverage-adapter-ingest.js",
+  "scripts/adaptive-coverage.js",
+  "docs/generic-exec.md",
+  "docs/high-noise-command-profiles.md",
+  "docs/go-command-profiles.md",
+  "docs/incremental-log.md",
+  "docs/adapters/command-observation-contract.md",
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",
   "CHANGELOG.md",
@@ -98,7 +174,25 @@ const REQUIRED_FILES = [
   "schemas/beta-funnel.schema.json",
   "schemas/dashboard.schema.json",
   "schemas/strategy-intake.schema.json",
-  "schemas/product-readiness.schema.json"
+  "schemas/product-readiness.schema.json",
+  "schemas/command-coverage.schema.json",
+  "schemas/adaptive-coverage.schema.json",
+  "schemas/runtime.schema.json",
+  "schemas/workspace-guard.schema.json",
+  "schemas/compare-search.schema.json",
+  "schemas/verify-go.schema.json",
+  "schemas/verify-changed.schema.json",
+  "schemas/boundary-check.schema.json",
+  "schemas/workspace-audit.schema.json",
+  "schemas/read-batch.schema.json",
+  "schemas/go-locate.schema.json",
+  "schemas/job.schema.json",
+  "schemas/compact-semantic-corpus.schema.json",
+  "schemas/compact-semantic-report.schema.json",
+  "schemas/performance-sla.schema.json",
+  "schemas/exec.schema.json",
+  "schemas/log-delta.schema.json",
+  "schemas/high-noise-profile-summary.schema.json"
 ];
 
 const REQUIRED_PACKAGE_SCRIPTS = [
@@ -124,6 +218,15 @@ const REQUIRED_PACKAGE_SCRIPTS = [
   "product:readiness",
   "product:readiness:heavy",
   "performance:summary",
+  "performance:sla:gate",
+  "performance:sla:probe",
+  "benchmark:runtime",
+    "quality:compact-semantic",
+    "quality:skill",
+    "quality:skill:ab",
+  "coverage:adapter:ingest",
+  "coverage:adaptive",
+  "runtime:status",
   "dashboard",
   "dashboard:build-app",
   "build:standalone",
@@ -177,7 +280,25 @@ const REQUIRED_SCHEMA_NAMES = [
   "beta-funnel",
   "dashboard",
   "strategy-intake",
-  "product-readiness"
+  "product-readiness",
+  "command-coverage",
+  "adaptive-coverage",
+  "runtime",
+  "workspace-guard",
+  "compare-search",
+  "verify-go",
+  "verify-changed",
+  "boundary-check",
+  "workspace-audit",
+  "read-batch",
+  "go-locate",
+  "job",
+  "compact-semantic-corpus",
+  "compact-semantic-report",
+  "performance-sla",
+  "exec",
+  "log-delta",
+  "high-noise-profile-summary"
 ];
 
 export function buildProductReadinessReport(projectRoot = root, options = {}) {
@@ -189,6 +310,7 @@ export function buildProductReadinessReport(projectRoot = root, options = {}) {
     checkAgentFacingGuidance(projectRoot),
     checkReadmeEntryPoints(projectRoot),
     checkSharePackage(projectRoot),
+    checkReleaseSource(projectRoot, options),
     checkProductBoundary(projectRoot),
     checkEvidenceDocs(projectRoot),
     checkDeferredMcp(projectRoot)
@@ -208,6 +330,17 @@ export function buildProductReadinessReport(projectRoot = root, options = {}) {
     summary: summarize(checks),
     checks
   };
+}
+
+function checkReleaseSource(projectRoot, options) {
+  const report = auditReleaseSource(projectRoot, options.releaseSourceAuditOptions);
+  return check({
+    id: "release-source-audit",
+    name: "Release package is built from tracked, bounded sources",
+    severity: BLOCKING,
+    status: report.ok ? "pass" : "fail",
+    details: report
+  });
 }
 
 function checkSharePackage(projectRoot) {
@@ -298,7 +431,7 @@ function checkPackageScripts(projectRoot) {
 }
 
 function checkSchemaRegistry(projectRoot) {
-  const source = readText(projectRoot, "src/commands/schema.js");
+  const source = readText(projectRoot, "src/core/command-registry.js");
   const missing = REQUIRED_SCHEMA_NAMES.filter((name) => !source.includes(`"${name}"`));
   return check({
     id: "schema-registry",
@@ -349,7 +482,9 @@ function checkAgentFacingGuidance(projectRoot) {
   ];
   const missing = [];
   for (const file of files) {
-    const text = readText(projectRoot, file);
+    const text = file === "skills/agentshell/SKILL.md"
+      ? readSkillGuidance(projectRoot)
+      : readText(projectRoot, file);
     for (const needle of requiredText) {
       if (!text.includes(needle) && !text.includes("agentshell manual --topic repair|plugin|benchmark|profile|onboarding|log-triage|reference")) {
         missing.push({ file, text: needle });
@@ -363,6 +498,20 @@ function checkAgentFacingGuidance(projectRoot) {
     status: missing.length === 0 ? "pass" : "fail",
     details: { missing }
   });
+}
+
+function readSkillGuidance(projectRoot) {
+  const skillRoot = path.join(projectRoot, "skills", "agentshell");
+  const referencesRoot = path.join(skillRoot, "references");
+  const sources = [fs.readFileSync(path.join(skillRoot, "SKILL.md"), "utf8")];
+  if (fs.existsSync(referencesRoot)) {
+    for (const entry of fs.readdirSync(referencesRoot, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(".md")) {
+        sources.push(fs.readFileSync(path.join(referencesRoot, entry.name), "utf8"));
+      }
+    }
+  }
+  return sources.join("\n");
 }
 
 function checkReadmeEntryPoints(projectRoot) {

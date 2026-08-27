@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentshell.local/schemas/compare-search.schema.json",
+  "title": "AgentShell Compare Search Response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "protocolVersion", "compact", "query", "mode", "caseSensitive", "summary", "roots", "privacy", "suggestedNextActions"],
+      "properties": {
+        "ok": { "const": true },
+        "protocolVersion": { "const": "agentshell.compare-search.v1" },
+        "compact": { "type": "boolean" },
+        "query": { "type": "string", "minLength": 1 },
+        "mode": { "enum": ["literal", "regex"] },
+        "caseSensitive": { "type": "boolean" },
+        "summary": {
+          "type": "object",
+          "required": ["rootCount", "rootsWithMatches", "observedMatches", "returnedMatches", "omittedMatches", "truncated", "limits"],
+          "properties": {
+            "rootCount": { "type": "integer", "minimum": 2 },
+            "rootsWithMatches": { "type": "integer", "minimum": 0 },
+            "observedMatches": { "type": "integer", "minimum": 0 },
+            "returnedMatches": { "type": "integer", "minimum": 0 },
+            "omittedMatches": { "type": "integer", "minimum": 0 },
+            "truncated": { "type": "boolean" },
+            "limits": {
+              "type": "object",
+              "required": ["maxMatches", "maxMatchesPerRoot", "maxMatchesPerFile", "previewChars"],
+              "properties": {
+                "maxMatches": { "type": "integer", "minimum": 1, "maximum": 200 },
+                "maxMatchesPerRoot": { "type": "integer", "minimum": 1, "maximum": 50 },
+                "maxMatchesPerFile": { "type": "integer", "minimum": 1, "maximum": 20 },
+                "previewChars": { "type": "integer", "minimum": 40, "maximum": 500 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "roots": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["rootId", "name", "engine", "observedMatches", "returnedMatches", "omittedMatches", "matches", "truncated"],
+            "properties": {
+              "rootId": { "type": "string", "pattern": "^root-[1-9][0-9]*$" },
+              "name": { "type": "string", "minLength": 1 },
+              "engine": { "enum": ["rg", "node-fallback"] },
+              "observedMatches": { "type": "integer", "minimum": 0 },
+              "returnedMatches": { "type": "integer", "minimum": 0 },
+              "omittedMatches": { "type": "integer", "minimum": 0 },
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["file", "line", "column", "preview"],
+                  "properties": {
+                    "file": { "type": "string", "minLength": 1 },
+                    "line": { "type": "integer", "minimum": 1 },
+                    "column": { "type": "integer", "minimum": 1 },
+                    "preview": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "truncated": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "required": ["workspacePathsExposed", "previewsMayContainSourceText", "secretLikeValuesRedacted", "networkUpload"],
+          "properties": {
+            "workspacePathsExposed": { "const": false },
+            "previewsMayContainSourceText": { "const": true },
+            "secretLikeValuesRedacted": { "const": true },
+            "networkUpload": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "suggestedNextActions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "common.schema.json#/$defs/suggestedNextAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/failure" }
+  ]
+}

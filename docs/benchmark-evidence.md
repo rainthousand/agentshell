@@ -97,7 +97,7 @@ these gates: raw failure reproduced, split repair passed, fix repair passed,
 rollback guidance was available for split and fix, fix used one command, and
 fix stayed under the historical v0.24 token ceiling.
 
-The current 275-token ceiling additionally carries verification operation IDs
+The current 280-token ceiling additionally carries verification operation IDs
 for exact savings attribution.
 
 For the detailed schema and per-case fields, see `docs/benchmark-suite.md`.
